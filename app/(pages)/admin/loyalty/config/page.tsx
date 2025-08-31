@@ -145,7 +145,7 @@ export default function LoyaltyConfigPage() {
     }))
   }
 
-  const updateTier = (index: number, field: keyof LoyaltyTier, value: any) => {
+  const updateTier = (index: number, field: keyof LoyaltyTier, value: string | number) => {
     setConfig(prev => ({
       ...prev,
       tiers: prev.tiers.map((tier, i) => 

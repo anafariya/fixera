@@ -141,7 +141,13 @@ export const validateVATWithAPI = async (vatNumber: string): Promise<VatValidati
 };
 
 // Update user VAT number
-export const updateUserVAT = async (vatNumber: string): Promise<{ success: boolean; error?: string; user?: any }> => {
+interface UpdateVATResponse {
+  success: boolean;
+  error?: string;
+  user?: unknown;
+}
+
+export const updateUserVAT = async (vatNumber: string): Promise<UpdateVATResponse> => {
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/vat`, {
       method: 'PUT',
