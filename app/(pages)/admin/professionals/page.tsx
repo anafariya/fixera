@@ -5,8 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
-import { User, Mail, Phone, Calendar, FileText, CheckCircle, XCircle, Eye, LucideChartNoAxesColumn, ClosedCaption } from "lucide-react"
+import { useEffect, useState, useCallback } from "react"
+import { User, Phone, Calendar, CheckCircle, XCircle, Eye, LucideChartNoAxesColumn, ClosedCaption } from "lucide-react"
 
 interface Professional {
   _id: string;
@@ -51,13 +51,7 @@ export default function ProfessionalsAdminPage() {
     }
   }, [isAuthenticated, loading, user, router])
 
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      fetchProfessionals()
-    }
-  }, [user, status])
-
-  const fetchProfessionals = async () => {
+  const fetchProfessionals = useCallback(async () => {
     setIsLoading(true)
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/professionals?status=${status}`, {
@@ -72,7 +66,13 @@ export default function ProfessionalsAdminPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [status])
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetchProfessionals()
+    }
+  }, [user, status, fetchProfessionals])
 
   const handleAction = async (professionalId: string, action: 'approve' | 'reject' | 'suspend', reason?: string) => {
     setActionLoading(professionalId)

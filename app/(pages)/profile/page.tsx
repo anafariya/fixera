@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { User, Mail, Phone, Shield, Calendar, Building, Check, X, AlertCircle, Loader2, Upload, FileText, Clock, MapPin, DollarSign, Tags, CalendarX } from "lucide-react"
+import { User, Mail, Phone, Shield, Calendar, Building, Check, X, AlertCircle, Loader2, Upload, FileText, Clock, CalendarX } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
@@ -84,7 +84,21 @@ export default function ProfilePage() {
       if (user.hourlyRate) setHourlyRate(user.hourlyRate.toString())
       if (user.currency) setCurrency(user.currency)
       if (user.serviceCategories) setServiceCategories(user.serviceCategories)
-      if (user.availability) setAvailability(prev => ({ ...prev, ...user.availability }))
+      if (user.availability) {
+        setAvailability(prev => {
+          const updated = { ...prev }
+          Object.entries(user.availability!).forEach(([day, dayAvailability]) => {
+            if (dayAvailability) {
+              updated[day as keyof typeof updated] = {
+                available: dayAvailability.available,
+                startTime: dayAvailability.startTime || '09:00',
+                endTime: dayAvailability.endTime || '17:00'
+              }
+            }
+          })
+          return updated
+        })
+      }
       if (user.blockedDates) setBlockedDates(user.blockedDates)
     }
   }, [user])
@@ -131,7 +145,7 @@ export default function ProfilePage() {
         companyName: result.companyName,
         companyAddress: result.companyAddress
       })
-    } catch (error) {
+    } catch {
       setVatValidation({
         valid: false,
         error: 'Failed to validate VAT number'
@@ -156,7 +170,7 @@ export default function ProfilePage() {
       } else {
         toast.error(result.error || 'Failed to update VAT number')
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to update VAT number')
     } finally {
       setVatSaving(false)
@@ -176,7 +190,7 @@ export default function ProfilePage() {
       } else {
         toast.error(result.error || 'Failed to remove VAT number')
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to remove VAT number')
     } finally {
       setVatSaving(false)
@@ -207,7 +221,7 @@ export default function ProfilePage() {
       } else {
         toast.error(result.msg || 'Failed to upload ID proof')
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to upload ID proof')
     } finally {
       setUploading(false)
@@ -241,7 +255,7 @@ export default function ProfilePage() {
       } else {
         toast.error(result.msg || 'Failed to update profile')
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to update profile')
     } finally {
       setProfileSaving(false)
@@ -871,7 +885,7 @@ export default function ProfilePage() {
                     Blocked Dates
                   </CardTitle>
                   <CardDescription>
-                    Block specific dates when you're not available for work
+                    Block specific dates when you&apos;re not available for work
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -936,7 +950,7 @@ export default function ProfilePage() {
                     <div className="text-center py-8 text-gray-500">
                       <CalendarX className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                       <p className="text-sm">No blocked dates set</p>
-                      <p className="text-xs">Add dates when you're not available for work</p>
+                      <p className="text-xs">Add dates when you&apos;re not available for work</p>
                     </div>
                   )}
 
