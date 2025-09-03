@@ -31,7 +31,7 @@ interface ApprovalStats {
 }
 
 export default function DashboardPage() {
-  const { user, isAuthenticated, loading, logout } = useAuth()
+  const { user, isAuthenticated, loading } = useAuth()
   const router = useRouter()
   const [loyaltyStats, setLoyaltyStats] = useState<LoyaltyStats | null>(null)
   const [approvalStats, setApprovalStats] = useState<ApprovalStats | null>(null)
@@ -105,9 +105,6 @@ export default function DashboardPage() {
               </h1>
               <p className="text-gray-600">Welcome back, {user?.name}! Manage your platform here.</p>
             </div>
-            <Button onClick={logout} variant="outline">
-              Logout
-            </Button>
           </div>
 
           <Tabs defaultValue="overview" className="space-y-6">
@@ -430,9 +427,6 @@ export default function DashboardPage() {
 
         {/* Action Buttons */}
         <div className="mt-8 flex gap-4">
-          <Button onClick={logout} variant="outline">
-            Logout
-          </Button>
           {(!user?.isEmailVerified || !user?.isPhoneVerified) && (
             <Button onClick={() => router.push('/verify-phone')}>
               Complete Verification
