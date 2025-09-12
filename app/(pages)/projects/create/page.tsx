@@ -27,7 +27,7 @@ export default function ProjectCreatePage() {
               Under Construction
             </CardTitle>
             <CardDescription className="text-lg mt-3 text-gray-600">
-              We're building something amazing for you!
+              We&apos;re building something amazing for you!
             </CardDescription>
           </CardHeader>
           
