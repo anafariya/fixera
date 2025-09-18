@@ -216,7 +216,7 @@ export default function ProjectCreatePage() {
 
       console.log('Saving project data:', dataToSave)
 
-      const response = await fetch('/api/projects/draft', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/projects/draft`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -319,7 +319,7 @@ export default function ProjectCreatePage() {
         projectId = savedProject._id
       }
 
-      const response = await fetch(`/api/projects/${projectId}/submit`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/projects/${projectId}/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

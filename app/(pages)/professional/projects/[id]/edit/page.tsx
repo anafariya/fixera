@@ -236,7 +236,7 @@ export default function ProjectEditPage() {
     try {
       // First save the changes
       console.log('Saving project changes...');
-      const saveResponse = await fetch('/api/projects/draft', {
+      const saveResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/projects/draft`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -257,7 +257,7 @@ export default function ProjectEditPage() {
 
       // Then submit for approval
       const submitResponse = await fetch(
-        `/api/projects/${project._id}/submit`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/projects/${project._id}/submit`,
         {
           method: 'POST',
           headers: {
