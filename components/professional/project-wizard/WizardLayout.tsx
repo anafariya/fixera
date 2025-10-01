@@ -21,6 +21,7 @@ interface WizardLayoutProps {
   onNext: () => void
   onPrevious: () => void
   onSubmit?: () => void
+  onShowValidationErrors?: () => void
   children: React.ReactNode
   isLoading?: boolean
   canProceed?: boolean
@@ -85,6 +86,7 @@ export default function WizardLayout({
   onNext,
   onPrevious,
   onSubmit,
+  onShowValidationErrors,
   children,
   isLoading = false,
   canProceed = true,
@@ -234,8 +236,14 @@ export default function WizardLayout({
 
                     {currentStep === 8 ? (
                       <Button
-                        onClick={onSubmit}
-                        disabled={!canProceed || isLoading}
+                        onClick={() => {
+                          if (!canProceed && onShowValidationErrors) {
+                            onShowValidationErrors()
+                          } else {
+                            onSubmit?.()
+                          }
+                        }}
+                        disabled={isLoading}
                         className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
                       >
                         <CheckCircle className="w-4 h-4" />
@@ -243,8 +251,14 @@ export default function WizardLayout({
                       </Button>
                     ) : (
                       <Button
-                        onClick={onNext}
-                        disabled={!canProceed || isLoading}
+                        onClick={() => {
+                          if (!canProceed && onShowValidationErrors) {
+                            onShowValidationErrors()
+                          } else {
+                            onNext()
+                          }
+                        }}
+                        disabled={isLoading}
                         className="flex items-center space-x-2"
                       >
                         <span>Next</span>

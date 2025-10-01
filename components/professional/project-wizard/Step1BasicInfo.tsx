@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useImperativeHandle, forwardRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import { Upload, X, MapPin, Users, FileText, Star } from "lucide-react"
+import { Upload, X, MapPin, FileText, Star } from "lucide-react"
+import { toast } from 'sonner'
 
 interface ProjectData {
   category?: string
@@ -31,6 +32,7 @@ interface ProjectData {
     images: string[]
     video?: string
   }
+  serviceConfigurationId?: string
 }
 
 interface Step1Props {
@@ -39,19 +41,9 @@ interface Step1Props {
   onValidate: (isValid: boolean) => void
 }
 
-// Mock data - in real app, fetch from API
-const CATEGORIES = [
-  { id: 'exterior', name: 'Exterior', services: ['architect', 'demolition', 'roofing'] },
-  { id: 'interior', name: 'Interior', services: ['plumber', 'electrician', 'painter'] },
-  { id: 'outdoor', name: 'Outdoor work', services: ['garden', 'driveways', 'fences'] },
-  { id: 'maintenance', name: 'Moving & small tasks', services: ['cleaning', 'handyman', 'moving'] },
-  { id: 'inspections', name: 'Inspections', services: ['boiler', 'electrical', 'energy'] },
-  { id: 'renovations', name: 'Large-scale renovation', services: ['full-renovation'] }
-]
-
-const PROJECT_TYPES = [
-  'New installation', 'Repair', 'Maintenance', 'Replacement', 'Upgrade', 'Consultation'
-]
+export interface Step1Ref {
+  showValidationErrors: () => void
+}
 
 const PRICE_MODELS = [
   { value: 'fixed', label: 'Fixed Price' },
@@ -62,10 +54,123 @@ const PRICE_MODELS = [
   { value: 'room', label: 'Per Room' }
 ]
 
-export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Props) {
+const Step1BasicInfo = forwardRef<Step1Ref, Step1Props>(({ data, onChange, onValidate }, ref) => {
   const [formData, setFormData] = useState<ProjectData>(data)
   const [keywordInput, setKeywordInput] = useState('')
   const [suggestedTitle, setSuggestedTitle] = useState('')
+
+  // Backend data
+  const [categories, setCategories] = useState<string[]>([])
+  const [services, setServices] = useState<string[]>([])
+  const [areasOfWork, setAreasOfWork] = useState<string[]>([])
+  const [loadingCategories, setLoadingCategories] = useState(false)
+  const [loadingServices, setLoadingServices] = useState(false)
+  const [loadingAreas, setLoadingAreas] = useState(false)
+
+  // Fetch categories on mount
+  useEffect(() => {
+    fetchCategories()
+  }, [])
+
+  // Fetch services when category changes
+  useEffect(() => {
+    if (formData.category) {
+      fetchServices(formData.category)
+    } else {
+      setServices([])
+      setAreasOfWork([])
+    }
+  }, [formData.category])
+
+  // Fetch areas of work when service changes
+  useEffect(() => {
+    if (formData.category && formData.service) {
+      fetchAreasOfWork(formData.category, formData.service)
+    } else {
+      setAreasOfWork([])
+    }
+  }, [formData.service])
+
+  // Fetch serviceConfigurationId when service or area changes
+  useEffect(() => {
+    if (formData.category && formData.service) {
+      fetchServiceConfigurationId(formData.category, formData.service, formData.areaOfWork)
+    }
+  }, [formData.service, formData.areaOfWork])
+
+  const fetchCategories = async () => {
+    setLoadingCategories(true)
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/categories`, {
+        credentials: 'include'
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setCategories(result.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch categories:', error)
+      toast.error('Failed to load categories')
+    } finally {
+      setLoadingCategories(false)
+    }
+  }
+
+  const fetchServices = async (category: string) => {
+    setLoadingServices(true)
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/services/${encodeURIComponent(category)}`, {
+        credentials: 'include'
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setServices(result.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch services:', error)
+      toast.error('Failed to load services')
+    } finally {
+      setLoadingServices(false)
+    }
+  }
+
+  const fetchAreasOfWork = async (category: string, service: string) => {
+    setLoadingAreas(true)
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/areas-of-work?category=${encodeURIComponent(category)}&service=${encodeURIComponent(service)}`,
+        { credentials: 'include' }
+      )
+      if (response.ok) {
+        const result = await response.json()
+        setAreasOfWork(result.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch areas of work:', error)
+    } finally {
+      setLoadingAreas(false)
+    }
+  }
+
+  const fetchServiceConfigurationId = async (category: string, service: string, areaOfWork?: string) => {
+    try {
+      const params = new URLSearchParams({ category, service })
+      if (areaOfWork) params.append('areaOfWork', areaOfWork)
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/service-configuration?${params}`,
+        { credentials: 'include' }
+      )
+      if (response.ok) {
+        const result = await response.json()
+        if (result.data?._id) {
+          updateFormData({ serviceConfigurationId: result.data._id })
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch service configuration ID:', error)
+    }
+  }
 
   useEffect(() => {
     onChange(formData)
@@ -80,11 +185,33 @@ export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Prop
       formData.description.length >= 100 &&
       formData.priceModel &&
       formData.distance?.address &&
-      formData.distance?.maxKmRange &&
-      formData.projectType?.length
+      formData.distance?.maxKmRange
     )
     onValidate(isValid)
   }
+
+  const showValidationErrors = () => {
+    const errors: string[] = []
+
+    if (!formData.category) errors.push('Category is required')
+    if (!formData.service) errors.push('Service is required')
+    if (!formData.description) {
+      errors.push('Description is required')
+    } else if (formData.description.length < 100) {
+      errors.push(`Description must be at least 100 characters (currently ${formData.description.length})`)
+    }
+    if (!formData.priceModel) errors.push('Price Model is required')
+    if (!formData.distance?.address) errors.push('Service Address is required')
+    if (!formData.distance?.maxKmRange) errors.push('Maximum Service Range is required')
+
+    if (errors.length > 0) {
+      errors.forEach(error => toast.error(error))
+    }
+  }
+
+  useImperativeHandle(ref, () => ({
+    showValidationErrors
+  }))
 
   const updateFormData = (updates: Partial<ProjectData>) => {
     setFormData(prev => ({ ...prev, ...updates }))
@@ -129,51 +256,26 @@ export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Prop
     })
   }
 
-  const toggleProjectType = (type: string) => {
-    const current = formData.projectType || []
-    if (current.includes(type)) {
-      updateFormData({
-        projectType: current.filter(t => t !== type)
-      })
-    } else {
-      updateFormData({
-        projectType: [...current, type]
-      })
-    }
-  }
-
   const generateTitle = async () => {
     if (!formData.service || !formData.description) return
 
     try {
-      // Create a more intelligent title generation
       const serviceTitle = formData.service.charAt(0).toUpperCase() + formData.service.slice(1)
       const keywords = formData.keywords?.join(', ') || ''
-      const projectTypes = formData.projectType?.join(', ') || ''
 
-      // Generate multiple title variations
       const titleVariations = [
         `Expert ${serviceTitle} Services - ${formData.areaOfWork || 'Professional Solutions'}`,
         `Quality ${serviceTitle} - ${keywords ? keywords.split(',')[0] : 'Reliable'} & Professional`,
-        `${serviceTitle} Specialist - ${projectTypes ? projectTypes.split(',')[0] : 'Complete'} Solutions`,
         `Professional ${serviceTitle} - Quality Work You Can Trust`,
         `${serviceTitle} Expert - ${formData.distance?.maxKmRange}km Range - Quality Guaranteed`
       ]
 
-      // Simple AI-like selection based on content
       let bestTitle = titleVariations[0]
 
-      // Prefer titles with keywords if available
       if (keywords) {
         bestTitle = titleVariations[1]
       }
 
-      // Prefer titles with project types if available
-      if (projectTypes && projectTypes.length > 5) {
-        bestTitle = titleVariations[2]
-      }
-
-      // Ensure title is within length limits
       if (bestTitle.length > 90) {
         bestTitle = bestTitle.substring(0, 87) + '...'
       }
@@ -185,7 +287,6 @@ export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Prop
       setSuggestedTitle(bestTitle)
     } catch (error) {
       console.error('Title generation error:', error)
-      // Fallback to simple generation
       const serviceTitle = formData.service.charAt(0).toUpperCase() + formData.service.slice(1)
       setSuggestedTitle(`Professional ${serviceTitle} Services - Quality Work You Can Trust`)
     }
@@ -203,7 +304,6 @@ export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Prop
     const maxSize = 5 * 1024 * 1024 // 5MB
     const currentImages = formData.media?.images || []
 
-    // Check if total files (current + new) exceed limit
     if (currentImages.length + files.length > maxFiles) {
       alert(`Maximum ${maxFiles} images allowed. You currently have ${currentImages.length} images. You can select ${maxFiles - currentImages.length} more.`)
       return
@@ -223,7 +323,6 @@ export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Prop
       return true
     })
 
-    // Process all valid files
     const newImages: string[] = []
     let processedCount = 0
 
@@ -234,7 +333,6 @@ export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Prop
           newImages.push(e.target.result as string)
           processedCount++
 
-          // Update state once all files are processed
           if (processedCount === validFiles.length) {
             updateMedia({ images: [...currentImages, ...newImages] })
           }
@@ -243,8 +341,6 @@ export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Prop
       reader.readAsDataURL(file)
     })
   }
-
-  const selectedCategory = CATEGORIES.find(cat => cat.id === formData.category)
 
   return (
     <div className="space-y-6">
@@ -265,15 +361,16 @@ export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Prop
               <Label htmlFor="category">Category *</Label>
               <Select
                 value={formData.category || ''}
-                onValueChange={(value) => updateFormData({ category: value, service: '' })}
+                onValueChange={(value) => updateFormData({ category: value, service: '', areaOfWork: '' })}
+                disabled={loadingCategories}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder={loadingCategories ? "Loading..." : "Select category"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map(category => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
+                  {categories.map(category => (
+                    <SelectItem key={category} value={category}>
+                      {category}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -284,16 +381,16 @@ export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Prop
               <Label htmlFor="service">Service *</Label>
               <Select
                 value={formData.service || ''}
-                onValueChange={(value) => updateFormData({ service: value })}
-                disabled={!formData.category}
+                onValueChange={(value) => updateFormData({ service: value, areaOfWork: '' })}
+                disabled={!formData.category || loadingServices}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select service" />
+                  <SelectValue placeholder={loadingServices ? "Loading..." : "Select service"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedCategory?.services.map(service => (
+                  {services.map(service => (
                     <SelectItem key={service} value={service}>
-                      {service.charAt(0).toUpperCase() + service.slice(1)}
+                      {service}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -301,15 +398,27 @@ export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Prop
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="areaOfWork">Area of Work (Optional)</Label>
-            <Input
-              id="areaOfWork"
-              value={formData.areaOfWork || ''}
-              onChange={(e) => updateFormData({ areaOfWork: e.target.value })}
-              placeholder="Specific area or sub-service"
-            />
-          </div>
+          {areasOfWork.length > 0 && (
+            <div>
+              <Label htmlFor="areaOfWork">Area of Work</Label>
+              <Select
+                value={formData.areaOfWork || ''}
+                onValueChange={(value) => updateFormData({ areaOfWork: value })}
+                disabled={loadingAreas}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingAreas ? "Loading..." : "Select area of work"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {areasOfWork.map(area => (
+                    <SelectItem key={area} value={area}>
+                      {area}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -368,30 +477,6 @@ export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Prop
               />
               <Label htmlFor="noBorders">Don&apos;t cross country borders</Label>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Project Type */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Project Type *</CardTitle>
-          <CardDescription>
-            Select all types of projects you can handle (check all that apply)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {PROJECT_TYPES.map(type => (
-              <div key={type} className="flex items-center space-x-2">
-                <Checkbox
-                  id={type}
-                  checked={formData.projectType?.includes(type) || false}
-                  onCheckedChange={() => toggleProjectType(type)}
-                />
-                <Label htmlFor={type} className="text-sm">{type}</Label>
-              </div>
-            ))}
           </div>
         </CardContent>
       </Card>
@@ -577,4 +662,8 @@ export default function Step1BasicInfo({ data, onChange, onValidate }: Step1Prop
       </Card>
     </div>
   )
-}
+})
+
+Step1BasicInfo.displayName = 'Step1BasicInfo'
+
+export default Step1BasicInfo

@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import WizardLayout from '@/components/professional/project-wizard/WizardLayout'
-import Step1BasicInfo from '@/components/professional/project-wizard/Step1BasicInfo'
+import Step1BasicInfo, { type Step1Ref } from '@/components/professional/project-wizard/Step1BasicInfo'
 import Step2Subprojects from '@/components/professional/project-wizard/Step2Subprojects'
 import Step3ExtraOptions from '@/components/professional/project-wizard/Step3ExtraOptions'
 import Step4FAQ from '@/components/professional/project-wizard/Step4FAQ'
@@ -124,6 +124,7 @@ export default function ProjectCreatePage() {
   const searchParams = useSearchParams()
   const projectId = searchParams.get('id')
   const [currentStep, setCurrentStep] = useState(1)
+  const step1Ref = useRef<Step1Ref>(null)
   const [projectData, setProjectData] = useState<ProjectData>({
     currentStep: 1,
     distance: {
@@ -341,11 +342,40 @@ export default function ProjectCreatePage() {
     setIsLoading(false)
   }
 
+  const handleShowValidationErrors = () => {
+    if (currentStep === 1) {
+      step1Ref.current?.showValidationErrors()
+    } else if (currentStep === 2) {
+      // Step 2 validation
+      if (!projectData.subprojects || projectData.subprojects.length === 0) {
+        toast.error('At least one subproject/package is required')
+      } else {
+        const invalidSubproject = projectData.subprojects.find(sub =>
+          !sub.name || !sub.description || !sub.pricing?.type
+        )
+        if (invalidSubproject) {
+          toast.error('All subprojects must have name, description, and pricing type')
+        }
+      }
+    } else if (currentStep === 3) {
+      toast.info('Step 3 is optional - you can proceed to the next step')
+    } else if (currentStep === 4) {
+      toast.info('Step 4 is optional - you can proceed to the next step')
+    } else if (currentStep === 5) {
+      toast.info('Step 5 is optional - you can proceed to the next step')
+    } else if (currentStep === 6) {
+      toast.info('Step 6 is optional - you can proceed to the next step')
+    } else if (currentStep === 7) {
+      toast.info('Step 7 is optional - you can proceed to the next step')
+    }
+  }
+
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 1:
         return (
           <Step1BasicInfo
+            ref={step1Ref}
             data={projectData}
             onChange={handleDataChange}
             onValidate={(isValid) => handleStepValidation(1, isValid)}
@@ -453,6 +483,7 @@ export default function ProjectCreatePage() {
       onNext={handleNext}
       onPrevious={handlePrevious}
       onSubmit={handleSubmit}
+      onShowValidationErrors={handleShowValidationErrors}
       isLoading={isLoading}
       canProceed={canProceed}
       isEditing={!!projectId}
