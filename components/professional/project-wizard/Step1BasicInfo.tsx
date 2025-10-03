@@ -683,7 +683,7 @@ const Step1BasicInfo = forwardRef<Step1Ref, Step1Props>(({ data, onChange, onVal
                     </SelectItem>
                   ))
                 ) : (
-                  <SelectItem value="" disabled>
+                  <SelectItem value="no-pricing-models" disabled>
                     No pricing models configured for this service
                   </SelectItem>
                 )}
