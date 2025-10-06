@@ -32,6 +32,7 @@ export default function AddressAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const { isLoaded, validateAddress } = useGoogleMaps();
+  const hasInitialized = useRef(false);
 
   // Initialize autocomplete
   useEffect(() => {
@@ -111,6 +112,40 @@ export default function AddressAutocomplete({
     setValidating(false);
   };
 
+  // Initialize: If value already exists on mount and hasn't been validated yet, validate it
+  useEffect(() => {
+    if (!hasInitialized.current && value && !validatedAddressRef.current) {
+      hasInitialized.current = true;
+      console.log('🔄 Initial address validation on mount:', value);
+      // Validate the initial address
+      (async () => {
+        setValidating(true);
+        const valid = await validateAddress(value);
+        console.log('📍 Initial validation result:', valid);
+        if (valid) {
+          validatedAddressRef.current = value;
+          selectedFromDropdownRef.current = true; // Treat pre-filled address as valid
+        }
+        setIsValid(valid);
+        onValidation(valid);
+        setValidating(false);
+      })();
+    }
+  }, []);
+
+  // Watch for value changes from parent and preserve validation if it's the same validated address
+  useEffect(() => {
+    console.log('📝 Value changed from parent:', value, 'validated:', validatedAddressRef.current);
+    if (value && validatedAddressRef.current === value && selectedFromDropdownRef.current) {
+      console.log('✅ Value matches validated address - keeping it valid');
+      // Don't let it go back to invalid
+      if (isValid !== true) {
+        setIsValid(true);
+        onValidation(true);
+      }
+    }
+  }, [value, isValid, onValidation]);
+
   const effectiveValue = useCompanyAddress ? companyAddress || '' : value;
 
   return (
@@ -125,11 +160,15 @@ export default function AddressAutocomplete({
           value={effectiveValue}
           onChange={(e) => {
             if (!useCompanyAddress) {
-              onChange(e.target.value);
-              // Reset validation state when user manually types
-              selectedFromDropdownRef.current = false;
-              validatedAddressRef.current = '';
-              setIsValid(null);
+              const newValue = e.target.value;
+              onChange(newValue);
+              // Only reset validation state if user is actually typing (not from dropdown update)
+              if (newValue !== validatedAddressRef.current) {
+                console.log('⌨️ User typing - resetting validation');
+                selectedFromDropdownRef.current = false;
+                validatedAddressRef.current = '';
+                setIsValid(null);
+              }
             }
           }}
           onBlur={handleBlur}
