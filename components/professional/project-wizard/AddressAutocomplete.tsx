@@ -27,7 +27,8 @@ export default function AddressAutocomplete({
 }: AddressAutocompleteProps) {
   const [validating, setValidating] = useState(false);
   const [isValid, setIsValid] = useState<boolean | null>(null);
-  const [selectedFromDropdown, setSelectedFromDropdown] = useState(false);
+  const selectedFromDropdownRef = useRef(false);
+  const validatedAddressRef = useRef<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const { isLoaded, validateAddress } = useGoogleMaps();
@@ -45,7 +46,8 @@ export default function AddressAutocomplete({
       if (place?.formatted_address) {
         console.log('✅ Address selected from dropdown:', place.formatted_address);
         onChange(place.formatted_address);
-        setSelectedFromDropdown(true);
+        selectedFromDropdownRef.current = true;
+        validatedAddressRef.current = place.formatted_address;
         setIsValid(true);
         onValidation(true);
       }
@@ -58,11 +60,17 @@ export default function AddressAutocomplete({
     };
   }, [isLoaded, useCompanyAddress]);
 
-  // Validate on blur
+  // Validate on blur - only for manually typed addresses
   const handleBlur = async () => {
+    // If selected from dropdown, it's already valid - don't do anything
+    if (selectedFromDropdownRef.current) {
+      console.log('✅ Address from dropdown - already valid, skipping blur validation');
+      return;
+    }
+
     const addressToValidate = useCompanyAddress ? companyAddress : value;
 
-    console.log('🔍 handleBlur called:', { addressToValidate, selectedFromDropdown, isValid });
+    console.log('🔍 handleBlur - validating manually typed address:', addressToValidate);
 
     if (!addressToValidate) {
       console.log('❌ Empty address');
@@ -71,17 +79,16 @@ export default function AddressAutocomplete({
       return;
     }
 
-    // If user selected from dropdown, it's already validated - don't revalidate
-    if (selectedFromDropdown && isValid === true) {
-      console.log('✅ Skipping validation - already validated from dropdown');
-      return;
-    }
-
-    // Otherwise validate the typed address using Google Maps API
+    // Validate manually typed address using Google Maps API
     console.log('🌐 Validating address via API...');
     setValidating(true);
     const valid = await validateAddress(addressToValidate);
     console.log('📍 Validation result:', valid);
+
+    if (valid) {
+      validatedAddressRef.current = addressToValidate;
+    }
+
     setIsValid(valid);
     onValidation(valid);
     setValidating(false);
@@ -119,7 +126,9 @@ export default function AddressAutocomplete({
           onChange={(e) => {
             if (!useCompanyAddress) {
               onChange(e.target.value);
-              setSelectedFromDropdown(false);
+              // Reset validation state when user manually types
+              selectedFromDropdownRef.current = false;
+              validatedAddressRef.current = '';
               setIsValid(null);
             }
           }}
