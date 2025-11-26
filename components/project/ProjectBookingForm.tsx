@@ -930,12 +930,27 @@ export default function ProjectBookingForm({ project, onBack }: ProjectBookingFo
                   </div>
                 )}
 
-                {/* Payment Section (Dummy) */}
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-6">
-                  <h3 className="font-semibold text-yellow-900 mb-2">Payment Coming Soon</h3>
-                  <p className="text-sm text-yellow-800">
-                    Payment integration will be added in the next phase. For now, clicking &quot;Submit Booking&quot; will create your booking request.
-                  </p>
+                {/* Payment Information */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+                  <h3 className="font-semibold text-blue-900 mb-2">Next Steps: Quote & Payment</h3>
+                  <div className="text-sm text-blue-800 space-y-2">
+                    <p className="flex items-start gap-2">
+                      <span className="font-semibold min-w-[20px]">1.</span>
+                      <span>After submitting, our professional will review your requirements and provide a detailed quote.</span>
+                    </p>
+                    <p className="flex items-start gap-2">
+                      <span className="font-semibold min-w-[20px]">2.</span>
+                      <span>Once you receive the quote, you can review and accept it.</span>
+                    </p>
+                    <p className="flex items-start gap-2">
+                      <span className="font-semibold min-w-[20px]">3.</span>
+                      <span>Payment is processed securely via Stripe after you accept the quote.</span>
+                    </p>
+                    <p className="flex items-start gap-2">
+                      <span className="font-semibold min-w-[20px]">4.</span>
+                      <span>Your payment is held securely until the project is completed to your satisfaction.</span>
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

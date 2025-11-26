@@ -6,7 +6,10 @@ import { useAuth } from "@/contexts/AuthContext"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Calendar, Clock, Package, Briefcase, User, Mail, Phone, Shield } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { ArrowLeft, Calendar, Clock, Package, Briefcase, User, Mail, Phone, Shield, CreditCard, FileText, CheckCircle, XCircle, Play, CheckCheck, Loader2 } from "lucide-react"
 
 type BookingStatus =
   | "rfq"
@@ -36,6 +39,16 @@ interface BookingDetail {
       max?: number
       currency?: string
     }
+  }
+  quote?: {
+    amount?: number
+    currency?: string
+    description?: string
+    breakdown?: Array<{ item: string; amount: number }>
+    validUntil?: string
+    termsAndConditions?: string
+    estimatedDuration?: string
+    submittedAt?: string
   }
   scheduledStartDate?: string
   scheduledEndDate?: string
@@ -93,7 +106,7 @@ const formatCurrencyRange = (booking: BookingDetail): string | null => {
 }
 
 export default function BookingDetailPage() {
-  const { isAuthenticated, loading } = useAuth()
+  const { user, isAuthenticated, loading } = useAuth()
   const router = useRouter()
   const params = useParams()
   const bookingId = (params?.id || params?.bookingId) as string | undefined
@@ -101,6 +114,12 @@ export default function BookingDetailPage() {
   const [booking, setBooking] = useState<BookingDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showQuoteForm, setShowQuoteForm] = useState(false)
+  const [quoteAmount, setQuoteAmount] = useState("")
+  const [quoteDescription, setQuoteDescription] = useState("")
+  const [submittingQuote, setSubmittingQuote] = useState(false)
+  const [respondingToQuote, setRespondingToQuote] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -136,6 +155,118 @@ export default function BookingDetailPage() {
 
     fetchBooking()
   }, [bookingId, isAuthenticated])
+
+  const handleSubmitQuote = async () => {
+    if (!quoteAmount || parseFloat(quoteAmount) <= 0) {
+      alert("Please enter a valid quote amount")
+      return
+    }
+
+    setSubmittingQuote(true)
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/${bookingId}/quote`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            amount: parseFloat(quoteAmount),
+            currency: "EUR",
+            description: quoteDescription || "Quote for your booking request"
+          })
+        }
+      )
+
+      const data = await response.json()
+      if (response.ok && data.success) {
+        alert("Quote submitted successfully!")
+        setShowQuoteForm(false)
+        // Refresh booking data
+        window.location.reload()
+      } else {
+        alert(data.msg || "Failed to submit quote")
+      }
+    } catch (err) {
+      console.error("Error submitting quote:", err)
+      alert("Failed to submit quote. Please try again.")
+    } finally {
+      setSubmittingQuote(false)
+    }
+  }
+
+  const handleRespondToQuote = async (action: "accept" | "reject") => {
+    setRespondingToQuote(true)
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/${bookingId}/respond`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ action })
+        }
+      )
+
+      const data = await response.json()
+      if (response.ok && data.success) {
+        if (action === "accept") {
+          alert("Quote accepted! Redirecting to payment...")
+          router.push(`/bookings/${bookingId}/payment`)
+        } else {
+          alert("Quote rejected")
+          window.location.reload()
+        }
+      } else {
+        alert(data.msg || `Failed to ${action} quote`)
+      }
+    } catch (err) {
+      console.error(`Error ${action}ing quote:`, err)
+      alert(`Failed to ${action} quote. Please try again.`)
+    } finally {
+      setRespondingToQuote(false)
+    }
+  }
+
+  const handleUpdateStatus = async (newStatus: BookingStatus, confirmMessage?: string) => {
+    if (confirmMessage && !confirm(confirmMessage)) {
+      return
+    }
+
+    setUpdatingStatus(true)
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/${bookingId}/status`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ status: newStatus })
+        }
+      )
+
+      const data = await response.json()
+      if (response.ok && data.success) {
+        // Show success message based on status
+        if (newStatus === "completed") {
+          alert("✅ Booking marked as completed!\n\nPayment has been transferred to the professional.\nFunds will arrive in the professional's bank account within 2-7 business days.")
+        } else if (newStatus === "in_progress") {
+          alert("✅ Work started! Good luck with the project.")
+        }
+
+        // Reload to show updated status
+        window.location.reload()
+      } else {
+        const errorMsg = data.error?.message || data.msg || `Failed to update booking status`
+        alert(`❌ Error: ${errorMsg}`)
+      }
+    } catch (err) {
+      console.error("Error updating status:", err)
+      alert("❌ Failed to update booking status. Please try again.")
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
 
   if (loading || isLoading) {
     return (
@@ -220,6 +351,280 @@ export default function BookingDetailPage() {
               </CardHeader>
 
               <CardContent className="pt-4 space-y-6">
+                {/* Payment Action - Show when quote is accepted but not yet paid (CUSTOMER ONLY) */}
+                {user?.role === 'customer' && (booking.status === 'quote_accepted' || booking.status === 'payment_pending') && (
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-blue-900 mb-1">
+                          Payment Required
+                        </h3>
+                        <p className="text-xs text-blue-700">
+                          Your quote has been accepted. Please proceed with payment to confirm your booking.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => router.push(`/bookings/${booking._id}/payment`)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
+                        size="sm"
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Pay Now
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Professional: Quote Accepted - Waiting for Payment */}
+                {user?.role === 'professional' && (booking.status === 'quote_accepted' || booking.status === 'payment_pending') && (
+                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
+                      <div>
+                        <h3 className="text-sm font-semibold text-amber-900 mb-1">
+                          Quote Accepted - Awaiting Payment
+                        </h3>
+                        <p className="text-xs text-amber-700">
+                          The customer has accepted your quote. Once they complete payment, you&apos;ll be notified to begin work.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Professional: Submit Quote (when status is RFQ) */}
+                {user?.role === 'professional' && booking.status === 'rfq' && (
+                  <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
+                    {!showQuoteForm ? (
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h3 className="text-sm font-semibold text-purple-900 mb-1">
+                            Quote Requested
+                          </h3>
+                          <p className="text-xs text-purple-700">
+                            The customer is waiting for your quote. Please review the requirements and submit your quote.
+                          </p>
+                        </div>
+                        <Button
+                          onClick={() => setShowQuoteForm(true)}
+                          className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
+                          size="sm"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Submit Quote
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <h3 className="text-sm font-semibold text-purple-900">Submit Your Quote</h3>
+                        <div className="space-y-3">
+                          <div>
+                            <Label htmlFor="quoteAmount" className="text-xs">Quote Amount (EUR) *</Label>
+                            <Input
+                              id="quoteAmount"
+                              type="number"
+                              placeholder="1500"
+                              value={quoteAmount}
+                              onChange={(e) => setQuoteAmount(e.target.value)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="quoteDescription" className="text-xs">Description (Optional)</Label>
+                            <Textarea
+                              id="quoteDescription"
+                              placeholder="Brief description of what's included..."
+                              value={quoteDescription}
+                              onChange={(e) => setQuoteDescription(e.target.value)}
+                              className="mt-1"
+                              rows={3}
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={handleSubmitQuote}
+                              disabled={submittingQuote}
+                              className="bg-purple-600 hover:bg-purple-700 text-white"
+                              size="sm"
+                            >
+                              {submittingQuote ? "Submitting..." : "Submit Quote"}
+                            </Button>
+                            <Button
+                              onClick={() => setShowQuoteForm(false)}
+                              variant="outline"
+                              size="sm"
+                              disabled={submittingQuote}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Customer: Quote Ready - Accept/Reject */}
+                {user?.role === 'customer' && booking.status === 'quoted' && booking.quote && (
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-green-900 mb-3">Quote Received</h3>
+                    <div className="bg-white rounded-lg p-4 mb-4 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Quote Amount:</span>
+                        <span className="text-2xl font-bold text-green-600">
+                          {booking.quote.currency || '€'}{booking.quote.amount?.toLocaleString()}
+                        </span>
+                      </div>
+                      {booking.quote.description && (
+                        <div className="pt-2 border-t">
+                          <p className="text-xs text-gray-600 mb-1">Description:</p>
+                          <p className="text-sm text-gray-800">{booking.quote.description}</p>
+                        </div>
+                      )}
+                      {booking.quote.submittedAt && (
+                        <p className="text-xs text-gray-500 pt-2">
+                          Submitted: {new Date(booking.quote.submittedAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => handleRespondToQuote("accept")}
+                        disabled={respondingToQuote}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                        size="sm"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        {respondingToQuote ? "Processing..." : "Accept & Pay"}
+                      </Button>
+                      <Button
+                        onClick={() => handleRespondToQuote("reject")}
+                        disabled={respondingToQuote}
+                        variant="outline"
+                        className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                        size="sm"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Professional: Start Work (when status is booked) */}
+                {user?.role === 'professional' && booking.status === 'booked' && (
+                  <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-blue-900 mb-1">
+                          Ready to Start Work
+                        </h3>
+                        <p className="text-xs text-blue-700">
+                          Payment has been authorized and is held in escrow. Click below to mark the work as started.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => handleUpdateStatus("in_progress")}
+                        disabled={updatingStatus}
+                        className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
+                        size="sm"
+                      >
+                        {updatingStatus ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Starting...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4 mr-2" />
+                            Start Work
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Professional: Customer must confirm completion */}
+                {user?.role === 'professional' && booking.status === 'in_progress' && (
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-start gap-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-green-900 mb-1">
+                          Waiting for customer confirmation
+                        </h3>
+                        <p className="text-xs text-green-700 mb-2">
+                          Finish the work and notify your customer. Only they can confirm completion and release the payment from escrow.
+                        </p>
+                        <p className="text-xs text-green-600 font-medium">
+                          Funds stay protected until the customer marks the booking as completed.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* Customer: Confirm Work Completion (when status is in_progress) */}
+                {user?.role === 'customer' && booking.status === 'in_progress' && (
+                  <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-teal-900 mb-1">
+                          Work In Progress
+                        </h3>
+                        <p className="text-xs text-teal-700 mb-2">
+                          The professional is currently working on your request. Once they complete the work, you can confirm completion.
+                        </p>
+                        <p className="text-xs text-teal-600 font-medium">
+                          💰 Payment will be released from escrow when you confirm completion
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => handleUpdateStatus(
+                          "completed",
+                          "Are you satisfied with the work?\n\n✅ This will release the payment from escrow to the professional."
+                        )}
+                        disabled={updatingStatus}
+                        className="bg-teal-600 hover:bg-teal-700 text-white shrink-0"
+                        size="sm"
+                      >
+                        {updatingStatus ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCheck className="h-4 w-4 mr-2" />
+                            Confirm Complete
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Both: Work Completed */}
+                {booking.status === 'completed' && (
+                  <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle className="h-6 w-6 text-emerald-600 mt-0.5" />
+                      <div>
+                        <h3 className="text-sm font-semibold text-emerald-900 mb-1">
+                          ✅ Work Completed
+                        </h3>
+                        <p className="text-xs text-emerald-700">
+                          This booking has been marked as completed. Payment has been transferred to the professional.
+                        </p>
+                        {user?.role === 'professional' && (
+                          <p className="text-xs text-emerald-600 font-medium mt-2">
+                            💰 Funds will arrive in your bank account within 2-7 business days
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Core info */}
                 <section className="grid md:grid-cols-2 gap-4 text-xs text-gray-700">
                   {booking.createdAt && (
