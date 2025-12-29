@@ -10,12 +10,16 @@ import EmployeeManagement from "@/components/TeamManagement"
 import PasswordChange from "@/components/PasswordChange"
 import EmployeeAvailability from "@/components/EmployeeAvailability"
 import AvailabilityCalendar from "@/components/calendar/AvailabilityCalendar"
+import WeeklyTimeBlocker from "@/components/calendar/WeeklyTimeBlocker"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { addDays, format, parseISO } from "date-fns"
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { getViewerTimezone, normalizeTimezone } from "@/lib/timezoneDisplay"
 import { 
   validateVATFormat, 
   validateVATWithAPI, 
@@ -63,11 +67,11 @@ export default function ProfilePage() {
   const [currency, setCurrency] = useState('USD')
   const [serviceCategories, setServiceCategories] = useState<string[]>([])
   const [availability, setAvailability] = useState({
-    monday: { available: false, startTime: '09:00', endTime: '17:00' },
-    tuesday: { available: false, startTime: '09:00', endTime: '17:00' },
-    wednesday: { available: false, startTime: '09:00', endTime: '17:00' },
-    thursday: { available: false, startTime: '09:00', endTime: '17:00' },
-    friday: { available: false, startTime: '09:00', endTime: '17:00' },
+    monday: { available: true, startTime: '09:00', endTime: '17:00' },
+    tuesday: { available: true, startTime: '09:00', endTime: '17:00' },
+    wednesday: { available: true, startTime: '09:00', endTime: '17:00' },
+    thursday: { available: true, startTime: '09:00', endTime: '17:00' },
+    friday: { available: true, startTime: '09:00', endTime: '17:00' },
     saturday: { available: false, startTime: '09:00', endTime: '17:00' },
     sunday: { available: false, startTime: '09:00', endTime: '17:00' }
   })
@@ -79,11 +83,11 @@ export default function ProfilePage() {
 
   // Company availability (for team members to inherit)
   const [companyAvailability, setCompanyAvailability] = useState({
-    monday: { available: false, startTime: '09:00', endTime: '17:00' },
-    tuesday: { available: false, startTime: '09:00', endTime: '17:00' },
-    wednesday: { available: false, startTime: '09:00', endTime: '17:00' },
-    thursday: { available: false, startTime: '09:00', endTime: '17:00' },
-    friday: { available: false, startTime: '09:00', endTime: '17:00' },
+    monday: { available: true, startTime: '09:00', endTime: '17:00' },
+    tuesday: { available: true, startTime: '09:00', endTime: '17:00' },
+    wednesday: { available: true, startTime: '09:00', endTime: '17:00' },
+    thursday: { available: true, startTime: '09:00', endTime: '17:00' },
+    friday: { available: true, startTime: '09:00', endTime: '17:00' },
     saturday: { available: false, startTime: '09:00', endTime: '17:00' },
     sunday: { available: false, startTime: '09:00', endTime: '17:00' }
   })
@@ -92,6 +96,7 @@ export default function ProfilePage() {
   const [companyBlockedRanges, setCompanyBlockedRanges] = useState<{startDate: string, endDate: string, reason?: string, isHoliday?: boolean}[]>([])
   const [newCompanyBlockedRange, setNewCompanyBlockedRange] = useState({startDate: '', endDate: '', reason: '', isHoliday: false})
   const [companyBlockingMode, setCompanyBlockingMode] = useState<'single' | 'range'>('range')
+  const [bookingBlockedDates, setBookingBlockedDates] = useState<{date: string, reason?: string}[]>([])
   const [profileSaving, setProfileSaving] = useState(false)
   const [showAutoPopulateDialog, setShowAutoPopulateDialog] = useState(false)
   const [pendingVatData, setPendingVatData] = useState<{
@@ -118,10 +123,9 @@ export default function ProfilePage() {
   }
 
   const addBlockedRangeFromCalendar = async (startDate: string, endDate: string) => {
-    const newRange = { startDate, endDate } as { startDate: string; endDate: string; reason?: string }
-    const updatedRanges = [...blockedRanges, newRange]
-    setBlockedRanges(updatedRanges)
-    await saveBlockedDatesAndRanges(blockedDates, updatedRanges)
+    const startIso = new Date(`${startDate}T00:00:00`).toISOString()
+    const endIso = new Date(`${endDate}T23:59:00`).toISOString()
+    await addBlockedRangeEntry(startIso, endIso)
   }
 
   useEffect(() => {
@@ -147,89 +151,251 @@ export default function ProfilePage() {
       if (user.currency) setCurrency(user.currency)
       if (user.serviceCategories) setServiceCategories(user.serviceCategories)
       if (user.availability) {
-        setAvailability(prev => {
-          const updated = { ...prev }
-          Object.entries(user.availability!).forEach(([day, dayAvailability]) => {
-            if (dayAvailability) {
-              updated[day as keyof typeof updated] = {
-                available: dayAvailability.available,
-                startTime: dayAvailability.startTime || '09:00',
-                endTime: dayAvailability.endTime || '17:00'
+        // Check if ALL days are unavailable (old/bad data)
+        const allDaysUnavailable = Object.values(user.availability).every(
+          (dayAvail) => dayAvail && typeof dayAvail === 'object' && 'available' in dayAvail && !dayAvail.available
+        )
+
+        // If all days are unavailable, don't load it - keep the new defaults (Mon-Fri available)
+        // Otherwise, load the saved availability
+        if (!allDaysUnavailable) {
+          setAvailability(prev => {
+            const updated = { ...prev }
+            Object.entries(user.availability!).forEach(([day, dayAvailability]) => {
+              if (dayAvailability) {
+                updated[day as keyof typeof updated] = {
+                  available: dayAvailability.available,
+                  startTime: dayAvailability.startTime || '09:00',
+                  endTime: dayAvailability.endTime || '17:00'
+                }
               }
-            }
+            })
+            return updated
           })
-          return updated
-        })
+        }
       }
       if (user.blockedDates) {
         // Handle both old format (string[]) and new format (object[])
         const formattedDates = user.blockedDates.map((item: string | { date: string | Date; reason?: string }) => {
           if (typeof item === 'string') {
-            return { date: item };
+            // Strip time portion if present
+            return { date: item.split('T')[0] };
           } else if (item.date) {
+            // Always strip time portion from date string or Date object
+            const dateStr = typeof item.date === 'string' ? item.date : item.date.toISOString();
             return {
-              date: typeof item.date === 'string' ? item.date : item.date.toISOString().split('T')[0],
+              date: dateStr.split('T')[0],
               reason: item.reason
             };
           }
-          return { date: String(item) };
+          return { date: String(item).split('T')[0] };
         });
         setBlockedDates(formattedDates);
       }
       if (user.blockedRanges) {
-        // Format blocked ranges from backend
-        const formattedRanges = user.blockedRanges.map((range: { startDate: string | Date; endDate: string | Date; reason?: string }) => ({
-          startDate: typeof range.startDate === 'string' ? range.startDate : range.startDate.toISOString().split('T')[0],
-          endDate: typeof range.endDate === 'string' ? range.endDate : range.endDate.toISOString().split('T')[0],
-          reason: range.reason || ''
-        }));
+        const formattedRanges = user.blockedRanges.map((range: { startDate: string | Date; endDate: string | Date; reason?: string }) => {
+          const startDateStr = typeof range.startDate === 'string' ? range.startDate : range.startDate.toISOString();
+          const endDateStr = typeof range.endDate === 'string' ? range.endDate : range.endDate.toISOString();
+          return {
+            startDate: startDateStr,
+            endDate: endDateStr,
+            reason: range.reason || ''
+          };
+        });
         setBlockedRanges(formattedRanges);
       }
 
       // Load company availability
       if (user.companyAvailability) {
-        setCompanyAvailability(prev => {
-          const updated = { ...prev }
-          Object.entries(user.companyAvailability!).forEach(([day, dayAvailability]) => {
-            if (dayAvailability) {
-              updated[day as keyof typeof updated] = {
-                available: dayAvailability.available,
-                startTime: dayAvailability.startTime || '09:00',
-                endTime: dayAvailability.endTime || '17:00'
+        // Check if ALL days are unavailable (old/bad data)
+        const allDaysUnavailable = Object.values(user.companyAvailability).every(
+          (dayAvail) => dayAvail && typeof dayAvail === 'object' && 'available' in dayAvail && !dayAvail.available
+        )
+
+        // If all days are unavailable, don't load it - keep the new defaults (Mon-Fri available)
+        // Otherwise, load the saved company availability
+        if (!allDaysUnavailable) {
+          setCompanyAvailability(prev => {
+            const updated = { ...prev }
+            Object.entries(user.companyAvailability!).forEach(([day, dayAvailability]) => {
+              if (dayAvailability) {
+                updated[day as keyof typeof updated] = {
+                  available: dayAvailability.available,
+                  startTime: dayAvailability.startTime || '09:00',
+                  endTime: dayAvailability.endTime || '17:00'
+                }
               }
-            }
+            })
+            return updated
           })
-          return updated
-        })
+        }
       }
       if (user.companyBlockedDates) {
         console.log('📥 Frontend: Loading companyBlockedDates from user:', user.companyBlockedDates);
         const formattedDates = user.companyBlockedDates.map((item: string | { date: string | Date; reason?: string; isHoliday?: boolean }) => {
           if (typeof item === 'string') {
-            return { date: item, isHoliday: false };
+            // Strip time portion if present
+            return { date: item.split('T')[0], isHoliday: false };
           } else if (item.date) {
+            // Always strip time portion from date string or Date object
+            const dateStr = typeof item.date === 'string' ? item.date : item.date.toISOString();
             return {
-              date: typeof item.date === 'string' ? item.date : item.date.toISOString().split('T')[0],
+              date: dateStr.split('T')[0],
               reason: item.reason,
               isHoliday: item.isHoliday || false
             };
           }
-          return { date: String(item), isHoliday: false };
+          return { date: String(item).split('T')[0], isHoliday: false };
         });
         console.log('📥 Frontend: Formatted companyBlockedDates:', formattedDates);
         setCompanyBlockedDates(formattedDates);
       }
       if (user.companyBlockedRanges) {
-        const formattedRanges = user.companyBlockedRanges.map((range: { startDate: string | Date; endDate: string | Date; reason?: string; isHoliday?: boolean }) => ({
-          startDate: typeof range.startDate === 'string' ? range.startDate : range.startDate.toISOString().split('T')[0],
-          endDate: typeof range.endDate === 'string' ? range.endDate : range.endDate.toISOString().split('T')[0],
-          reason: range.reason || '',
-          isHoliday: range.isHoliday || false
-        }));
+        const formattedRanges = user.companyBlockedRanges.map((range: { startDate: string | Date; endDate: string | Date; reason?: string; isHoliday?: boolean }) => {
+          const startDateStr = typeof range.startDate === 'string' ? range.startDate : range.startDate.toISOString();
+          const endDateStr = typeof range.endDate === 'string' ? range.endDate : range.endDate.toISOString();
+          return {
+            startDate: startDateStr.split('T')[0],
+            endDate: endDateStr.split('T')[0],
+            reason: range.reason || '',
+            isHoliday: range.isHoliday || false
+          };
+        });
         setCompanyBlockedRanges(formattedRanges);
       }
     }
   }, [user])
+
+  useEffect(() => {
+    if (loading || !isAuthenticated || user?.role !== 'professional') {
+      return
+    }
+
+    const fetchBookingBlocks = async () => {
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/my-bookings`, {
+          credentials: 'include',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined
+        })
+        const result = await response.json()
+
+        if (!response.ok || !result.success) {
+          return
+        }
+
+        const professionalTimeZone = normalizeTimezone(
+          user?.businessInfo?.timezone,
+          getViewerTimezone()
+        )
+        const minutesByDay = new Map<string, number>()
+
+        const parseTimeToMinutes = (value?: string) => {
+          if (!value) return null
+          const [hours, minutes] = value.split(':').map(Number)
+          if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
+          return hours * 60 + minutes
+        }
+
+        const getWorkingWindowUtc = (dateStr: string) => {
+          const dayStartUtc = fromZonedTime(`${dateStr}T00:00:00`, professionalTimeZone)
+          const weekday = formatInTimeZone(dayStartUtc, professionalTimeZone, 'eeee').toLowerCase() as keyof typeof companyAvailability
+          const daySchedule = companyAvailability[weekday]
+
+          if (daySchedule?.available === false) {
+            return null
+          }
+
+          const startTime = daySchedule?.startTime || '09:00'
+          const endTime = daySchedule?.endTime || '17:00'
+          const startMinutes = parseTimeToMinutes(startTime)
+          const endMinutes = parseTimeToMinutes(endTime)
+
+          if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+            return null
+          }
+
+          const workStartUtc = fromZonedTime(`${dateStr}T${startTime}:00`, professionalTimeZone)
+          const workEndUtc = fromZonedTime(`${dateStr}T${endTime}:00`, professionalTimeZone)
+          if (workEndUtc <= workStartUtc) {
+            return null
+          }
+
+          return { workStartUtc, workEndUtc }
+        }
+
+        interface BookingData {
+          scheduledStartDate?: string | Date | null;
+          scheduledExecutionEndDate?: string | Date | null;
+          scheduledBufferStartDate?: string | Date | null;
+          scheduledBufferEndDate?: string | Date | null;
+          status?: string;
+        }
+
+        const activeBookings = (result.bookings || []).filter((booking: BookingData) =>
+          booking?.scheduledStartDate &&
+          (booking?.scheduledExecutionEndDate || booking?.scheduledBufferEndDate) &&
+          !['completed', 'cancelled', 'refunded'].includes(booking?.status || '')
+        )
+
+        activeBookings.forEach((booking: BookingData) => {
+          const parseDate = (value?: string | Date | null) => {
+            if (!value) return null
+            const date = new Date(value)
+            return Number.isNaN(date.getTime()) ? null : date
+          }
+
+          const scheduledStart = parseDate(booking.scheduledStartDate)
+          const executionEnd = parseDate(booking.scheduledExecutionEndDate)
+          const bufferStart = parseDate(booking.scheduledBufferStartDate)
+          const scheduledEnd = parseDate(booking.scheduledBufferEndDate)
+
+          const intervals: Array<{ start: Date; end: Date }> = []
+
+          if (scheduledStart && executionEnd && executionEnd > scheduledStart) {
+            intervals.push({ start: scheduledStart, end: executionEnd })
+          } else if (scheduledStart && scheduledEnd && scheduledEnd > scheduledStart) {
+            intervals.push({ start: scheduledStart, end: scheduledEnd })
+          }
+
+          if (bufferStart && scheduledEnd && scheduledEnd > bufferStart) {
+            intervals.push({ start: bufferStart, end: scheduledEnd })
+          }
+
+          intervals.forEach((interval) => {
+            const startDateKey = formatInTimeZone(interval.start, professionalTimeZone, 'yyyy-MM-dd')
+            const endDateKey = formatInTimeZone(interval.end, professionalTimeZone, 'yyyy-MM-dd')
+            let cursor = parseISO(startDateKey)
+            const endCursor = parseISO(endDateKey)
+
+            while (cursor <= endCursor) {
+              const dateKey = format(cursor, 'yyyy-MM-dd')
+              const workingWindow = getWorkingWindowUtc(dateKey)
+              if (workingWindow) {
+                const overlapStart = Math.max(workingWindow.workStartUtc.getTime(), interval.start.getTime())
+                const overlapEnd = Math.min(workingWindow.workEndUtc.getTime(), interval.end.getTime())
+                if (overlapEnd > overlapStart) {
+                  const minutes = (overlapEnd - overlapStart) / (1000 * 60)
+                  minutesByDay.set(dateKey, (minutesByDay.get(dateKey) || 0) + minutes)
+                }
+              }
+              cursor = addDays(cursor, 1)
+            }
+          })
+        })
+
+        const blocked = Array.from(minutesByDay.entries())
+          .filter(([, minutes]) => minutes >= 240)
+          .map(([date]) => ({ date, reason: 'Booking' }))
+
+        setBookingBlockedDates(blocked)
+      } catch (error) {
+        console.error('Failed to load booking blocks:', error)
+      }
+    }
+
+    fetchBookingBlocks()
+  }, [loading, isAuthenticated, user?.role, user?.businessInfo?.timezone, companyAvailability])
 
   const handleVatNumberChange = (value: string) => {
     setVatNumber(value)
@@ -493,39 +659,58 @@ export default function ProfilePage() {
     }
   }
 
-  const addBlockedRange = async () => {
-    if (!newBlockedRange.startDate || !newBlockedRange.endDate) return
-    
-    const startDate = new Date(newBlockedRange.startDate)
-    const endDate = new Date(newBlockedRange.endDate)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    if (startDate < today) {
-      toast.error('Cannot block dates in the past')
-      return
+  const addBlockedRangeEntry = async (startValue: string, endValue: string, reason?: string) => {
+    const startDate = new Date(startValue)
+    const endDate = new Date(endValue)
+    const now = new Date()
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      toast.error('Please provide valid start and end times')
+      return false
     }
-    
-    if (startDate > endDate) {
-      toast.error('Start date must be before end date')
-      return
+
+    if (startDate < now) {
+      toast.error('Cannot block time in the past')
+      return false
     }
-    
+
+    if (startDate >= endDate) {
+      toast.error('Start must be before end time')
+      return false
+    }
+
     const newRange = {
-      startDate: newBlockedRange.startDate,
-      endDate: newBlockedRange.endDate,
-      reason: newBlockedRange.reason || undefined
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      reason: reason || undefined
     }
-    
+
     const updatedRanges = [...blockedRanges, newRange]
     setBlockedRanges(updatedRanges)
-    setNewBlockedRange({startDate: '', endDate: '', reason: ''})
-    
-    // Save immediately to backend
+
     const success = await saveBlockedDatesAndRanges(blockedDates, updatedRanges)
     if (success) {
-      const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
-      toast.success(`Blocked ${days} day${days === 1 ? '' : 's'} from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()} and saved`)
+      const durationHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
+      if (durationHours >= 24) {
+        const days = Math.ceil(durationHours / 24)
+        toast.success(`Blocked ${days} day${days === 1 ? '' : 's'} from ${startDate.toLocaleString()} to ${endDate.toLocaleString()}`)
+      } else {
+        const roundedHours = Math.round(durationHours * 10) / 10
+        toast.success(`Blocked ${roundedHours} hour${roundedHours === 1 ? '' : 's'} on ${startDate.toLocaleDateString()}`)
+      }
+    }
+
+    return success
+  }
+
+  const addBlockedRange = async () => {
+    if (!newBlockedRange.startDate || !newBlockedRange.endDate) {
+      toast.error('Select start and end values')
+      return
+    }
+    const success = await addBlockedRangeEntry(newBlockedRange.startDate, newBlockedRange.endDate, newBlockedRange.reason)
+    if (success) {
+      setNewBlockedRange({ startDate: '', endDate: '', reason: '' })
     }
   }
 
@@ -1303,7 +1488,7 @@ export default function ProfilePage() {
                 title="Personal Availability"
                 description="Month view with working days, company blocks and your blocks"
                 weeklySchedule={availability}
-                personalBlockedDates={blockedDates}
+                personalBlockedDates={[...blockedDates, ...bookingBlockedDates]}
                 personalBlockedRanges={blockedRanges}
                 companyBlockedDates={companyBlockedDates}
                 companyBlockedRanges={companyBlockedRanges}
@@ -1312,6 +1497,89 @@ export default function ProfilePage() {
                 onAddRange={addBlockedRangeFromCalendar}
                 compact
               />
+
+              <WeeklyTimeBlocker
+                blockedRanges={blockedRanges}
+                onAddBlockedRange={(start, end, reason) => addBlockedRangeEntry(start, end, reason)}
+                onRemoveBlockedRange={removeBlockedRange}
+                description="Block specific hours right from this weekly planner."
+              />
+
+              {/* Personal Weekly Schedule */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Personal Working Hours
+                  </CardTitle>
+                  <CardDescription>
+                    Set your personal weekly schedule and working hours
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {Object.entries(availability).map(([day, schedule]) => (
+                    <div key={day} className="flex items-center gap-4 p-3 border rounded-lg">
+                      <div className="w-20 text-sm font-medium capitalize">{day}</div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={schedule.available}
+                          onChange={(e) => {
+                            setAvailability(prev => ({
+                              ...prev,
+                              [day]: { ...prev[day as keyof typeof prev], available: e.target.checked }
+                            }))
+                          }}
+                          className="rounded"
+                        />
+                        <span className="text-sm">Available</span>
+                      </div>
+                      {schedule.available && (
+                        <>
+                          <Input
+                            type="time"
+                            value={schedule.startTime}
+                            onChange={(e) => {
+                              setAvailability(prev => ({
+                                ...prev,
+                                [day]: { ...prev[day as keyof typeof prev], startTime: e.target.value }
+                              }))
+                            }}
+                            className="w-32"
+                          />
+                          <span className="text-sm">to</span>
+                          <Input
+                            type="time"
+                            value={schedule.endTime}
+                            onChange={(e) => {
+                              setAvailability(prev => ({
+                                ...prev,
+                                [day]: { ...prev[day as keyof typeof prev], endTime: e.target.value }
+                              }))
+                            }}
+                            className="w-32"
+                          />
+                        </>
+                      )}
+                    </div>
+                  ))}
+
+                  <Button
+                    onClick={saveBusinessInfo}
+                    disabled={profileSaving}
+                    className="w-full mt-6"
+                  >
+                    {profileSaving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Personal Schedule'
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
 
               {/* PHASE 4: Enhanced Date Blocking Card */}
               <Card>
@@ -1397,20 +1665,18 @@ export default function ProfilePage() {
                           <Label htmlFor="startDate">Start Date</Label>
                           <Input
                             id="startDate"
-                            type="date"
+                            type="datetime-local"
                             value={newBlockedRange.startDate}
                             onChange={(e) => setNewBlockedRange(prev => ({ ...prev, startDate: e.target.value }))}
-                            min={new Date().toISOString().split('T')[0]}
                           />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="endDate">End Date</Label>
                           <Input
                             id="endDate"
-                            type="date"
+                            type="datetime-local"
                             value={newBlockedRange.endDate}
                             onChange={(e) => setNewBlockedRange(prev => ({ ...prev, endDate: e.target.value }))}
-                            min={newBlockedRange.startDate || new Date().toISOString().split('T')[0]}
                           />
                         </div>
                         <div className="space-y-2">
@@ -1829,7 +2095,7 @@ export default function ProfilePage() {
 
             {/* Employees Tab */}
             <TabsContent value="employees" className="space-y-6">
-              <EmployeeManagement companyName={user?.businessInfo?.companyName || user?.name || ''} />
+              <EmployeeManagement />
             </TabsContent>
 
             {/* Security Tab */}

@@ -30,6 +30,7 @@ interface User {
     city?: string
     country?: string
     postalCode?: string
+    timezone?: string
   }
   hourlyRate?: number
   currency?: string
@@ -105,6 +106,8 @@ interface SignupData {
   role?: 'customer' | 'professional'
 }
 
+const AUTH_TOKEN_KEY = 'authToken'
+
 // Route Configuration
 const ROUTE_CONFIG = {
   // Public routes - accessible to everyone
@@ -115,32 +118,33 @@ const ROUTE_CONFIG = {
     '/professionals',
     '/services',
     '/search',
+    '/categories',
   ],
-  
-  // Auth routes - only accessible when not authenticated
+
+  // Auth routes - only accessible when NOT authenticated
   AUTH: [
     '/login',
     '/register',
     '/join',
-    '/verify-phone',
     '/forgot-password',
-    '/reset-password'
+    '/reset-password',
+    '/signup',
   ],
-  
-  // Protected routes - require authentication
+
+  // Protected routes - require authentication (any role)
   PROTECTED: [
     '/dashboard',
     '/profile',
-    '/settings',
     '/bookings',
   ],
-  
-  // Role-based routes
+
+  // Role-based routes - require specific roles
   ROLE_BASED: {
     admin: ['/admin'],
-    professional: [],
-    customer: [],
+    professional: ['/professional', '/projects/create'],
+    employee: ['/professional', '/projects/create'],
   } as Record<string, string[]>
+  // Note: /professional covers /professional/earnings, /professional/projects/*, etc.
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -155,9 +159,18 @@ export const useAuth = () => {
 
 // Helper functions for route checking
 const isPublicRoute = (pathname: string): boolean => {
-  return ROUTE_CONFIG.PUBLIC.some(route => 
+  // Check standard public routes
+  const isStandardPublic = ROUTE_CONFIG.PUBLIC.some(route =>
     pathname === route || pathname.startsWith(route + '/')
   )
+  if (isStandardPublic) return true
+
+  // Special case: /projects/[id] is public for viewing (but NOT /projects/create)
+  if (pathname.startsWith('/projects/') && !pathname.startsWith('/projects/create')) {
+    return true
+  }
+
+  return false
 }
 
 const isAuthRoute = (pathname: string): boolean => {
@@ -172,12 +185,30 @@ const isProtectedRoute = (pathname: string): boolean => {
   )
 }
 
-const getRequiredRole = (pathname: string): string | null => {
+// Returns all roles that have access to this route
+const getAllowedRoles = (pathname: string): string[] => {
+  const allowedRoles: string[] = []
   for (const [role, routes] of Object.entries(ROUTE_CONFIG.ROLE_BASED)) {
     const hasAccess = routes.some(route => pathname.startsWith(route))
-    if (hasAccess) return role
+    if (hasAccess) {
+      allowedRoles.push(role)
+    }
   }
-  return null
+  return allowedRoles
+}
+
+// Check if a user's role has access to the route
+const hasRoleAccess = (userRole: string, pathname: string): boolean => {
+  // Admin has access to everything
+  if (userRole === 'admin') return true
+
+  const allowedRoles = getAllowedRoles(pathname)
+
+  // If no role restrictions, anyone authenticated can access
+  if (allowedRoles.length === 0) return true
+
+  // Check if user's role is in the allowed list
+  return allowedRoles.includes(userRole)
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -187,10 +218,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const router = useRouter()
   const pathname = usePathname()
 
+  const getStoredToken = () => {
+    if (typeof window === 'undefined') {
+      return null
+    }
+    return window.localStorage.getItem(AUTH_TOKEN_KEY)
+  }
+
+  const persistToken = (token?: string | null) => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    if (token) {
+      window.localStorage.setItem(AUTH_TOKEN_KEY, token)
+    } else {
+      window.localStorage.removeItem(AUTH_TOKEN_KEY)
+    }
+  }
+
   const checkAuth = async () => {
     try {
+      const token = getStoredToken()
+      const headers: Record<string, string> = {}
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/me`, {
         credentials: 'include',
+        headers: Object.keys(headers).length ? headers : undefined
       })
       if (response.ok) {
         const data = await response.json()
@@ -198,11 +256,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return data.user
       } else {
         setUser(null)
+        persistToken(null)
         return null
       }
     } catch (error) {
       console.error('Auth check failed:', error)
       setUser(null)
+      persistToken(null)
       return null
     } finally {
       setLoading(false)
@@ -224,6 +284,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.ok && data.success) {
         setUser(data.user)
+        persistToken(data.token)
         toast.success('Login successful!')
         
         // Handle redirect after successful login
@@ -264,6 +325,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.ok && data.success) {
         setUser(data.user)
+        persistToken(data.token)
         toast.success('Account created successfully!')
         
         if (data.welcomeEmailSent) {
@@ -296,6 +358,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Logout error:', error)
     } finally {
       setUser(null)
+      persistToken(null)
       sessionStorage.removeItem('redirectAfterAuth')
       toast.success('Logged out successfully')
       router.push('/login')
@@ -306,22 +369,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleRouteProtection = async (currentUser: User | null) => {
     const isUserAuthenticated = !!currentUser
 
-    // Handle protected routes
-    if (isProtectedRoute(pathname)) {
+    // Check if this is a role-restricted route
+    const allowedRoles = getAllowedRoles(pathname)
+    const isRoleRestrictedRoute = allowedRoles.length > 0
+
+    // Handle protected routes (require authentication)
+    if (isProtectedRoute(pathname) || isRoleRestrictedRoute) {
       if (!isUserAuthenticated) {
         // Store the intended path for redirect after login
         sessionStorage.setItem('redirectAfterAuth', pathname)
-        const loginUrl = `/login`
-        router.replace(loginUrl)
+        router.replace('/login')
         return
       }
 
-      // Check role-based access
-      const requiredRole = getRequiredRole(pathname)
-      if (requiredRole && currentUser.role !== requiredRole) {
+      // Check role-based access for role-restricted routes
+      if (isRoleRestrictedRoute && !hasRoleAccess(currentUser.role, pathname)) {
         toast.error('You do not have permission to access this page')
-        const dashboardPath = '/dashboard'
-        router.replace(`${dashboardPath}?unauthorized=true`)
+        router.replace('/dashboard?unauthorized=true')
         return
       }
     }
@@ -331,23 +395,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initializeAuth = async () => {
       setLoading(true)
-      
-      // Always check auth status on route change, except for certain paths
-      const skipAuthCheck = isPublicRoute(pathname)
-      
+
+      // Check if this route has role restrictions (takes priority over public routes)
+      const allowedRoles = getAllowedRoles(pathname)
+      const isRoleRestrictedRoute = allowedRoles.length > 0
+      const needsProtection = isRoleRestrictedRoute || isProtectedRoute(pathname) || !isPublicRoute(pathname)
+
+      // Always check auth on first load to properly show user state in navbar
+      // On subsequent navigations to truly public routes, we can skip if already initialized
+      const skipAuthCheck = isInitialized && !needsProtection
+
       let currentUser = user
-      
+
       if (!skipAuthCheck) {
         currentUser = await checkAuth()
       } else {
         setLoading(false)
       }
 
-      // Apply route protection logic
-      if (!skipAuthCheck) {
+      // Apply route protection logic for protected/role-restricted routes
+      if (needsProtection) {
         await handleRouteProtection(currentUser)
       }
-      
+
       setIsInitialized(true)
     }
 

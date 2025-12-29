@@ -11,8 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Upload, X, MapPin, FileText, Star, Users } from "lucide-react"
 import { toast } from 'sonner'
-import AddressAutocomplete from "./AddressAutocomplete"
+import AddressAutocomplete, { type PlaceData } from "./AddressAutocomplete"
 import CertificationManager from "./CertificationManager"
+import { useAuth } from "@/contexts/AuthContext"
 
 interface IServiceSelection {
   category: string
@@ -25,6 +26,7 @@ interface ProjectData {
   category?: string
   service?: string
   areaOfWork?: string
+  timeMode?: 'hours' | 'days'
   categories?: string[]
   services?: IServiceSelection[]
   distance?: {
@@ -32,6 +34,10 @@ interface ProjectData {
     useCompanyAddress: boolean
     maxKmRange: number
     noBorders: boolean
+    coordinates?: {
+      latitude: number
+      longitude: number
+    }
   }
   resources?: string[]
   intakeMeeting?: {
@@ -58,6 +64,20 @@ interface ProjectData {
     uploadedAt: Date
     isRequired: boolean
   }>
+  minResources?: number
+  minOverlapPercentage?: number
+  preparationDuration?: {
+    value: number
+    unit: 'hours' | 'days'
+  }
+  executionDuration?: {
+    value: number
+    unit: 'hours' | 'days'
+  }
+  bufferDuration?: {
+    value: number
+    unit: 'hours' | 'days'
+  }
 }
 
 interface TeamMember {
@@ -83,6 +103,7 @@ const Step1BasicInfo = forwardRef<Step1Ref, Step1Props>(({ data, onChange, onVal
   const [keywordInput, setKeywordInput] = useState('')
   const [suggestedTitle, setSuggestedTitle] = useState('')
   const [addressValid, setAddressValid] = useState(false)
+  const { user } = useAuth()
   const [serviceConfig, setServiceConfig] = useState<{
     pricingModel?: string;
     certificationRequired?: boolean;
@@ -94,6 +115,15 @@ const Step1BasicInfo = forwardRef<Step1Ref, Step1Props>(({ data, onChange, onVal
 
   // Derived flags
   const isRenovationCategory = (formData.category || '').toLowerCase() === 'renovation'
+  const selectedResourceCount = formData.resources?.length ?? 0
+  const companyAddress = [
+    user?.businessInfo?.address,
+    user?.businessInfo?.postalCode,
+    user?.businessInfo?.city,
+    user?.businessInfo?.country,
+  ]
+    .filter(Boolean)
+    .join(', ')
 
   // Backend data
   const [categories, setCategories] = useState<string[]>([])
@@ -104,6 +134,15 @@ const Step1BasicInfo = forwardRef<Step1Ref, Step1Props>(({ data, onChange, onVal
   const [loadingServices, setLoadingServices] = useState(false)
   const [loadingAreas, setLoadingAreas] = useState(false)
   const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
+
+  // Ensure defaults for resource fields
+  useEffect(() => {
+    setFormData(prev => ({
+      minResources: prev.minResources || 1,
+      minOverlapPercentage: prev.minOverlapPercentage ?? 70,
+      ...prev
+    }))
+  }, [])
 
 
   // Fetch categories and team members on mount
@@ -291,6 +330,22 @@ const Step1BasicInfo = forwardRef<Step1Ref, Step1Props>(({ data, onChange, onVal
     }
   }, [pricingModels])
 
+  useEffect(() => {
+    const currentMin = formData.minResources ?? 1
+
+    if (selectedResourceCount === 0) {
+      if (formData.minResources !== undefined) {
+        setFormData(prev => ({ ...prev, minResources: undefined }))
+      }
+      return
+    }
+
+    const clampedMinimum = Math.min(selectedResourceCount, Math.max(1, currentMin))
+    if (clampedMinimum !== currentMin) {
+      setFormData(prev => ({ ...prev, minResources: clampedMinimum }))
+    }
+  }, [formData.minResources, formData.resources, selectedResourceCount])
+
   const validateForm = () => {
     // Check if area of work is required and missing
     const isAreaOfWorkValid = !serviceConfig?.areaOfWorkRequired ||
@@ -314,8 +369,6 @@ const Step1BasicInfo = forwardRef<Step1Ref, Step1Props>(({ data, onChange, onVal
     const isRenovation = (formData.category || '').toLowerCase() === 'renovation'
     const hasExecutionResources = Array.isArray(formData.resources) && formData.resources.length > 0
     const hasIntakeResources = Array.isArray(formData.intakeMeeting?.resources) && (formData.intakeMeeting?.resources.length || 0) > 0
-    const planningEnabled = !!formData.renovationPlanning?.fixeraManaged
-
     const isResourcesValid = isRenovation
       ? (hasIntakeResources && hasExecutionResources)
       : hasExecutionResources
@@ -411,7 +464,13 @@ const Step1BasicInfo = forwardRef<Step1Ref, Step1Props>(({ data, onChange, onVal
     setFormData(prev => ({ ...prev, ...updates }))
   }
 
-  const updateDistance = (updates: Partial<{ address: string; useCompanyAddress: boolean; maxKmRange: number; noBorders: boolean }>) => {
+  const updateDistance = (updates: Partial<{
+    address: string
+    useCompanyAddress: boolean
+    maxKmRange: number
+    noBorders: boolean
+    coordinates?: { latitude: number; longitude: number }
+  }>) => {
     setFormData(prev => ({
       ...prev,
       distance: {
@@ -419,6 +478,7 @@ const Step1BasicInfo = forwardRef<Step1Ref, Step1Props>(({ data, onChange, onVal
         useCompanyAddress: prev.distance?.useCompanyAddress || false,
         maxKmRange: prev.distance?.maxKmRange || 50,
         noBorders: prev.distance?.noBorders || false,
+        coordinates: prev.distance?.coordinates,
         ...updates
       }
     }))
@@ -751,10 +811,22 @@ const Step1BasicInfo = forwardRef<Step1Ref, Step1Props>(({ data, onChange, onVal
 
           <AddressAutocomplete
             value={formData.distance?.address || ''}
-            onChange={(address) => updateDistance({ address })}
+            onChange={(address, place?: PlaceData) => {
+              if (place?.coordinates) {
+                updateDistance({
+                  address,
+                  coordinates: {
+                    latitude: place.coordinates.lat,
+                    longitude: place.coordinates.lng,
+                  },
+                })
+              } else {
+                updateDistance({ address, coordinates: undefined })
+              }
+            }}
             onValidation={setAddressValid}
             useCompanyAddress={formData.distance?.useCompanyAddress || false}
-            companyAddress="[Get from user profile]"
+            companyAddress={companyAddress}
             label="Service Address"
             required
           />
@@ -780,6 +852,7 @@ const Step1BasicInfo = forwardRef<Step1Ref, Step1Props>(({ data, onChange, onVal
                 onCheckedChange={(checked) => updateDistance({ noBorders: checked as boolean })}
               />
               <Label htmlFor="noBorders">Don&apos;t cross country borders</Label>
+              
             </div>
           </div>
         </CardContent>
@@ -1017,6 +1090,64 @@ const Step1BasicInfo = forwardRef<Step1Ref, Step1Props>(({ data, onChange, onVal
           </Card>
         </>
       )}
+
+      {/* Resource Planning - Shown AFTER team member selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Resource Planning</CardTitle>
+          <CardDescription>
+            Configure resource requirements based on your selected team members
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Minimum Required Resources</Label>
+              <Input
+                type="number"
+                min={selectedResourceCount === 0 ? 0 : 1}
+                max={selectedResourceCount === 0 ? undefined : selectedResourceCount}
+                value={selectedResourceCount === 0 ? 0 : (formData.minResources ?? 1)}
+                disabled={selectedResourceCount === 0}
+                onChange={(e) => {
+                  const value = Number(e.target.value)
+                  if (Number.isNaN(value) || selectedResourceCount === 0) return
+                  const clamped = Math.min(selectedResourceCount, Math.max(1, value))
+                  updateFormData({
+                    minResources: clamped
+                  })
+                }}
+              />
+              <p className="text-xs text-gray-500">
+                {selectedResourceCount === 0
+                  ? 'Select execution team members to enable resource limits'
+                  : `Cannot exceed ${selectedResourceCount} selected resource${selectedResourceCount === 1 ? '' : 's'}`}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Minimum Overlap Between Resources (%)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={formData.minOverlapPercentage ?? 70}
+                onChange={(e) => {
+                  const value = Number(e.target.value)
+                  const clamped = Math.min(100, Math.max(0, isNaN(value) ? 70 : value))
+                  updateFormData({ minOverlapPercentage: clamped })
+                }}
+                disabled={(formData.minResources ?? 1) <= 1}
+              />
+              <p className="text-xs text-gray-500">
+                {(formData.minResources ?? 1) <= 1
+                  ? 'Only available when required resources > 1'
+                  : 'Percentage of time resources must work together'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Description & Pricing */}
       <Card>
