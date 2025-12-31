@@ -1,19 +1,7 @@
 import { useState, useEffect } from 'react';
+import { FilterOptions, DEFAULT_PRICE_MODELS } from '@/types/filters';
 
-export interface FilterOptions {
-  services: string[];
-  projectTypes: string[];
-  includedItems: string[];
-  areasOfWork: string[];
-  priceModels: Array<{ value: string; label: string }>;
-  categories: string[];
-}
-
-const DEFAULT_PRICE_MODELS: FilterOptions["priceModels"] = [
-  { value: 'fixed', label: 'Fixed Price' },
-  { value: 'unit', label: 'Unit Based' },
-  { value: 'rfq', label: 'Request for Quote' }
-];
+export type { FilterOptions } from '@/types/filters';
 
 interface ServiceCategoryResponse {
   name: string;

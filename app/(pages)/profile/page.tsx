@@ -119,7 +119,10 @@ export default function ProfilePage() {
   const addBlockedRangeFromCalendar = async (startDate: string, endDate: string) => {
     const startIso = new Date(`${startDate}T00:00:00`).toISOString()
     const endIso = new Date(`${endDate}T23:59:00`).toISOString()
-    await addBlockedRangeEntry(startIso, endIso)
+    const success = await addBlockedRangeEntry(startIso, endIso, undefined, true)
+    if (!success) {
+      // User already notified via toast in addBlockedRangeEntry
+    }
   }
 
   useEffect(() => {
@@ -219,12 +222,13 @@ export default function ProfilePage() {
         setCompanyBlockedDates(formattedDates);
       }
       if (user.companyBlockedRanges) {
+        // Keep full ISO timestamps for consistency with personal ranges
         const formattedRanges = user.companyBlockedRanges.map((range: { startDate: string | Date; endDate: string | Date; reason?: string; isHoliday?: boolean }) => {
           const startDateStr = typeof range.startDate === 'string' ? range.startDate : range.startDate.toISOString();
           const endDateStr = typeof range.endDate === 'string' ? range.endDate : range.endDate.toISOString();
           return {
-            startDate: startDateStr.split('T')[0],
-            endDate: endDateStr.split('T')[0],
+            startDate: startDateStr,
+            endDate: endDateStr,
             reason: range.reason || '',
             isHoliday: range.isHoliday || false
           };
@@ -627,7 +631,7 @@ export default function ProfilePage() {
     }
   }
 
-  const addBlockedRangeEntry = async (startValue: string, endValue: string, reason?: string) => {
+  const addBlockedRangeEntry = async (startValue: string, endValue: string, reason?: string, isFullDayRange = false) => {
     const startDate = new Date(startValue)
     const endDate = new Date(endValue)
     const now = new Date()
@@ -637,7 +641,16 @@ export default function ProfilePage() {
       return false
     }
 
-    if (startDate < now) {
+    // For full-day ranges from calendar, compare dates only (not timestamps)
+    // This allows blocking "today" when the time is 00:00:00
+    if (isFullDayRange) {
+      const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
+      const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      if (startDateOnly < todayDateOnly) {
+        toast.error('Cannot block dates in the past')
+        return false
+      }
+    } else if (startDate < now) {
       toast.error('Cannot block time in the past')
       return false
     }

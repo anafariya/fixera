@@ -36,14 +36,9 @@ export interface SearchFiltersState {
 
 export type SearchFilterKey = keyof SearchFiltersState;
 
-export interface FilterOptions {
-  services?: string[];
-  projectTypes?: string[];
-  includedItems?: string[];
-  areasOfWork?: string[];
-  priceModels?: Array<{ value: string; label: string }>;
-  categories?: string[];
-}
+// Re-export FilterOptions from shared types for backward compatibility
+export type { FilterOptions } from '@/types/filters';
+import type { FilterOptions } from '@/types/filters';
 
 export interface ProjectFacetCounts {
   categories: Record<string, number>;
