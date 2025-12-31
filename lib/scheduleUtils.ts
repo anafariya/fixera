@@ -68,9 +68,6 @@ export function getWorkingWindowUtc(
 
   const workStartUtc = fromZonedTime(`${dateStr}T${startTime}:00`, professionalTimeZone)
   const workEndUtc = fromZonedTime(`${dateStr}T${endTime}:00`, professionalTimeZone)
-  if (workEndUtc <= workStartUtc) {
-    return null
-  }
 
   return { workStartUtc, workEndUtc }
 }
