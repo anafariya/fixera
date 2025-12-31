@@ -119,10 +119,7 @@ export default function ProfilePage() {
   const addBlockedRangeFromCalendar = async (startDate: string, endDate: string) => {
     const startIso = new Date(`${startDate}T00:00:00`).toISOString()
     const endIso = new Date(`${endDate}T23:59:00`).toISOString()
-    const success = await addBlockedRangeEntry(startIso, endIso, undefined, true)
-    if (!success) {
-      // User already notified via toast in addBlockedRangeEntry
-    }
+    await addBlockedRangeEntry(startIso, endIso, undefined, true)
   }
 
   useEffect(() => {
@@ -243,12 +240,15 @@ export default function ProfilePage() {
       return
     }
 
+    const abortController = new AbortController()
+
     const fetchBookingBlocks = async () => {
       try {
         const token = getAuthToken()
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/my-bookings`, {
           credentials: 'include',
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: abortController.signal
         })
         const result = await response.json()
 
@@ -366,12 +366,20 @@ export default function ProfilePage() {
 
         setBookingBlockedDates(blocked)
       } catch (error) {
+        // Ignore abort errors (expected when component unmounts)
+        if (error instanceof Error && error.name === 'AbortError') {
+          return
+        }
         console.error('Failed to load booking blocks:', error)
         toast.error('Failed to load booking blocks. Please refresh to try again.')
       }
     }
 
     fetchBookingBlocks()
+
+    return () => {
+      abortController.abort()
+    }
   }, [loading, isAuthenticated, user?.role, user?.businessInfo?.timezone, availabilityKey])
 
   const handleVatNumberChange = (value: string) => {

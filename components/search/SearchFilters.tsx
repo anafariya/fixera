@@ -38,7 +38,7 @@ export type SearchFilterKey = keyof SearchFiltersState;
 
 // Re-export FilterOptions from shared types for backward compatibility
 export type { FilterOptions } from '@/types/filters';
-import type { FilterOptions } from '@/types/filters';
+import { type FilterOptions, DEFAULT_PRICE_MODELS } from '@/types/filters';
 
 export interface ProjectFacetCounts {
   categories: Record<string, number>;
@@ -77,8 +77,8 @@ const COMMON_INCLUDED_ITEMS = [
   'Transportation', 'Design Services', 'Consultation', 'Warranty'
 ];
 
-// Price models
-const PRICE_MODELS = [
+// Use shared price models constant (with fallback for type safety)
+const PRICE_MODELS = DEFAULT_PRICE_MODELS ?? [
   { value: 'fixed', label: 'Fixed Price' },
   { value: 'unit', label: 'Unit Based' },
   { value: 'rfq', label: 'Request for Quote' }
@@ -604,11 +604,6 @@ const SearchFilters = ({
             </SelectItem>
           </SelectContent>
         </Select>
-        {filters.sortBy === 'popularity' && (
-          <p className="text-xs text-gray-500 mt-1">
-            Available in future release - based on reviews and bookings
-          </p>
-        )}
       </div>
     </div>
   );
