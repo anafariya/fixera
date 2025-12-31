@@ -61,7 +61,10 @@ interface ISubproject {
   included: IIncludedItem[]
   materialsIncluded: boolean
   materials?: IMaterial[]
-  deliveryPreparation: number
+  preparationDuration?: {
+    value: number
+    unit: 'hours' | 'days'
+  }
   executionDuration: {
     value: number
     unit: 'hours' | 'days'
@@ -96,6 +99,7 @@ interface ProjectData {
   category?: string
   service?: string
   areaOfWork?: string
+  timeMode?: 'hours' | 'days'
   priceModel?: string
 }
 
@@ -136,8 +140,22 @@ const PREDEFINED_INCLUDED_ITEMS = {
 }
 
 export default function Step2Subprojects({ data, onChange, onValidate }: Step2Props) {
-  const [subprojects, setSubprojects] = useState<ISubproject[]>(
-    data.subprojects || []
+  const normalizePreparationDuration = (subproject?: ISubproject) => {
+    const value =
+      typeof subproject?.preparationDuration?.value === 'number'
+        ? subproject.preparationDuration.value
+        : 1
+    const unit = (subproject?.preparationDuration?.unit || 'days') as 'hours' | 'days'
+    return { value, unit }
+  }
+
+  const resolvePreparationUnit = (subproject?: ISubproject) =>
+    normalizePreparationDuration(subproject).unit
+  const [subprojects, setSubprojects] = useState<ISubproject[]>(() =>
+    (data.subprojects || []).map((sub) => ({
+      ...sub,
+      preparationDuration: normalizePreparationDuration(sub)
+    }))
   )
 
   // NEW: Dynamic fields from backend
@@ -231,6 +249,8 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
       sub.pricing.type &&
       (sub.pricing.type === 'rfq' || sub.pricing.amount) &&
       sub.included.length >= 3 &&
+      sub.preparationDuration &&
+      typeof sub.preparationDuration.value === 'number' &&
       sub.executionDuration.value > 0 &&
       // Materials validation: if materialsIncluded is true, must have at least one material
       (!sub.materialsIncluded || (sub.materials && sub.materials.length > 0))
@@ -261,7 +281,7 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
       included: [],
       materialsIncluded: false,
       materials: [],
-      deliveryPreparation: 1,
+      preparationDuration: { value: 1, unit: 'days' },
       executionDuration: {
         value: 1,
         unit: 'hours'
@@ -377,18 +397,6 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
 
     updateSubproject(subprojectId, {
       materials: (subproject.materials || []).filter((_, index) => index !== materialIndex)
-    })
-  }
-
-  const updateMaterial = (subprojectId: string, materialIndex: number, updates: Partial<IMaterial>) => {
-    const subproject = subprojects.find(s => s.id === subprojectId)
-    if (!subproject) return
-
-    const updatedMaterials = [...(subproject.materials || [])]
-    updatedMaterials[materialIndex] = { ...updatedMaterials[materialIndex], ...updates }
-
-    updateSubproject(subprojectId, {
-      materials: updatedMaterials
     })
   }
 
@@ -597,32 +605,58 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
                   <div className="w-full flex gap-4">
                     <div>
                       <Label>Pricing Type *</Label>
-                      <Select
-                        value={subproject.pricing.type}
-                        onValueChange={(value: string) => {
-                          // If user chooses the service's price model label option, map to fixed
-                          const resolved: 'fixed' | 'unit' | 'rfq' = value === 'model' ? 'fixed' : (value as 'fixed' | 'unit' | 'rfq')
-                          updateSubproject(subproject.id, {
-                            pricing: { ...subproject.pricing, type: resolved }
-                          })
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {data.priceModel && data.category?.toLowerCase() !== 'renovation' && (
-                            <SelectItem value="model">{data.priceModel}</SelectItem>
-                          )}
-                          <SelectItem value="rfq">RFQ</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <Select
+                      value={subproject.pricing.type}
+                      onValueChange={(value: 'fixed' | 'unit' | 'rfq') => {
+                        updateSubproject(subproject.id, {
+                          pricing: { ...subproject.pricing, type: value }
+                        })
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select pricing type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {data.priceModel && data.category?.toLowerCase() !== 'renovation' ? (
+                          <SelectItem value="fixed">{data.priceModel}</SelectItem>
+                        ) : (
+                          <>
+                            <SelectItem value="fixed">Fixed Price (Total)</SelectItem>
+                            <SelectItem value="unit">Unit Price (EUR/unit)</SelectItem>
+                          </>
+                        )}
+                        <SelectItem value="rfq">RFQ (Request for Quote)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">
+                      Current selection:{' '}
+                      {subproject.pricing.type === 'fixed' && (data.priceModel && data.category?.toLowerCase() !== 'renovation' ? data.priceModel : 'Fixed Price (Total)')}
+                      {subproject.pricing.type === 'unit' && 'Unit Price (per unit)'}
+                      {subproject.pricing.type === 'rfq' && 'Request for Quote'}
+                      {!subproject.pricing.type && 'None'}
+                    </p>
+                  </div>
 
                     {subproject.pricing.type === 'fixed' && (
+                      <div>
+                        <Label>Total Price (EUR) *</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={subproject.pricing.amount || ''}
+                          onChange={(e) => updateSubproject(subproject.id, {
+                            pricing: { ...subproject.pricing, amount: parseFloat(e.target.value) }
+                          })}
+                          placeholder="0.00"
+                        />
+                      </div>
+                    )}
+
+                    {subproject.pricing.type === 'unit' && (
                       <>
                         <div>
-                          <Label>{data.priceModel} (€) *</Label>
+                          <Label>Price per Unit (EUR/unit) *</Label>
                           <Input
                             type="number"
                             min="0"
@@ -635,7 +669,7 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
                           />
                         </div>
                         <div>
-                          <Label>Minimum Order Value (€) *</Label>
+                          <Label>Minimum Order Value (EUR)</Label>
                           <Input
                             type="number"
                             min="0"
@@ -652,7 +686,7 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
 
                     {subproject.pricing.type === 'rfq' && (
                       <div className="md:col-span-2">
-                        <Label>Estimated Price Range (€)</Label>
+                        <Label>Estimated Price Range (EUR)</Label>
                         <div className="flex space-x-2">
                           <Input
                             type="number"
@@ -1118,24 +1152,52 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <Label>Preparation Time (days) *</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={subproject.deliveryPreparation}
-                        onChange={(e) => updateSubproject(subproject.id, {
-                          deliveryPreparation: parseInt(e.target.value) || 0
-                        })}
-                      />
+                      <Label>Preparation Time *</Label>
+                      <div className="flex space-x-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={subproject.preparationDuration?.value ?? 0}
+                          onChange={(e) => {
+                            const parsed = parseFloat(e.target.value)
+                            updateSubproject(subproject.id, {
+                              preparationDuration: {
+                                value: Number.isNaN(parsed) ? 0 : parsed,
+                                unit: resolvePreparationUnit(subproject)
+                              }
+                            })
+                          }}
+                        />
+                        <Select
+                          value={resolvePreparationUnit(subproject)}
+                          onValueChange={(value: 'hours' | 'days') =>
+                            updateSubproject(subproject.id, {
+                              preparationDuration: {
+                                value: subproject.preparationDuration?.value ?? 0,
+                                unit: value
+                              }
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-24">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hours">Hours</SelectItem>
+                            <SelectItem value="days">Days</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        Time needed before starting work
+                        Time needed before starting work ({resolvePreparationUnit(subproject)})
                       </p>
                     </div>
 
                     {subproject.pricing.type === 'rfq' ? (
                       <>
                         <div>
-                          <Label>Minimum (days) *</Label>
+                          <Label>Minimum *</Label>
                           <Input
                             type="number"
                             min="1"
@@ -1153,7 +1215,7 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
                           />
                         </div>
                         <div>
-                          <Label>Maximum (days) *</Label>
+                          <Label>Maximum *</Label>
                           <Input
                             type="number"
                             min="1"
@@ -1344,7 +1406,7 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
                     <tr key={sub.id} className="border-b">
                       <td className="p-2 font-medium">{sub.name || `Package ${index + 1}`}</td>
                       <td className="p-2">
-                        {sub.pricing.type === 'fixed' && sub.pricing.amount && `€${sub.pricing.amount} (${data.priceModel})`}
+                        {sub.pricing.type === 'fixed' && sub.pricing.amount && `EUR ${sub.pricing.amount} (${data.priceModel})`}
                         {sub.pricing.type === 'rfq' && 'Quote required'}
                       </td>
                       <td className="p-2">
@@ -1365,7 +1427,7 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
                 <div className="flex items-center space-x-2">
                   <Info className="w-4 h-4 text-blue-600" />
                   <span className="font-medium text-blue-900">
-                    Total fixed price packages: €{calculateTotalPrice().toFixed(2)}
+                    Total fixed price packages: EUR {calculateTotalPrice().toFixed(2)}
                   </span>
                 </div>
               </div>
