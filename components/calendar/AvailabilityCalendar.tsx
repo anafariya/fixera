@@ -147,7 +147,6 @@ export default function AvailabilityCalendar({
   const isPB = (d: Date) =>
     pSet.has(ymd(d)) || inRanges(d, personalBlockedRanges);
   const isPartial = (d: Date) => partialMap.has(ymd(d));
-  const getPartialMinutes = (d: Date) => partialMap.get(ymd(d)) || 0;
   const isWork = (d: Date) => {
     const idx = d.getDay();
     const key: WeekdayKey = [
@@ -194,7 +193,6 @@ export default function AvailabilityCalendar({
     if (isCompanyBlocked(d)) return 'Company Block';
     if (isPB(d)) return 'Blocked';
     if (isPartial(d)) {
-      const mins = (d);
       return `Partially booked`;
     }
     if (isWork(d)) return 'Available';
