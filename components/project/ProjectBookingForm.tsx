@@ -647,11 +647,37 @@ export default function ProjectBookingForm({
     return (executionSource.value || 0) * 24;
   };
 
+  const adjustRangeEndForMidnightUtc = (
+    rangeEnd: Date,
+    targetDate: Date,
+    tz: string,
+    dayEndOverride?: Date
+  ): Date => {
+    const isExactMidnightUTC =
+      rangeEnd.getUTCHours() === 0 &&
+      rangeEnd.getUTCMinutes() === 0 &&
+      rangeEnd.getUTCSeconds() === 0;
+
+    if (!isExactMidnightUTC) {
+      return rangeEnd;
+    }
+
+    const rangeEndDateInTz = formatInTimeZone(rangeEnd, tz, 'yyyy-MM-dd');
+    const targetDateInTz = formatInTimeZone(targetDate, tz, 'yyyy-MM-dd');
+
+    if (rangeEndDateInTz !== targetDateInTz) {
+      return rangeEnd;
+    }
+
+    return dayEndOverride || addDays(startOfDay(targetDate), 1);
+  };
+
   const getBlockedIntervalsForDate = (date: Date) => {
     const intervals: Array<{ start: Date; end: Date }> = [];
     const dayStart = startOfDay(date);
     const dayEnd = addDays(dayStart, 1);
     const dateKey = format(dayStart, 'yyyy-MM-dd');
+    const tz = normalizeTimezone(professionalTimezone);
 
     if (blockedDates.blockedDates.includes(dateKey)) {
       intervals.push({ start: dayStart, end: dayEnd });
@@ -660,7 +686,7 @@ export default function ProjectBookingForm({
     blockedDates.blockedRanges.forEach((range) => {
       try {
         const rangeStart = parseISO(range.startDate);
-        const rangeEnd = parseISO(range.endDate);
+        let rangeEnd = parseISO(range.endDate);
 
         if (
           Number.isNaN(rangeStart.getTime()) ||
@@ -668,6 +694,8 @@ export default function ProjectBookingForm({
         ) {
           return;
         }
+
+        rangeEnd = adjustRangeEndForMidnightUtc(rangeEnd, date, tz, dayEnd);
 
         if (rangeEnd <= dayStart || rangeStart >= dayEnd) {
           return;
@@ -695,6 +723,7 @@ export default function ProjectBookingForm({
     const { startTime, endTime } = getWorkingHoursForDate(date);
     const [startHour, startMin] = startTime.split(':').map(Number);
     const [endHour, endMin] = endTime.split(':').map(Number);
+    const dayEnd = addDays(startOfDay(date), 1);
 
     // Create working hours in professional's timezone, then convert to UTC for comparison
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -708,11 +737,17 @@ export default function ProjectBookingForm({
 
     const clamped = intervals
       .map((interval) => {
+        const intervalEnd = adjustRangeEndForMidnightUtc(
+          interval.end,
+          date,
+          tz,
+          dayEnd
+        ).getTime();
         const start = Math.max(
           interval.start.getTime(),
           workingStart.getTime()
         );
-        const end = Math.min(interval.end.getTime(), workingEnd.getTime());
+        const end = Math.min(intervalEnd, workingEnd.getTime());
         return { start, end };
       })
       .filter((interval) => interval.end > interval.start)
@@ -750,16 +785,24 @@ export default function ProjectBookingForm({
     if (windowEnd <= windowStart) {
       return false;
     }
+    const tz = normalizeTimezone(professionalTimezone);
+    const dayEnd = addDays(startOfDay(windowStart), 1);
 
     return blockedDates.blockedRanges.some((range) => {
       const rangeStart = parseISO(range.startDate);
-      const rangeEnd = parseISO(range.endDate);
+      let rangeEnd = parseISO(range.endDate);
       if (
         Number.isNaN(rangeStart.getTime()) ||
         Number.isNaN(rangeEnd.getTime())
       ) {
         return false;
       }
+      rangeEnd = adjustRangeEndForMidnightUtc(
+        rangeEnd,
+        windowStart,
+        tz,
+        dayEnd
+      );
       return windowStart < rangeEnd && windowEnd > rangeStart;
     });
   };
@@ -1171,24 +1214,7 @@ export default function ProjectBookingForm({
       return true;
     }
 
-    const dayStart = startOfDay(dateObj);
-    const dayEnd = addDays(dayStart, 1);
-
-    const intervals: Array<{ start: Date; end: Date }> = [];
-    blockedDates.blockedRanges.forEach((range) => {
-      const rangeStart = parseISO(range.startDate);
-      const rangeEnd = parseISO(range.endDate);
-      if (
-        Number.isNaN(rangeStart.getTime()) ||
-        Number.isNaN(rangeEnd.getTime())
-      ) {
-        return;
-      }
-      if (rangeStart < dayEnd && rangeEnd > dayStart) {
-        intervals.push({ start: rangeStart, end: rangeEnd });
-      }
-    });
-
+    const intervals = getBlockedIntervalsForDate(dateObj);
     return shouldBlockDayForIntervals(dateObj, intervals);
   };
 
@@ -1212,26 +1238,7 @@ export default function ProjectBookingForm({
           return false; // Already disabled above
         }
 
-        const dayStart = startOfDay(date);
-        const dayEnd = addDays(dayStart, 1);
-
-        // Build intervals from blocked ranges that overlap this day
-        const intervals: Array<{ start: Date; end: Date }> = [];
-        blockedDates.blockedRanges.forEach((range) => {
-          const rangeStart = parseISO(range.startDate);
-          const rangeEnd = parseISO(range.endDate);
-          if (
-            Number.isNaN(rangeStart.getTime()) ||
-            Number.isNaN(rangeEnd.getTime())
-          ) {
-            return;
-          }
-          if (rangeStart < dayEnd && rangeEnd > dayStart) {
-            intervals.push({ start: rangeStart, end: rangeEnd });
-          }
-        });
-
-        // Use the 4-hour threshold check
+        const intervals = getBlockedIntervalsForDate(date);
         return shouldBlockDayForIntervals(date, intervals);
       };
       disabledMatchers.push(rangeBlockMatcher);
