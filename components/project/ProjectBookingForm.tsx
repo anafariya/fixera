@@ -735,7 +735,6 @@ export default function ProjectBookingForm({
           endDate.getUTCSeconds() === 0;
 
         // Get the date string in professional's timezone for comparison
-        const tz = normalizeTimezone(professionalTimezone);
         const endDateInTz = formatInTimeZone(endDate, tz, 'yyyy-MM-dd');
         const checkDateInTz = formatInTimeZone(date, tz, 'yyyy-MM-dd');
 
@@ -745,6 +744,7 @@ export default function ProjectBookingForm({
           intervalEnd = workingEnd.getTime();
         }
 
+        
         const start = Math.max(
           interval.start.getTime(),
           workingStart.getTime()
