@@ -578,7 +578,7 @@ export default function ProjectCreatePage() {
         }
       }
     } else if (currentStep === 3) {
-      toast.info('Step 3 is optional - you can proceed to the next step')
+      toast.info('Please specify customer presence requirement')
     } else if (currentStep === 4) {
       toast.info('Step 4 is optional - you can proceed to the next step')
     } else if (currentStep === 5) {

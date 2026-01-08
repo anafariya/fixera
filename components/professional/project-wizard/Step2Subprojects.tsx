@@ -56,8 +56,6 @@ interface ISubproject {
     type: 'fixed' | 'unit' | 'rfq'
     amount?: number
     priceRange?: { min: number; max: number }
-    minProjectValue?: number
-    includedQuantity?: number // Fixed pricing: max quantity covered by price
     minOrderQuantity?: number // Unit pricing: minimum order quantity
   }
   included: IIncludedItem[]
@@ -141,31 +139,29 @@ const PREDEFINED_INCLUDED_ITEMS = {
   ]
 }
 
-// Price models that represent a total/flat price (no per-unit quantity)
-const TOTAL_PRICE_MODELS = new Set([
-  'total',
-  'total price',
-  'fixed price total',
-  'flat rate',
-  'flat price',
-  'project total',
-  'lump sum'
-])
-
+// Check if priceModel is a "total price" type (fixed pricing)
 const isTotalPriceModel = (priceModel?: string): boolean => {
   if (!priceModel) return false
-  // Normalize: lowercase, replace separators with space, collapse spaces, trim
-  const normalized = priceModel
-    .toLowerCase()
-    .replace(/[\W_]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  return TOTAL_PRICE_MODELS.has(normalized)
+  const normalized = priceModel.toLowerCase().trim()
+  return normalized === 'total price' || normalized === 'total' || normalized === 'fixed price'
+}
+
+// Get unit label from priceModel (e.g., "m² of floor surface" → "m²")
+const getUnitLabel = (priceModel?: string): string => {
+  if (!priceModel) return 'unit'
+  const normalized = priceModel.toLowerCase().trim()
+  if (normalized.includes('m²') || normalized.includes('m2')) return 'm²'
+  if (normalized.includes('hour')) return 'hour'
+  if (normalized.includes('day')) return 'day'
+  if (normalized.includes('meter')) return 'meter'
+  if (normalized.includes('room')) return 'room'
+  return priceModel // Return original if no match
 }
 
 export default function Step2Subprojects({ data, onChange, onValidate }: Step2Props) {
-  // Show included quantity field for unit-based price models (e.g., "per m²", "per hour")
-  const showIncludedQuantity = data.priceModel && !isTotalPriceModel(data.priceModel)
+  // Determine if this is a total price model or unit-based model
+  const isTotalPrice = isTotalPriceModel(data.priceModel)
+  const unitLabel = getUnitLabel(data.priceModel)
 
   const normalizePreparationDuration = (subproject?: ISubproject) => {
     const value =
@@ -269,6 +265,38 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subprojects])
 
+  // Fix pricing types when priceModel changes (ensure they match available options)
+  useEffect(() => {
+    const isRenovation = data.category?.toLowerCase() === 'renovation'
+
+    // Determine valid pricing types based on category and priceModel
+    const getValidTypes = (): Array<'fixed' | 'unit' | 'rfq'> => {
+      if (isRenovation) return ['rfq']
+      if (isTotalPrice) return ['fixed', 'rfq']
+      return ['unit', 'rfq']
+    }
+
+    const validTypes = getValidTypes()
+    const defaultType = validTypes[0]
+
+    // Check if any subproject has an invalid pricing type
+    const needsUpdate = subprojects.some(sub => !validTypes.includes(sub.pricing.type))
+
+    if (needsUpdate && subprojects.length > 0) {
+      const updatedSubprojects = subprojects.map(sub => {
+        if (!validTypes.includes(sub.pricing.type)) {
+          return {
+            ...sub,
+            pricing: { ...sub.pricing, type: defaultType }
+          }
+        }
+        return sub
+      })
+      setSubprojects(updatedSubprojects)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.priceModel, data.category, isTotalPrice])
+
   const validateForm = () => {
     const isValid = subprojects.length > 0 && subprojects.every(sub =>
       sub.name &&
@@ -291,9 +319,18 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
       return
     }
 
-    // Set default pricing type based on category
+    // Set default pricing type based on category and priceModel
     const isRenovation = data.category?.toLowerCase() === 'renovation'
-    const defaultPricingType = isRenovation ? 'rfq' : 'fixed'
+    let defaultPricingType: 'fixed' | 'unit' | 'rfq' = 'rfq'
+
+    if (isRenovation) {
+      defaultPricingType = 'rfq'
+    } else if (isTotalPrice) {
+      defaultPricingType = 'fixed'
+    } else {
+      // Unit-based model (m², hour, etc.)
+      defaultPricingType = 'unit'
+    }
 
     const newSubproject: ISubproject = {
       id: Date.now().toString(),
@@ -644,21 +681,28 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
                         <SelectValue placeholder="Select pricing type" />
                       </SelectTrigger>
                       <SelectContent>
-                        {data.priceModel && data.category?.toLowerCase() !== 'renovation' ? (
-                          <SelectItem value="fixed">{data.priceModel}</SelectItem>
-                        ) : (
+                        {data.category?.toLowerCase() === 'renovation' ? (
+                          // Renovation: only RFQ
+                          <SelectItem value="rfq">RFQ (Request for Quote)</SelectItem>
+                        ) : isTotalPrice ? (
+                          // Total price model: Fixed or RFQ
                           <>
                             <SelectItem value="fixed">Fixed Price (Total)</SelectItem>
-                            <SelectItem value="unit">Unit Price (EUR/unit)</SelectItem>
+                            <SelectItem value="rfq">RFQ (Request for Quote)</SelectItem>
+                          </>
+                        ) : (
+                          // Unit-based model: Unit pricing or RFQ
+                          <>
+                            <SelectItem value="unit">Price per {unitLabel}</SelectItem>
+                            <SelectItem value="rfq">RFQ (Request for Quote)</SelectItem>
                           </>
                         )}
-                        <SelectItem value="rfq">RFQ (Request for Quote)</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-gray-500">
                       Current selection:{' '}
-                      {subproject.pricing.type === 'fixed' && (data.priceModel && data.category?.toLowerCase() !== 'renovation' ? data.priceModel : 'Fixed Price (Total)')}
-                      {subproject.pricing.type === 'unit' && 'Unit Price (per unit)'}
+                      {subproject.pricing.type === 'fixed' && 'Fixed Price (Total)'}
+                      {subproject.pricing.type === 'unit' && `Price per ${unitLabel}`}
                       {subproject.pricing.type === 'rfq' && 'Request for Quote'}
                       {!subproject.pricing.type && 'None'}
                     </p>
@@ -679,31 +723,13 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
                             placeholder="0.00"
                           />
                         </div>
-                        {showIncludedQuantity && (
-                          <div>
-                            <Label>Included Quantity</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              step="1"
-                              value={subproject.pricing.includedQuantity || ''}
-                              onChange={(e) => updateSubproject(subproject.id, {
-                                pricing: { ...subproject.pricing, includedQuantity: parseInt(e.target.value) || undefined }
-                              })}
-                              placeholder="1"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">
-                              Maximum quantity included in this fixed price
-                            </p>
-                          </div>
-                        )}
                       </>
                     )}
 
                     {subproject.pricing.type === 'unit' && (
                       <>
                         <div>
-                          <Label>Price per Unit (EUR/unit) *</Label>
+                          <Label>Price per {unitLabel} (EUR) *</Label>
                           <Input
                             type="number"
                             min="0"
@@ -716,7 +742,7 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
                           />
                         </div>
                         <div>
-                          <Label>Minimum Order Quantity</Label>
+                          <Label>Minimum Order Quantity ({unitLabel})</Label>
                           <Input
                             type="number"
                             min="1"
@@ -727,62 +753,54 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
                             })}
                             placeholder="1"
                           />
-                        </div>
-                        <div>
-                          <Label>Minimum Order Value (EUR)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={subproject.pricing.minProjectValue || ''}
-                            onChange={(e) => updateSubproject(subproject.id, {
-                              pricing: { ...subproject.pricing, minProjectValue: parseFloat(e.target.value) }
-                            })}
-                            placeholder="50.00"
-                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Customer must order at least this quantity
+                          </p>
                         </div>
                       </>
                     )}
 
                     {subproject.pricing.type === 'rfq' && (
-                      <div className="md:col-span-2">
-                        <Label>Estimated Price Range (EUR)</Label>
-                        <div className="flex space-x-2">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={subproject.pricing.priceRange?.min || ''}
-                            onChange={(e) => updateSubproject(subproject.id, {
-                              pricing: {
-                                ...subproject.pricing,
-                                priceRange: {
-                                  min: parseFloat(e.target.value),
-                                  max: subproject.pricing.priceRange?.max || 0
+                      <>
+                        <div className="md:col-span-2">
+                          <Label>Estimated Price Range (EUR)</Label>
+                          <div className="flex space-x-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={subproject.pricing.priceRange?.min || ''}
+                              onChange={(e) => updateSubproject(subproject.id, {
+                                pricing: {
+                                  ...subproject.pricing,
+                                  priceRange: {
+                                    min: parseFloat(e.target.value),
+                                    max: subproject.pricing.priceRange?.max || 0
+                                  }
                                 }
-                              }
-                            })}
-                            placeholder="Min price"
-                          />
-                          <span className="self-center">to</span>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={subproject.pricing.priceRange?.max || ''}
-                            onChange={(e) => updateSubproject(subproject.id, {
-                              pricing: {
-                                ...subproject.pricing,
-                                priceRange: {
-                                  min: subproject.pricing.priceRange?.min || 0,
-                                  max: parseFloat(e.target.value)
+                              })}
+                              placeholder="Min price"
+                            />
+                            <span className="self-center">to</span>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={subproject.pricing.priceRange?.max || ''}
+                              onChange={(e) => updateSubproject(subproject.id, {
+                                pricing: {
+                                  ...subproject.pricing,
+                                  priceRange: {
+                                    min: subproject.pricing.priceRange?.min || 0,
+                                    max: parseFloat(e.target.value)
+                                  }
                                 }
-                              }
-                            })}
-                            placeholder="Max price"
-                          />
+                              })}
+                              placeholder="Max price"
+                            />
+                          </div>
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1466,8 +1484,18 @@ export default function Step2Subprojects({ data, onChange, onValidate }: Step2Pr
                     <tr key={sub.id} className="border-b">
                       <td className="p-2 font-medium">{sub.name || `Package ${index + 1}`}</td>
                       <td className="p-2">
-                        {sub.pricing.type === 'fixed' && sub.pricing.amount && `EUR ${sub.pricing.amount} (${data.priceModel})`}
-                        {sub.pricing.type === 'rfq' && 'Quote required'}
+                        {sub.pricing.type === 'fixed' && sub.pricing.amount && `EUR ${sub.pricing.amount} (Total)`}
+                        {sub.pricing.type === 'unit' && sub.pricing.amount && `EUR ${sub.pricing.amount}/${unitLabel}${sub.pricing.minOrderQuantity ? ` (min ${sub.pricing.minOrderQuantity})` : ''}`}
+                        {sub.pricing.type === 'rfq' && (
+                          <>
+                            Quote required
+                            {sub.pricing.priceRange?.min && sub.pricing.priceRange?.max && (
+                              <span className="text-gray-500 text-sm ml-1">
+                                (EUR {sub.pricing.priceRange.min}-{sub.pricing.priceRange.max})
+                              </span>
+                            )}
+                          </>
+                        )}
                       </td>
                       <td className="p-2">
                         {sub.executionDuration.value} {sub.executionDuration.unit}
