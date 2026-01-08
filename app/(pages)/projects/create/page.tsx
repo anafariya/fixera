@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import WizardLayout from '@/components/professional/project-wizard/WizardLayout'
 import Step1BasicInfo, { type Step1Ref } from '@/components/professional/project-wizard/Step1BasicInfo'
@@ -428,7 +428,7 @@ export default function ProjectCreatePage() {
     setProjectData(prev => ({ ...prev, ...stepData }))
   }
 
-  const handleStepValidation = (step: number, isValid: boolean) => {
+  const handleStepValidation = useCallback((step: number, isValid: boolean) => {
     setStepValidation(prev => {
       const newValidation = [...prev]
       newValidation[step - 1] = isValid
@@ -436,10 +436,11 @@ export default function ProjectCreatePage() {
     })
 
     // Update canProceed based on current step validation
-    if (step === currentStep) {
-      setCanProceed(isValid)
-    }
-  }
+    setCanProceed(prevCanProceed => {
+      // Only update if this is the current step
+      return step === currentStep ? isValid : prevCanProceed
+    })
+  }, [currentStep])
 
   // Auto-validate step 8 when we reach it (it's just a review step)
   useEffect(() => {
@@ -451,6 +452,7 @@ export default function ProjectCreatePage() {
   const handleSubmit = async () => {
     if (isLoading) return // Prevent multiple submissions
     setIsLoading(true)
+    let shouldResetLoading = true
     try {
       console.log('Submit called - Current project status:', projectData.status)
       console.log('Full project data:', projectData)
@@ -490,13 +492,14 @@ export default function ProjectCreatePage() {
           if (currentProject.status === 'pending_approval') {
             console.log('Project already pending approval, redirecting...')
             toast.success('Project is already submitted and pending approval!')
+            shouldResetLoading = false
             router.replace('/professional/projects/manage')
             return
           }
 
           // Handle on_hold projects - need to change to published first
           if (currentProject.status === 'on_hold') {
-            console.log('🔄 NEW CODE: On-hold project detected - changing to published status first')
+            console.log('On-hold project detected - changing to published status first')
             try {
               const statusChangeResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/projects/${projectId}/status`, {
                 method: 'PATCH',
@@ -514,7 +517,7 @@ export default function ProjectCreatePage() {
                 return
               }
 
-              console.log('✅ NEW CODE: Successfully changed on_hold project to published')
+              console.log('Successfully changed on_hold project to published')
               setProjectData(prev => ({ ...prev, status: 'published' }))
             } catch (error) {
               console.error('Error changing status to published:', error)
@@ -545,12 +548,8 @@ export default function ProjectCreatePage() {
         const submittedProject = await response.json()
         console.log('Project submitted successfully:', submittedProject)
 
-        // Update local state with the new status
-        if (submittedProject.status) {
-          setProjectData(prev => ({ ...prev, status: submittedProject.status }))
-        }
-
         toast.success('Project submitted for approval!')
+        shouldResetLoading = false
         router.replace('/professional/projects/manage')
       } else {
         const error = await response.json()
@@ -561,7 +560,9 @@ export default function ProjectCreatePage() {
       console.error('Submit error:', error)
       toast.error('Failed to submit project')
     } finally {
-      setIsLoading(false)
+      if (shouldResetLoading) {
+        setIsLoading(false)
+      }
     }
   }
 
