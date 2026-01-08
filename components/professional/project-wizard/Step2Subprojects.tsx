@@ -145,7 +145,7 @@ const PREDEFINED_INCLUDED_ITEMS = {
 const TOTAL_PRICE_MODELS = new Set([
   'total',
   'total price',
-  'fixed price (total)',
+  'fixed price total',
   'flat rate',
   'flat price',
   'project total',
@@ -154,7 +154,13 @@ const TOTAL_PRICE_MODELS = new Set([
 
 const isTotalPriceModel = (priceModel?: string): boolean => {
   if (!priceModel) return false
-  return TOTAL_PRICE_MODELS.has(priceModel.trim().toLowerCase())
+  // Normalize: lowercase, replace separators with space, collapse spaces, trim
+  const normalized = priceModel
+    .toLowerCase()
+    .replace(/[\W_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return TOTAL_PRICE_MODELS.has(normalized)
 }
 
 export default function Step2Subprojects({ data, onChange, onValidate }: Step2Props) {
