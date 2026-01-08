@@ -164,7 +164,8 @@ const isTotalPriceModel = (priceModel?: string): boolean => {
 }
 
 export default function Step2Subprojects({ data, onChange, onValidate }: Step2Props) {
-  // Show included quantity field for unit-based price models (e.g., "per m²", "per hour")
+  // Show "Included Quantity" in fixed pricing when priceModel is unit-based (e.g., "per m²")
+  // This defines the maximum quantity included in the fixed price
   const showIncludedQuantity = data.priceModel && !isTotalPriceModel(data.priceModel)
 
   const normalizePreparationDuration = (subproject?: ISubproject) => {
