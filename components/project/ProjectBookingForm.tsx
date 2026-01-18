@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -524,6 +524,41 @@ export default function ProjectBookingForm({
     selectedTime,
   ]);
 
+  const fetchScheduleWindow = useCallback(async (startDate: string, startTime?: string) => {
+    try {
+      setLoadingScheduleWindow(true);
+      let url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/public/projects/${project._id}/schedule-window?startDate=${startDate}`;
+      if (typeof selectedPackageIndex === 'number') {
+        url += `&subprojectIndex=${selectedPackageIndex}`;
+      }
+      if (startTime) {
+        url += `&startTime=${startTime}`;
+      }
+      console.log('%c[SCHEDULE WINDOW] Fetching...', 'color: #ff6600; font-weight: bold', {
+        url,
+        startDate,
+        startTime,
+        selectedPackageIndex
+      });
+      const response = await fetch(url);
+      const data = await response.json();
+      console.log('%c[SCHEDULE WINDOW] Response:', 'color: #ff6600; font-weight: bold', data);
+      if (data.success && data.window) {
+        console.log('%c[SCHEDULE WINDOW] Setting scheduleWindow state:', 'color: #00cc00; font-weight: bold', data.window);
+        setScheduleWindow(data.window);
+      } else {
+        console.warn('%c[SCHEDULE WINDOW] Not available:', 'color: #cc0000', data.error);
+        setScheduleWindow(null);
+      }
+    } catch (error) {
+      console.error('%c[SCHEDULE WINDOW] Error:', 'color: #cc0000', error);
+      setScheduleWindow(null);
+    } finally {
+      setLoadingScheduleWindow(false);
+      console.log('[SCHEDULE WINDOW] Loading complete');
+    }
+  }, [project._id, selectedPackageIndex]);
+
   // Fetch schedule window from backend when date changes (for days mode)
   useEffect(() => {
     console.log('[SCHEDULE WINDOW] useEffect triggered:', {
@@ -537,7 +572,7 @@ export default function ProjectBookingForm({
       console.log('[SCHEDULE WINDOW] Calling fetchScheduleWindow for date:', selectedDate);
       fetchScheduleWindow(selectedDate);
     }
-  }, [selectedDate, projectMode, selectedPackageIndex, loadingAvailability]);
+  }, [selectedDate, projectMode, loadingAvailability, fetchScheduleWindow]);
 
   const fetchTeamAvailability = async (packageIndex?: number) => {
     try {
@@ -681,41 +716,6 @@ export default function ProjectBookingForm({
       );
     } finally {
       setLoadingWorkingHours(false);
-    }
-  };
-
-  const fetchScheduleWindow = async (startDate: string, startTime?: string) => {
-    try {
-      setLoadingScheduleWindow(true);
-      let url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/public/projects/${project._id}/schedule-window?startDate=${startDate}`;
-      if (typeof selectedPackageIndex === 'number') {
-        url += `&subprojectIndex=${selectedPackageIndex}`;
-      }
-      if (startTime) {
-        url += `&startTime=${startTime}`;
-      }
-      console.log('%c[SCHEDULE WINDOW] Fetching...', 'color: #ff6600; font-weight: bold', {
-        url,
-        startDate,
-        startTime,
-        selectedPackageIndex
-      });
-      const response = await fetch(url);
-      const data = await response.json();
-      console.log('%c[SCHEDULE WINDOW] Response:', 'color: #ff6600; font-weight: bold', data);
-      if (data.success && data.window) {
-        console.log('%c[SCHEDULE WINDOW] Setting scheduleWindow state:', 'color: #00cc00; font-weight: bold', data.window);
-        setScheduleWindow(data.window);
-      } else {
-        console.warn('%c[SCHEDULE WINDOW] Not available:', 'color: #cc0000', data.error);
-        setScheduleWindow(null);
-      }
-    } catch (error) {
-      console.error('%c[SCHEDULE WINDOW] Error:', 'color: #cc0000', error);
-      setScheduleWindow(null);
-    } finally {
-      setLoadingScheduleWindow(false);
-      console.log('[SCHEDULE WINDOW] Loading complete');
     }
   };
 
