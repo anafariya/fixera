@@ -850,7 +850,7 @@ export default function EmployeeManagement() {
                       <div key={blocked.date} className="flex items-center justify-between p-2 border rounded">
                         <div>
                           <span className="text-sm font-medium">
-                            {new Date(blocked.date).toLocaleDateString()}
+                            {new Date(blocked.date + 'T00:00:00').toLocaleDateString()}
                           </span>
                           {blocked.reason && <span className="text-xs text-muted-foreground ml-2">{blocked.reason}</span>}
                         </div>
@@ -942,7 +942,7 @@ export default function EmployeeManagement() {
                 return (
                   <div className="space-y-2">
                     {paginatedBlockedRanges.map((range, index) => (
-                      <div key={startIdx + index} className="flex items-center justify-between p-2 border rounded">
+                      <div key={`${new Date(range.startDate).getTime()}-${new Date(range.endDate).getTime()}${range.reason ? `-${range.reason}` : ''}`} className="flex items-center justify-between p-2 border rounded">
                         <div>
                           <span className="text-sm font-medium">
                             {new Date(range.startDate).toLocaleDateString()} - {new Date(range.endDate).toLocaleDateString()}
