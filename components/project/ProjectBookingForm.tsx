@@ -1999,20 +1999,22 @@ export default function ProjectBookingForm({
     }
 
     try {
-      // Parse ISO dates and convert to professional's timezone for correct display
+      // Parse ISO dates - keep as UTC, formatInTimeZone will handle display conversion
       const tz = normalizeTimezone(professionalTimezone);
       const startUtc = parseISO(proposals.shortestThroughputProposal.start);
       const endUtc = parseISO(proposals.shortestThroughputProposal.executionEnd);
 
-      // Convert to professional's timezone to get correct local dates
-      const startDate = toZonedTime(startUtc, tz);
-      const endDate = toZonedTime(endUtc, tz);
+      // Use toZonedTime ONLY for calendar day calculations (not for display)
+      // This ensures differenceInCalendarDays counts days in the professional's timezone
+      const startZoned = toZonedTime(startUtc, tz);
+      const endZoned = toZonedTime(endUtc, tz);
 
       const totalDays = Math.max(
         1,
-        differenceInCalendarDays(endDate, startDate) + 1
+        differenceInCalendarDays(endZoned, startZoned) + 1
       );
-      return { startDate, endDate, totalDays };
+      // Return UTC dates - formatInTimeZone will convert them correctly for display
+      return { startDate: startUtc, endDate: endUtc, totalDays };
     } catch {
       return null;
     }
