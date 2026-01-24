@@ -409,12 +409,19 @@ export default function EmployeeManagement() {
       setBlockedDates([])
     }
     if (employee.blockedRanges) {
-      // Normalize blocked ranges - ensure dates are strings
-      setBlockedRanges(employee.blockedRanges.map(range => ({
-        startDate: extractDateValue(range.startDate) || '',
-        endDate: extractDateValue(range.endDate) || '',
-        reason: range.reason
-      })).filter(r => r.startDate && r.endDate))
+      // Normalize blocked ranges - convert to date-only format (YYYY-MM-DD) to avoid timezone shifts
+      setBlockedRanges(employee.blockedRanges.map(range => {
+        const startDateStr = extractDateValue(range.startDate);
+        const endDateStr = extractDateValue(range.endDate);
+        // Extract date-only portion to avoid timezone issues with timestamps like "2026-01-24T00:00:00Z"
+        const startDateOnly = startDateStr ? startDateStr.split('T')[0] : '';
+        const endDateOnly = endDateStr ? endDateStr.split('T')[0] : '';
+        return {
+          startDate: startDateOnly,
+          endDate: endDateOnly,
+          reason: range.reason
+        };
+      }).filter(r => r.startDate && r.endDate))
     } else {
       setBlockedRanges([])
     }
