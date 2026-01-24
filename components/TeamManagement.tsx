@@ -74,19 +74,31 @@ interface Employee {
 
 // Safe date formatting helper to handle invalid dates
 // Handles date-only strings (YYYY-MM-DD) as local dates to avoid timezone shift
-const formatDateSafe = (dateStr: string | undefined | null): string => {
+// Also handles MongoDB Extended JSON format ({$date: "..."})
+const formatDateSafe = (dateStr: string | { $date: string } | undefined | null): string => {
   if (!dateStr) return 'Invalid Date';
   try {
+    let dateValue: string;
+
+    // Handle MongoDB Extended JSON format where date is {$date: "ISO string"}
+    if (typeof dateStr === 'object' && dateStr !== null && '$date' in dateStr) {
+      dateValue = dateStr.$date;
+    } else if (typeof dateStr === 'string') {
+      dateValue = dateStr;
+    } else {
+      return 'Invalid Date';
+    }
+
     let date: Date;
 
     // Check if it's a date-only string (YYYY-MM-DD) without time component
     // These should be parsed as local dates to avoid UTC interpretation shifting the day
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      const [year, month, day] = dateStr.split('-').map(Number);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+      const [year, month, day] = dateValue.split('-').map(Number);
       date = new Date(year, month - 1, day); // month is 0-indexed
     } else {
       // Full ISO timestamp or other format - parse normally
-      date = new Date(dateStr);
+      date = new Date(dateValue);
     }
 
     if (isNaN(date.getTime())) return 'Invalid Date';
@@ -96,11 +108,41 @@ const formatDateSafe = (dateStr: string | undefined | null): string => {
   }
 };
 
+// Canonical date value extractor - handles string, Date, {$date: string}, null, undefined
+// Returns validated date string or null
+type DateInput = string | Date | { $date: string } | null | undefined;
+
+const getDateValue = (dateValue: DateInput): string | null => {
+  if (!dateValue) return null;
+
+  // Handle MongoDB Extended JSON format {$date: "..."}
+  if (typeof dateValue === 'object' && dateValue !== null && '$date' in dateValue) {
+    const parsed = new Date(dateValue.$date);
+    return isNaN(parsed.getTime()) ? null : dateValue.$date;
+  }
+
+  // Handle Date objects
+  if (dateValue instanceof Date) {
+    return isNaN(dateValue.getTime()) ? null : dateValue.toISOString();
+  }
+
+  // Handle string dates - validate by parsing
+  if (typeof dateValue === 'string') {
+    const parsed = new Date(dateValue);
+    return isNaN(parsed.getTime()) ? null : dateValue;
+  }
+
+  return null;
+};
+
 // Check if a date range has valid dates
-const isValidDateRange = (range: { startDate: string; endDate: string }): boolean => {
-  if (!range.startDate || !range.endDate) return false;
-  const start = new Date(range.startDate);
-  const end = new Date(range.endDate);
+// Handles string, Date, and MongoDB Extended JSON format ({$date: "..."})
+const isValidDateRange = (range: { startDate: DateInput; endDate: DateInput }): boolean => {
+  const startStr = getDateValue(range.startDate);
+  const endStr = getDateValue(range.endDate);
+  if (!startStr || !endStr) return false;
+  const start = new Date(startStr);
+  const end = new Date(endStr);
   return !isNaN(start.getTime()) && !isNaN(end.getTime());
 };
 
@@ -316,6 +358,38 @@ export default function EmployeeManagement() {
     }
   }
 
+  // Helper to format Date to local YYYY-MM-DD string (avoids UTC timezone shift)
+  const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Helper to extract date string from various formats (string, Date, {$date: "..."})
+  // Returns local date string to avoid UTC timezone issues with date-only fields
+  const extractDateValue = (d: string | Date | { $date: string } | null | undefined): string | null => {
+    if (!d) return null;
+    // Handle MongoDB Extended JSON format {$date: "..."}
+    if (typeof d === 'object' && d !== null && '$date' in d) {
+      return d.$date;
+    }
+    // Handle string - return as-is (preserve original format)
+    if (typeof d === 'string') {
+      return d;
+    }
+    // Handle Date object - use local date formatting to avoid UTC shift
+    if (d instanceof Date) {
+      // Handle invalid Date objects explicitly - return null if time is NaN
+      if (isNaN(d.getTime())) {
+        return null;
+      }
+      return formatLocalDate(d);
+    }
+    // All valid cases handled above; return null for any unexpected input
+    return null;
+  };
+
   // Open availability dialog
   const openAvailabilityDialog = (employee: Employee) => {
     setAvailabilityDialog(employee)
@@ -325,15 +399,29 @@ export default function EmployeeManagement() {
     setBookingBlockedRangesPage(1)
     // Load employee's blocked dates
     if (employee.blockedDates) {
-      setBlockedDates(employee.blockedDates.map(d => ({
-        date: typeof d === 'string' ? d : new Date(d).toISOString().split('T')[0],
-        reason: undefined
-      })))
+      setBlockedDates(employee.blockedDates.map(d => {
+        const dateStr = extractDateValue(d);
+        // Convert to date-only format (YYYY-MM-DD) for the date input
+        const dateOnly = dateStr ? dateStr.split('T')[0] : '';
+        return { date: dateOnly, reason: undefined };
+      }).filter(d => d.date))
     } else {
       setBlockedDates([])
     }
     if (employee.blockedRanges) {
-      setBlockedRanges(employee.blockedRanges)
+      // Normalize blocked ranges - convert to date-only format (YYYY-MM-DD) to avoid timezone shifts
+      setBlockedRanges(employee.blockedRanges.map(range => {
+        const startDateStr = extractDateValue(range.startDate);
+        const endDateStr = extractDateValue(range.endDate);
+        // Extract date-only portion to avoid timezone issues with timestamps like "2026-01-24T00:00:00Z"
+        const startDateOnly = startDateStr ? startDateStr.split('T')[0] : '';
+        const endDateOnly = endDateStr ? endDateStr.split('T')[0] : '';
+        return {
+          startDate: startDateOnly,
+          endDate: endDateOnly,
+          reason: range.reason
+        };
+      }).filter(r => r.startDate && r.endDate))
     } else {
       setBlockedRanges([])
     }
@@ -974,10 +1062,10 @@ export default function EmployeeManagement() {
                 return (
                   <div className="space-y-2">
                     {paginatedBlockedRanges.map((range, index) => (
-                      <div key={`${new Date(range.startDate + "T00:00:00").getTime()}-${new Date(range.endDate + "T00:00:00").getTime()}${range.reason ? `-${range.reason}` : ''}`} className="flex items-center justify-between p-2 border rounded">
+                      <div key={`${range.startDate}-${range.endDate}${range.reason ? `-${range.reason}` : ''}-${index}`} className="flex items-center justify-between p-2 border rounded">
                         <div>
                           <span className="text-sm font-medium">
-                            {new Date(range.startDate + "T00:00:00").toLocaleDateString()} - {new Date(range.endDate + "T00:00:00").toLocaleDateString()}
+                            {formatDateSafe(range.startDate)} - {formatDateSafe(range.endDate)}
                           </span>
                           {range.reason && <span className="text-xs text-muted-foreground ml-2">{range.reason}</span>}
                         </div>
