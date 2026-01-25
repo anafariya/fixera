@@ -570,6 +570,7 @@ export default function ProjectBookingForm({
     });
     if (selectedDate && projectMode === 'days' && !loadingAvailability) {
       console.log('[SCHEDULE WINDOW] Calling fetchScheduleWindow for date:', selectedDate);
+      setScheduleWindow(null);
       fetchScheduleWindow(selectedDate);
     }
   }, [selectedDate, projectMode, loadingAvailability, fetchScheduleWindow]);
@@ -1692,6 +1693,17 @@ export default function ProjectBookingForm({
         return false;
       }
 
+      if (
+        projectMode === 'days' &&
+        !loadingScheduleWindow &&
+        !scheduleWindowCompletionDate
+      ) {
+        toast.error(
+          'Selected date does not meet team availability requirements.'
+        );
+        return false;
+      }
+
       // Check time selection for hourly projects
       if (projectMode === 'hours' && !selectedTime) {
         toast.error('Please select a time slot for your booking');
@@ -1980,6 +1992,10 @@ export default function ProjectBookingForm({
 
   const projectedCompletionDate = calculateCompletionDate();
   const projectedCompletionDateTime = calculateCompletionDateTime();
+  const scheduleWindowCompletionDate =
+    scheduleWindow?.scheduledExecutionEndDate
+      ? parseISO(scheduleWindow.scheduledExecutionEndDate)
+      : null;
 
   // Debug log for completion date display
   console.log('[SCHEDULE WINDOW] Render state:', {
@@ -2787,7 +2803,7 @@ export default function ProjectBookingForm({
 
                         {(projectMode === 'hours'
                           ? projectedCompletionDateTime
-                          : (scheduleWindow?.scheduledExecutionEndDate || projectedCompletionDate)) && (
+                          : scheduleWindowCompletionDate) && (
                           <>
                             <p className='text-sm text-blue-900 font-semibold pt-2 border-t border-blue-300'>
                               <strong>Projected Completion:</strong>{' '}
@@ -2805,14 +2821,9 @@ export default function ProjectBookingForm({
                                       minute: '2-digit',
                                     }
                                   )}`
-                                : scheduleWindow?.scheduledExecutionEndDate
+                                : scheduleWindowCompletionDate
                                 ? format(
-                                    parseISO(scheduleWindow.scheduledExecutionEndDate),
-                                    'EEEE, MMMM d, yyyy'
-                                  )
-                                : projectedCompletionDate
-                                ? format(
-                                    projectedCompletionDate,
+                                    scheduleWindowCompletionDate,
                                     'EEEE, MMMM d, yyyy'
                                   )
                                 : null}
@@ -2823,6 +2834,14 @@ export default function ProjectBookingForm({
                             </p>
                           </>
                         )}
+                        {projectMode === 'days' &&
+                          !loadingScheduleWindow &&
+                          selectedDate &&
+                          !scheduleWindowCompletionDate && (
+                            <p className='text-sm font-semibold pt-2 border-t border-blue-300 text-red-600'>
+                              Selected date does not meet team availability.
+                            </p>
+                          )}
                         {projectMode === 'days' &&
                           shortestThroughputDetails && (
                             <div className='border-t border-blue-300 pt-3 space-y-3'>
@@ -3186,7 +3205,7 @@ export default function ProjectBookingForm({
                     </p>
                     {(projectMode === 'hours'
                       ? projectedCompletionDateTime
-                      : (scheduleWindow?.scheduledExecutionEndDate || projectedCompletionDate)) && (
+                      : scheduleWindowCompletionDate) && (
                       <>
                         <p className='text-sm font-semibold pt-2 border-t border-gray-300'>
                           <strong>Expected Completion:</strong>{' '}
@@ -3204,14 +3223,9 @@ export default function ProjectBookingForm({
                                   minute: '2-digit',
                                 }
                               )}`
-                            : scheduleWindow?.scheduledExecutionEndDate
+                            : scheduleWindowCompletionDate
                             ? format(
-                                parseISO(scheduleWindow.scheduledExecutionEndDate),
-                                'EEEE, MMMM d, yyyy'
-                              )
-                            : projectedCompletionDate
-                            ? format(
-                                projectedCompletionDate,
+                                scheduleWindowCompletionDate,
                                 'EEEE, MMMM d, yyyy'
                               )
                             : null}
@@ -3222,6 +3236,14 @@ export default function ProjectBookingForm({
                         </p>
                       </>
                     )}
+                    {projectMode === 'days' &&
+                      !loadingScheduleWindow &&
+                      selectedDate &&
+                      !scheduleWindowCompletionDate && (
+                        <p className='text-sm font-semibold pt-2 border-t border-gray-300 text-red-600'>
+                          Selected date does not meet team availability.
+                        </p>
+                      )}
                     {projectMode === 'days' && shortestThroughputDetails && (
                       <div className='border-t border-gray-300 pt-3 space-y-3'>
                         <div className='flex flex-col gap-1'>
