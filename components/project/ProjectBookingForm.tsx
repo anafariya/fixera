@@ -1695,8 +1695,7 @@ export default function ProjectBookingForm({
 
       if (
         projectMode === 'days' &&
-        !loadingScheduleWindow &&
-        !scheduleWindowCompletionDate
+        (loadingScheduleWindow || !scheduleWindowCompletionDate)
       ) {
         toast.error(
           'Selected date does not meet team availability requirements.'
@@ -1992,10 +1991,16 @@ export default function ProjectBookingForm({
 
   const projectedCompletionDate = calculateCompletionDate();
   const projectedCompletionDateTime = calculateCompletionDateTime();
-  const scheduleWindowCompletionDate =
-    scheduleWindow?.scheduledExecutionEndDate
-      ? parseISO(scheduleWindow.scheduledExecutionEndDate)
-      : null;
+  const scheduleWindowCompletionDate = (() => {
+    if (!scheduleWindow?.scheduledExecutionEndDate) {
+      return null;
+    }
+    const parsed = parseISO(scheduleWindow.scheduledExecutionEndDate);
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+    return parsed;
+  })();
 
   // Debug log for completion date display
   console.log('[SCHEDULE WINDOW] Render state:', {
