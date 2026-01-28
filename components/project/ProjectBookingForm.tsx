@@ -286,6 +286,28 @@ const hasDurationRange = (
   range: { min?: number; max?: number };
 } => Boolean(duration && 'range' in duration && duration.range);
 
+const convertDurationToDays = (
+  duration?: AnyExecutionDuration,
+  preferRange?: 'min' | 'max'
+) => {
+  if (!duration) return 0;
+  let value = duration.value;
+
+  if ((!value || value <= 0) && hasDurationRange(duration)) {
+    const { range } = duration;
+    if (preferRange === 'max' && range.max) {
+      value = range.max;
+    } else if (preferRange === 'min' && range.min) {
+      value = range.min;
+    } else {
+      value = range.max || range.min;
+    }
+  }
+
+  if (!value || value <= 0) return 0;
+  return duration.unit === 'days' ? value : value / 24;
+};
+
 const isDev = process.env.NODE_ENV === 'development';
 
 export default function ProjectBookingForm({
@@ -1725,28 +1747,6 @@ export default function ProjectBookingForm({
     return null;
   };
 
-  const convertDurationToDays = (
-    duration?: AnyExecutionDuration,
-    preferRange?: 'min' | 'max'
-  ) => {
-    if (!duration) return 0;
-    let value = duration.value;
-
-    if ((!value || value <= 0) && hasDurationRange(duration)) {
-      const { range } = duration;
-      if (preferRange === 'max' && range.max) {
-        value = range.max;
-      } else if (preferRange === 'min' && range.min) {
-        value = range.min;
-      } else {
-        value = range.max || range.min;
-      }
-    }
-
-    if (!value || value <= 0) return 0;
-    return duration.unit === 'days' ? value : value / 24;
-  };
-
   const calculateCompletionDate = (includeBuffer = false): Date | null => {
     if (!selectedDate) return null;
 
@@ -2293,7 +2293,6 @@ export default function ProjectBookingForm({
     scheduleWindowCompletionDate,
     professionalTz,
     scheduleWindow?.throughputDays,
-    convertDurationToDays,
   ]);
 
   // Debug log for completion date display
