@@ -48,9 +48,17 @@ interface WeeklyAvailabilityCalendarProps {
   className?: string
 }
 
-const parseTimeToMinutes = (value: string) => {
-  const [hours, minutes] = value.split(':').map((part) => Number.parseInt(part, 10))
-  return hours * 60 + (Number.isNaN(minutes) ? 0 : minutes)
+const parseTimeToMinutes = (value: string): number => {
+  const parts = value.split(':')
+  const hours = Number.parseInt(parts[0], 10)
+  const minutes = parts[1] !== undefined ? Number.parseInt(parts[1], 10) : 0
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    throw new Error(`Invalid time format: "${value}". Expected "HH:MM" format.`)
+  }
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    throw new Error(`Invalid time values: hours=${hours}, minutes=${minutes}. Hours must be 0-23, minutes must be 0-59.`)
+  }
+  return hours * 60 + minutes
 }
 
 const buildDayTime = (day: Date, minutesFromMidnight: number) => {
@@ -122,16 +130,16 @@ export default function WeeklyAvailabilityCalendar({
       if (Number.isNaN(event.start.getTime()) || Number.isNaN(event.end.getTime())) return
       if (event.end <= event.start) return
 
-      days.forEach((day, dayIndex) => {
+      for (const [dayIndex, day] of days.entries()) {
         const dayStartTime = buildDayTime(day, startMinutes)
         const dayEndTime = buildDayTime(day, endMinutes)
 
-        if (event.end <= dayStartTime || event.start >= dayEndTime) return
+        if (event.end <= dayStartTime || event.start >= dayEndTime) continue
 
         const segmentStart = event.start > dayStartTime ? event.start : dayStartTime
         const segmentEnd = event.end < dayEndTime ? event.end : dayEndTime
 
-        if (segmentEnd <= segmentStart) return
+        if (segmentEnd <= segmentStart) continue
 
         dayMap.get(dayIndex)?.push({
           ...event,
@@ -140,7 +148,7 @@ export default function WeeklyAvailabilityCalendar({
           laneIndex: 0,
           laneCount: 1,
         })
-      })
+      }
     })
 
     dayMap.forEach((segments, dayIndex) => {

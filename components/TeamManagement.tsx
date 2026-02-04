@@ -28,6 +28,7 @@ import {
   ChevronRight
 } from "lucide-react"
 import { toast } from "sonner"
+import { toLocalInputValue } from "@/lib/dateUtils"
 
 type Day =
   | 'monday'
@@ -394,13 +395,6 @@ export default function EmployeeManagement() {
     }
     const parsed = new Date(dateStr);
     return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-  };
-
-  const toLocalInputValue = (value: string) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-    const offset = date.getTimezoneOffset() * 60000;
-    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
   };
 
   const formatDateTimeSafe = (value: DateInput): string => {

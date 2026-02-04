@@ -29,6 +29,7 @@ import {
   getVATCountryName,
   formatVATNumber
 } from "@/lib/vatValidation"
+import { toLocalInputValue, getNextDateValue } from "@/lib/dateUtils"
 
 
 export default function ProfilePage() {
@@ -222,9 +223,12 @@ export default function ProfilePage() {
               : ''
           const dateOnly = dateValue.split('T')[0]
           if (!dateOnly) return
+          // Normalize to full ISO timestamps for consistency with companyBlockedRanges
+          const startIso = new Date(`${dateOnly}T00:00:00`).toISOString()
+          const endIso = new Date(`${dateOnly}T23:59:59`).toISOString()
           addCompanyRange({
-            startDate: dateOnly,
-            endDate: dateOnly,
+            startDate: startIso,
+            endDate: endIso,
             reason: typeof item === 'string' ? undefined : item.reason,
             isHoliday: typeof item === 'string' ? false : item.isHoliday || false
           })
@@ -511,20 +515,6 @@ export default function ProfilePage() {
     } finally {
       setProfileSaving(false)
     }
-  }
-
-  const toLocalInputValue = (value: string) => {
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return ''
-    const offset = date.getTimezoneOffset() * 60000
-    return new Date(date.getTime() - offset).toISOString().slice(0, 16)
-  }
-
-  const getNextDateValue = (value: string) => {
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return ''
-    date.setDate(date.getDate() + 1)
-    return date.toISOString().split('T')[0]
   }
 
   const openEditRange = (index: number) => {
