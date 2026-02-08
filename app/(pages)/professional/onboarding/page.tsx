@@ -77,7 +77,7 @@ export default function ProfessionalOnboardingPage() {
   const [businessSaving, setBusinessSaving] = useState(false)
   const [isAddressValid, setIsAddressValid] = useState(false)
 
-  const [companyAvailability, setCompanyAvailability] = useState(DEFAULT_COMPANY_AVAILABILITY)
+  const [companyAvailability, setCompanyAvailability] = useState<typeof DEFAULT_COMPANY_AVAILABILITY>(DEFAULT_COMPANY_AVAILABILITY)
   const [companySaving, setCompanySaving] = useState(false)
 
   const [agreements, setAgreements] = useState<boolean[]>(AGREEMENTS.map(() => false))
@@ -120,10 +120,19 @@ export default function ProfessionalOnboardingPage() {
     if (user.vatNumber) setVatNumber(user.vatNumber)
 
     if (user.companyAvailability) {
-      setCompanyAvailability(prev => ({
-        ...prev,
-        ...user.companyAvailability
-      }))
+      setCompanyAvailability(prev => {
+        const next = { ...prev }
+        Object.entries(user.companyAvailability || {}).forEach(([day, schedule]) => {
+          if (!schedule) return
+          const key = day as keyof typeof next
+          next[key] = {
+            available: schedule.available,
+            startTime: schedule.startTime || prev[key].startTime,
+            endTime: schedule.endTime || prev[key].endTime
+          }
+        })
+        return next
+      })
     }
   }, [user])
 
