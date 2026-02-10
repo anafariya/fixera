@@ -29,8 +29,8 @@ import {
   ChevronRight
 } from "lucide-react"
 import { toast } from "sonner"
-import { toLocalInputValue } from "@/lib/dateUtils"
-import { parseTimeToMinutes } from "@/lib/scheduleUtils"
+import { toLocalInputValue, getDateValue, toIsoDateTime, type DateInput } from "@/lib/dateUtils"
+import { parseTimeToMinutes, minutesToTime, getScheduleWindow } from "@/lib/scheduleUtils"
 
 type Day =
   | 'monday'
@@ -50,39 +50,6 @@ interface DayAvailability {
 type WeeklyAvailability = {
   [day in Day]: DayAvailability;
 };
-
-const minutesToTime = (minutes: number) => {
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
-}
-
-const getScheduleWindow = (availability?: WeeklyAvailability) => {
-  if (!availability) {
-    return { dayStart: '09:00', dayEnd: '17:00' }
-  }
-
-  const days: Day[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-  let min: number | null = null
-  let max: number | null = null
-
-  days.forEach((day) => {
-    const dayData = availability[day]
-    if (!dayData?.available) return
-    const start = parseTimeToMinutes(dayData.startTime || '09:00')
-    const end = parseTimeToMinutes(dayData.endTime || '17:00')
-    if (start === null || end === null || end <= start) return
-    min = min === null ? start : Math.min(min, start)
-    max = max === null ? end : Math.max(max, end)
-  })
-
-  if (min === null || max === null) {
-    return { dayStart: '09:00', dayEnd: '17:00' }
-  }
-
-  return { dayStart: minutesToTime(min), dayEnd: minutesToTime(max) }
-}
-
 
 interface Employee {
   _id: string
@@ -115,33 +82,6 @@ interface Employee {
     };
   }[]
 }
-
-// Canonical date value extractor - handles string, Date, {$date: string}, null, undefined
-// Returns validated date string or null
-type DateInput = string | Date | { $date: string } | null | undefined;
-
-const getDateValue = (dateValue: DateInput): string | null => {
-  if (!dateValue) return null;
-
-  // Handle MongoDB Extended JSON format {$date: "..."}
-  if (typeof dateValue === 'object' && dateValue !== null && '$date' in dateValue) {
-    const parsed = new Date(dateValue.$date);
-    return isNaN(parsed.getTime()) ? null : dateValue.$date;
-  }
-
-  // Handle Date objects
-  if (dateValue instanceof Date) {
-    return isNaN(dateValue.getTime()) ? null : dateValue.toISOString();
-  }
-
-  // Handle string dates - validate by parsing
-  if (typeof dateValue === 'string') {
-    const parsed = new Date(dateValue);
-    return isNaN(parsed.getTime()) ? null : dateValue;
-  }
-
-  return null;
-};
 
 export default function EmployeeManagement() {
   const router = useRouter()
@@ -424,18 +364,6 @@ export default function EmployeeManagement() {
       setRemoving(false)
     }
   }
-
-  const toIsoDateTime = (value: DateInput, isEnd = false): string | null => {
-    const dateStr = getDateValue(value);
-    if (!dateStr) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      const suffix = isEnd ? 'T23:59:59' : 'T00:00:00';
-      const parsed = new Date(`${dateStr}${suffix}`);
-      return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-    }
-    const parsed = new Date(dateStr);
-    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-  };
 
   const formatDateTimeSafe = (value: DateInput): string => {
     const dateStr = getDateValue(value);

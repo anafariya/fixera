@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,8 +11,8 @@ import { Calendar, CalendarX, Loader2, RefreshCw, User, X } from "lucide-react"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/AuthContext"
 import WeeklyAvailabilityCalendar, { CalendarEvent } from "@/components/calendar/WeeklyAvailabilityCalendar"
-import { toLocalInputValue } from "@/lib/dateUtils"
-import { parseTimeToMinutes } from "@/lib/scheduleUtils"
+import { toLocalInputValue, getDateValue, toIsoDateTime, type DateInput } from "@/lib/dateUtils"
+import { parseTimeToMinutes, minutesToTime, getScheduleWindow } from "@/lib/scheduleUtils"
 
 interface BlockedRange {
   startDate: string
@@ -59,67 +59,6 @@ interface AvailabilityData {
   }>
 }
 
-type DateInput = string | Date | { $date: string } | null | undefined
-
-const getDateValue = (dateValue: DateInput): string | null => {
-  if (!dateValue) return null
-  if (typeof dateValue === 'object' && dateValue !== null && '$date' in dateValue) {
-    const parsed = new Date(dateValue.$date)
-    return Number.isNaN(parsed.getTime()) ? null : dateValue.$date
-  }
-  if (dateValue instanceof Date) {
-    return Number.isNaN(dateValue.getTime()) ? null : dateValue.toISOString()
-  }
-  if (typeof dateValue === 'string') {
-    const parsed = new Date(dateValue)
-    return Number.isNaN(parsed.getTime()) ? null : dateValue
-  }
-  return null
-}
-
-const toIsoDateTime = (value: DateInput, isEnd = false): string | null => {
-  const dateStr = getDateValue(value)
-  if (!dateStr) return null
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    const suffix = isEnd ? 'T23:59:59' : 'T00:00:00'
-    const parsed = new Date(`${dateStr}${suffix}`)
-    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
-  }
-  const parsed = new Date(dateStr)
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
-}
-
-const minutesToTime = (minutes: number) => {
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
-}
-
-const getScheduleWindow = (availability?: AvailabilityData['availability']) => {
-  if (!availability) {
-    return { dayStart: '09:00', dayEnd: '17:00' }
-  }
-  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-  let min: number | null = null
-  let max: number | null = null
-
-  days.forEach((day) => {
-    const dayData = availability[day]
-    if (!dayData?.available) return
-    const start = parseTimeToMinutes(dayData.startTime || '09:00')
-    const end = parseTimeToMinutes(dayData.endTime || '17:00')
-    if (start === null || end === null || end <= start) return
-    min = min === null ? start : Math.min(min, start)
-    max = max === null ? end : Math.max(max, end)
-  })
-
-  if (min === null || max === null) {
-    return { dayStart: '09:00', dayEnd: '17:00' }
-  }
-
-  return { dayStart: minutesToTime(min), dayEnd: minutesToTime(max) }
-}
-
 export default function EmployeeAvailability({ className }: EmployeeAvailabilityProps) {
   const { user } = useAuth()
   const router = useRouter()
@@ -140,7 +79,7 @@ export default function EmployeeAvailability({ className }: EmployeeAvailability
     reason: string
   } | null>(null)
 
-  const fetchAvailability = async () => {
+  const fetchAvailability = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -208,7 +147,7 @@ export default function EmployeeAvailability({ className }: EmployeeAvailability
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   const saveBlockedRanges = async (
     customRanges: BlockedRange[] = blockedRanges
@@ -387,17 +326,19 @@ export default function EmployeeAvailability({ className }: EmployeeAvailability
 
   useEffect(() => {
     fetchAvailability()
-  }, [])
+  }, [fetchAvailability])
 
-  const scheduleWindow = getScheduleWindow(availabilityData?.availability)
+  const scheduleWindow = useMemo(
+    () => getScheduleWindow(availabilityData?.availability),
+    [availabilityData?.availability]
+  )
 
   const calendarEvents = useMemo(() => {
     const events: CalendarEvent[] = []
 
     const toEventDate = (value: string, isEnd = false) => {
       if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        const [year, month, day] = value.split('-').map(Number)
-        return new Date(year, month - 1, day, isEnd ? 23 : 0, isEnd ? 59 : 0, isEnd ? 59 : 0)
+        return new Date(`${value}T${isEnd ? '23:59:59' : '00:00:00'}`)
       }
       return new Date(value)
     }
@@ -598,6 +539,7 @@ export default function EmployeeAvailability({ className }: EmployeeAvailability
                         onClick={() => openEditRange(index)}
                         variant="ghost"
                         size="sm"
+                        disabled={saving}
                         className="text-rose-700 hover:text-rose-900 hover:bg-rose-100"
                       >
                         Edit
