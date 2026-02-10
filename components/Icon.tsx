@@ -3,14 +3,13 @@
 import React from 'react';
 import { iconMap } from '@/data/content';
 
-const isIconName = (name: string): name is keyof typeof iconMap =>
-  Object.prototype.hasOwnProperty.call(iconMap, name);
+export type IconName = keyof typeof iconMap;
 
-const Icon = ({ name, className }: { name: string; className?: string }) => {
-  if (!isIconName(name)) {
+const Icon = ({ name, className }: { name: IconName; className?: string }) => {
+  const LucideIcon = iconMap[name];
+  if (!LucideIcon) {
     return null;
   }
-  const LucideIcon = iconMap[name];
   return <LucideIcon className={className} />;
 };
 
