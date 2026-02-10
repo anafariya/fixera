@@ -879,10 +879,6 @@ export default function ProfilePage() {
       return
     }
 
-    if (newPhoneNumber.length < 10 || newPhoneNumber.length > 15) {
-      toast.error('Invalid phone number format')
-      return
-    }
 
     setPhoneUpdating(true)
     try {
