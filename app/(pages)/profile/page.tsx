@@ -67,8 +67,8 @@ export default function ProfilePage() {
   const [hourlyRate, setHourlyRate] = useState('')
   const [currency, setCurrency] = useState('USD')
   const [serviceCategories, setServiceCategories] = useState<string[]>([])
-  const [blockedRanges, setBlockedRanges] = useState<{startDate: string, endDate: string, reason?: string}[]>([])
-  const [newBlockedRange, setNewBlockedRange] = useState({startDate: '', endDate: '', reason: ''})
+  const [blockedRanges, setBlockedRanges] = useState<{ startDate: string, endDate: string, reason?: string }[]>([])
+  const [newBlockedRange, setNewBlockedRange] = useState({ startDate: '', endDate: '', reason: '' })
 
   // Company availability (for team members to inherit)
   const [companyAvailability, setCompanyAvailability] = useState({
@@ -80,8 +80,8 @@ export default function ProfilePage() {
     saturday: { available: false, startTime: '09:00', endTime: '17:00' },
     sunday: { available: false, startTime: '09:00', endTime: '17:00' }
   })
-  const [companyBlockedRanges, setCompanyBlockedRanges] = useState<{startDate: string, endDate: string, reason?: string, isHoliday?: boolean}[]>([])
-  const [newCompanyBlockedRange, setNewCompanyBlockedRange] = useState({startDate: '', endDate: '', reason: '', isHoliday: false})
+  const [companyBlockedRanges, setCompanyBlockedRanges] = useState<{ startDate: string, endDate: string, reason?: string, isHoliday?: boolean }[]>([])
+  const [newCompanyBlockedRange, setNewCompanyBlockedRange] = useState({ startDate: '', endDate: '', reason: '', isHoliday: false })
   const [bookingEvents, setBookingEvents] = useState<CalendarEvent[]>([])
   const [profileSaving, setProfileSaving] = useState(false)
   const [showAutoPopulateDialog, setShowAutoPopulateDialog] = useState(false)
@@ -104,10 +104,10 @@ export default function ProfilePage() {
     reason: string;
   } | null>(null)
 
-  // Phone editing state
-  const [editingPhone, setEditingPhone] = useState(false)
-  const [newPhone, setNewPhone] = useState('')
-  const [phoneSaving, setPhoneSaving] = useState(false)
+  // Phone number update state
+  const [isEditingPhone, setIsEditingPhone] = useState(false)
+  const [newPhoneNumber, setNewPhoneNumber] = useState('')
+  const [phoneUpdating, setPhoneUpdating] = useState(false)
 
   // Customer address state
   const [customerAddress, setCustomerAddress] = useState({
@@ -138,7 +138,7 @@ export default function ProfilePage() {
 
     // Populate phone
     if (user?.phone) {
-      setNewPhone(user.phone)
+      setNewPhoneNumber(user.phone)
     }
 
     // Populate customer address
@@ -406,7 +406,7 @@ export default function ProfilePage() {
     }
 
     const formatted = formatVATNumber(vatNumber)
-    
+
     // Client-side format validation
     const formatValidation = validateVATFormat(formatted)
     if (!formatValidation.valid) {
@@ -463,7 +463,7 @@ export default function ProfilePage() {
     setVatSaving(true)
     try {
       const result = await updateUserVAT(vatNumber)
-      
+
       if (result.success) {
         toast.success(vatNumber ? 'VAT number updated successfully' : 'VAT number removed successfully')
         // Refresh user data
@@ -485,7 +485,7 @@ export default function ProfilePage() {
     setVatSaving(true)
     try {
       const result = await updateUserVAT('')
-      
+
       if (result.success) {
         toast.success('VAT number removed successfully')
         await checkAuth()
@@ -515,7 +515,7 @@ export default function ProfilePage() {
       })
 
       const result = await response.json()
-      
+
       if (result.success) {
         toast.success('ID proof uploaded successfully')
         setIdProofFile(null)
@@ -531,7 +531,7 @@ export default function ProfilePage() {
   }
 
   const saveBlockedRanges = async (
-    customRanges?: {startDate: string, endDate: string, reason?: string}[]
+    customRanges?: { startDate: string, endDate: string, reason?: string }[]
   ) => {
     setProfileSaving(true)
     try {
@@ -548,7 +548,7 @@ export default function ProfilePage() {
       })
 
       const result = await response.json()
-      
+
       if (result.success) {
         await checkAuth() // Refresh user data
         return true
@@ -605,10 +605,10 @@ export default function ProfilePage() {
     const updatedRanges = blockedRanges.map((range, rangeIndex) =>
       rangeIndex === index
         ? {
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            reason: reason || undefined
-          }
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          reason: reason || undefined
+        }
         : range
     )
     setBlockedRanges(updatedRanges)
@@ -673,8 +673,8 @@ export default function ProfilePage() {
   }
 
   const handleServiceCategoryToggle = (category: string) => {
-    setServiceCategories(prev => 
-      prev.includes(category) 
+    setServiceCategories(prev =>
+      prev.includes(category)
         ? prev.filter(c => c !== category)
         : [...prev, category]
     )
@@ -757,7 +757,7 @@ export default function ProfilePage() {
 
   // Company blocked dates and ranges management
   const saveCompanyBlockedRanges = async (
-    customRanges?: {startDate: string, endDate: string, reason?: string, isHoliday?: boolean}[]
+    customRanges?: { startDate: string, endDate: string, reason?: string, isHoliday?: boolean }[]
   ) => {
     setProfileSaving(true)
     try {
@@ -817,7 +817,7 @@ export default function ProfilePage() {
 
     const updatedRanges = [...companyBlockedRanges, newRange]
     setCompanyBlockedRanges(updatedRanges)
-    setNewCompanyBlockedRange({startDate: '', endDate: '', reason: '', isHoliday: false})
+    setNewCompanyBlockedRange({ startDate: '', endDate: '', reason: '', isHoliday: false })
 
     const success = await saveCompanyBlockedRanges(updatedRanges)
     if (success) {
@@ -846,7 +846,7 @@ export default function ProfilePage() {
     setVatSaving(true)
     try {
       const result = await validateAndPopulateVAT(pendingVatData.vatNumber, true)
-      
+
       if (result.success && result.businessInfo) {
         // Update business info state with populated data
         setBusinessInfo(prev => ({
@@ -857,7 +857,7 @@ export default function ProfilePage() {
           country: result.businessInfo?.parsedAddress?.country || prev.country,
           postalCode: result.businessInfo?.parsedAddress?.postalCode || prev.postalCode,
         }))
-        
+
         toast.success('Business information auto-populated from VAT data!')
         await checkAuth() // Refresh user data
       } else {
@@ -872,13 +872,49 @@ export default function ProfilePage() {
     }
   }
 
+
+  const handleUpdatePhone = async () => {
+    if (!newPhoneNumber || newPhoneNumber.trim() === '') {
+      toast.error('Phone number cannot be empty')
+      return
+    }
+
+
+    setPhoneUpdating(true)
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/phone`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ phone: newPhoneNumber })
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        toast.success(result.msg || 'Phone number updated successfully')
+        setIsEditingPhone(false)
+        await checkAuth() // Refresh user data
+      } else {
+        toast.error(result.msg || 'Failed to update phone number')
+      }
+    } catch (error) {
+      console.error('Phone update error:', error)
+      toast.error('Failed to update phone number')
+    } finally {
+      setPhoneUpdating(false)
+    }
+  }
+
   const handleSubmitForVerification = async () => {
     if (!user) return
 
     setVerificationSubmitting(true)
     try {
       const result = await submitForVerification()
-      
+
       if (result.success) {
         toast.success('Thanks for submitting. Your profile will be checked within 48 hours.', {
           duration: 5000,
@@ -900,41 +936,6 @@ export default function ProfilePage() {
     }
   }
 
-  // Phone update handler
-  const handlePhoneUpdate = async () => {
-    if (!newPhone.trim()) {
-      toast.error('Phone number is required')
-      return
-    }
-
-    setPhoneSaving(true)
-    try {
-      const token = getAuthToken()
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/phone`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        credentials: 'include',
-        body: JSON.stringify({ phone: newPhone.trim() })
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        toast.success(result.msg || 'Phone number updated. Please verify your new number.')
-        setEditingPhone(false)
-        await checkAuth()
-      } else {
-        toast.error(result.msg || 'Failed to update phone number')
-      }
-    } catch {
-      toast.error('Failed to update phone number')
-    } finally {
-      setPhoneSaving(false)
-    }
-  }
 
   // Customer profile update handler
   const handleCustomerProfileUpdate = async () => {
@@ -1077,30 +1078,27 @@ export default function ProfilePage() {
           <p className="text-gray-600">Manage your account information and settings</p>
           {isProfessional && (
             <div className="mt-4 space-y-3">
-              <div className={`p-4 border rounded-lg ${
-                user?.professionalStatus === 'approved' ? 'bg-green-50 border-green-200' :
+              <div className={`p-4 border rounded-lg ${user?.professionalStatus === 'approved' ? 'bg-green-50 border-green-200' :
                 user?.professionalStatus === 'pending' ? 'bg-yellow-50 border-yellow-200' :
-                user?.professionalStatus === 'rejected' ? 'bg-red-50 border-red-200' :
-                'bg-gray-50 border-gray-200'
-              }`}>
+                  user?.professionalStatus === 'rejected' ? 'bg-red-50 border-red-200' :
+                    'bg-gray-50 border-gray-200'
+                }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <AlertCircle className={`h-4 w-4 ${
-                      user?.professionalStatus === 'approved' ? 'text-green-600' :
+                    <AlertCircle className={`h-4 w-4 ${user?.professionalStatus === 'approved' ? 'text-green-600' :
                       user?.professionalStatus === 'pending' ? 'text-yellow-600' :
-                      user?.professionalStatus === 'rejected' ? 'text-red-600' :
-                      'text-gray-600'
-                    }`} />
-                    <span className={`text-sm font-medium ${
-                      user?.professionalStatus === 'approved' ? 'text-green-800' :
+                        user?.professionalStatus === 'rejected' ? 'text-red-600' :
+                          'text-gray-600'
+                      }`} />
+                    <span className={`text-sm font-medium ${user?.professionalStatus === 'approved' ? 'text-green-800' :
                       user?.professionalStatus === 'pending' ? 'text-yellow-800' :
-                      user?.professionalStatus === 'rejected' ? 'text-red-800' :
-                      'text-gray-800'
-                    }`}>
+                        user?.professionalStatus === 'rejected' ? 'text-red-800' :
+                          'text-gray-800'
+                      }`}>
                       Professional Status: {user?.professionalStatus || 'not submitted'}
                     </span>
                   </div>
-                  
+
                   {(user?.professionalStatus === 'rejected' || !user?.professionalStatus) && (
                     <Button
                       onClick={handleSubmitForVerification}
@@ -1119,19 +1117,19 @@ export default function ProfilePage() {
                     </Button>
                   )}
                 </div>
-                
+
                 {user?.professionalStatus === 'rejected' && user?.rejectionReason && (
                   <div className="mt-2 p-2 bg-red-100 border border-red-300 rounded text-xs text-red-700">
                     <strong>Rejection Reason:</strong> {user.rejectionReason}
                   </div>
                 )}
-                
+
                 {user?.professionalStatus === 'pending' && (
                   <div className="mt-2 text-xs text-yellow-700">
                     Your profile is under review. You will be notified within 48 hours.
                   </div>
                 )}
-                
+
                 {user?.professionalStatus === 'approved' && (
                   <div className="mt-2 text-xs text-green-700">
                     Your professional profile has been approved. You can now receive project bookings.
@@ -1153,260 +1151,259 @@ export default function ProfilePage() {
               <TabsTrigger value="company-availability">Company Availability</TabsTrigger>
               <TabsTrigger value="security">Security</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="profile" className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
-          {/* User Profile Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Profile Information
-              </CardTitle>
-              <CardDescription>Your account details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-gray-500" />
-                <span className="text-sm">{user?.email}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-gray-500" />
-                {editingPhone ? (
-                  <div className="flex items-center gap-2 flex-1">
-                    <Input
-                      value={newPhone}
-                      onChange={(e) => setNewPhone(e.target.value)}
-                      placeholder="+32123456789"
-                      className="h-8 text-sm flex-1"
-                    />
-                    <Button size="sm" onClick={handlePhoneUpdate} disabled={phoneSaving} className="h-8">
-                      {phoneSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => { setEditingPhone(false); setNewPhone(user?.phone || '') }} className="h-8">
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 flex-1">
-                    <span className="text-sm">{user?.phone}</span>
-                    <Button size="sm" variant="ghost" onClick={() => setEditingPhone(true)} className="h-6 w-6 p-0">
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    {!user?.isPhoneVerified && (
-                      <span className="text-xs text-orange-600">(Not verified)</span>
+                {/* User Profile Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="h-5 w-5" />
+                      Profile Information
+                    </CardTitle>
+                    <CardDescription>Your account details</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm">{user?.email}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-gray-500" />
+                      {isEditingPhone ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <Input
+                            value={newPhoneNumber}
+                            onChange={(e) => setNewPhoneNumber(e.target.value)}
+                            placeholder="+32123456789"
+                            className="h-8 text-sm flex-1"
+                          />
+                          <Button size="sm" onClick={handleUpdatePhone} disabled={phoneUpdating} className="h-8">
+                            {phoneUpdating ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setIsEditingPhone(false); setNewPhoneNumber(user?.phone || '') }} className="h-8">
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="text-sm">{user?.phone}</span>
+                          <Button size="sm" variant="ghost" onClick={() => setIsEditingPhone(true)} className="h-6 w-6 p-0">
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          {!user?.isPhoneVerified && (
+                            <span className="text-xs text-orange-600">(Not verified)</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm capitalize">{user?.role}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Verification Status Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="h-5 w-5" />
+                      Verification Status
+                    </CardTitle>
+                    <CardDescription>Account verification progress</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Email Verification</span>
+                      <span className={`text-sm font-medium ${user?.isEmailVerified ? 'text-green-600' : 'text-red-600'}`}>
+                        {user?.isEmailVerified ? 'Verified' : 'Not Verified'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Phone Verification</span>
+                      <span className={`text-sm font-medium ${user?.isPhoneVerified ? 'text-green-600' : 'text-red-600'}`}>
+                        {user?.isPhoneVerified ? 'Verified' : 'Not Verified'}
+                      </span>
+                    </div>
+                    {(user?.role === 'professional' || user?.role === 'customer') && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">VAT Verification</span>
+                        <span className={`text-sm font-medium ${user?.isVatVerified ? 'text-green-600' : 'text-red-600'}`}>
+                          {user?.isVatVerified ? 'Verified' : 'Not Verified'}
+                        </span>
+                      </div>
                     )}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-gray-500" />
-                <span className="text-sm capitalize">{user?.role}</span>
-              </div>
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
 
-          {/* Verification Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Verification Status
-              </CardTitle>
-              <CardDescription>Account verification progress</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Email Verification</span>
-                <span className={`text-sm font-medium ${user?.isEmailVerified ? 'text-green-600' : 'text-red-600'}`}>
-                  {user?.isEmailVerified ? 'Verified' : 'Not Verified'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Phone Verification</span>
-                <span className={`text-sm font-medium ${user?.isPhoneVerified ? 'text-green-600' : 'text-red-600'}`}>
-                  {user?.isPhoneVerified ? 'Verified' : 'Not Verified'}
-                </span>
-              </div>
-              {(user?.role === 'professional' || user?.role === 'customer') && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">VAT Verification</span>
-                  <span className={`text-sm font-medium ${user?.isVatVerified ? 'text-green-600' : 'text-red-600'}`}>
-                    {user?.isVatVerified ? 'Verified' : 'Not Verified'}
-                  </span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                {/* VAT Number Card - For professionals and customers */}
+                {(user?.role === 'professional' || user?.role === 'customer') && (
+                  <Card className="md:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Building className="h-5 w-5" />
+                        VAT Information
+                      </CardTitle>
+                      <CardDescription>
+                        Add your VAT number for EU tax compliance. EU VAT numbers will be verified using VIES.
+                        {user?.role === 'customer' && ' Useful for business customers who need VAT invoices.'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="vatNumber">VAT Number</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="vatNumber"
+                            placeholder="e.g., DE123456789"
+                            value={vatNumber}
+                            onChange={(e) => handleVatNumberChange(e.target.value.toUpperCase())}
+                            className="flex-1"
+                          />
+                          <Button
+                            onClick={validateVatNumber}
+                            disabled={!canValidate || vatValidating}
+                            variant="outline"
+                            className="shrink-0"
+                          >
+                            {vatValidating ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                Validating
+                              </>
+                            ) : (
+                              'Validate'
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Format: 2-letter country code + 4-15 characters (e.g., DE123456789, FR12345678901)
+                        </p>
+                      </div>
 
-          {/* VAT Number Card - For professionals and customers */}
-          {(user?.role === 'professional' || user?.role === 'customer') && (
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building className="h-5 w-5" />
-                  VAT Information
-                </CardTitle>
-                <CardDescription>
-                  Add your VAT number for EU tax compliance. EU VAT numbers will be verified using VIES.
-                  {user?.role === 'customer' && ' Useful for business customers who need VAT invoices.'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="vatNumber">VAT Number</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="vatNumber"
-                      placeholder="e.g., DE123456789"
-                      value={vatNumber}
-                      onChange={(e) => handleVatNumberChange(e.target.value.toUpperCase())}
-                      className="flex-1"
-                    />
-                    <Button 
-                      onClick={validateVatNumber}
-                      disabled={!canValidate || vatValidating}
-                      variant="outline"
-                      className="shrink-0"
-                    >
-                      {vatValidating ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          Validating
-                        </>
-                      ) : (
-                        'Validate'
-                      )}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    Format: 2-letter country code + 4-15 characters (e.g., DE123456789, FR12345678901)
-                  </p>
-                </div>
-
-                {/* Validation Results */}
-                {vatValidation.valid !== undefined && (
-                  <div className={`p-3 rounded-lg border ${
-                    vatValidation.valid 
-                      ? 'bg-green-50 border-green-200' 
-                      : 'bg-red-50 border-red-200'
-                  }`}>
-                    <div className="flex items-start gap-2">
-                      {vatValidation.valid ? (
-                        <Check className="h-4 w-4 text-green-600 mt-0.5" />
-                      ) : (
-                        <X className="h-4 w-4 text-red-600 mt-0.5" />
-                      )}
-                      <div className="flex-1 text-sm">
-                        {vatValidation.valid ? (
-                          <div>
-                            <p className="font-medium text-green-800">VAT number is valid</p>
-                            {isEUVatNumber(vatNumber) && (
-                              <p className="text-green-700">
-                                Country: {getVATCountryName(vatNumber)}
-                              </p>
+                      {/* Validation Results */}
+                      {vatValidation.valid !== undefined && (
+                        <div className={`p-3 rounded-lg border ${vatValidation.valid
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-red-50 border-red-200'
+                          }`}>
+                          <div className="flex items-start gap-2">
+                            {vatValidation.valid ? (
+                              <Check className="h-4 w-4 text-green-600 mt-0.5" />
+                            ) : (
+                              <X className="h-4 w-4 text-red-600 mt-0.5" />
                             )}
-                            {vatValidation.companyName && (
-                              <p className="text-green-700 mt-1">
-                                <span className="font-medium">Company:</span> {vatValidation.companyName}
-                              </p>
-                            )}
-                            {vatValidation.companyAddress && (
-                              <p className="text-green-700">
-                                <span className="font-medium">Address:</span> {vatValidation.companyAddress}
-                              </p>
-                            )}
+                            <div className="flex-1 text-sm">
+                              {vatValidation.valid ? (
+                                <div>
+                                  <p className="font-medium text-green-800">VAT number is valid</p>
+                                  {isEUVatNumber(vatNumber) && (
+                                    <p className="text-green-700">
+                                      Country: {getVATCountryName(vatNumber)}
+                                    </p>
+                                  )}
+                                  {vatValidation.companyName && (
+                                    <p className="text-green-700 mt-1">
+                                      <span className="font-medium">Company:</span> {vatValidation.companyName}
+                                    </p>
+                                  )}
+                                  {vatValidation.companyAddress && (
+                                    <p className="text-green-700">
+                                      <span className="font-medium">Address:</span> {vatValidation.companyAddress}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <div>
+                                  <p className="font-medium text-red-800">Validation failed</p>
+                                  {vatValidation.error && (
+                                    <p className="text-red-700">{vatValidation.error}</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        ) : (
-                          <div>
-                            <p className="font-medium text-red-800">Validation failed</p>
-                            {vatValidation.error && (
-                              <p className="text-red-700">{vatValidation.error}</p>
-                            )}
+                        </div>
+                      )}
+
+                      {/* Current VAT Status */}
+                      {user?.vatNumber && (
+                        <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
+                            <div className="flex-1 text-sm">
+                              <p className="font-medium text-blue-800">Current VAT Number</p>
+                              <p className="text-blue-700">
+                                {user.vatNumber} ({getVATCountryName(user.vatNumber)})
+                              </p>
+                              <p className="text-blue-700">
+                                Status: {user.isVatVerified ? 'Verified' : 'Not Verified'}
+                              </p>
+                            </div>
                           </div>
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={saveVatNumber}
+                          disabled={!hasVatChanges || vatSaving}
+                          className="flex-1"
+                        >
+                          {vatSaving ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              Saving...
+                            </>
+                          ) : (
+                            vatNumber ? 'Save VAT Number' : 'Remove VAT Number'
+                          )}
+                        </Button>
+                        {user?.vatNumber && (
+                          <Button
+                            onClick={removeVatNumber}
+                            disabled={vatSaving}
+                            variant="outline"
+                          >
+                            Remove
+                          </Button>
                         )}
                       </div>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 )}
 
-                {/* Current VAT Status */}
-                {user?.vatNumber && (
-                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
-                      <div className="flex-1 text-sm">
-                        <p className="font-medium text-blue-800">Current VAT Number</p>
-                        <p className="text-blue-700">
-                          {user.vatNumber} ({getVATCountryName(user.vatNumber)})
-                        </p>
-                        <p className="text-blue-700">
-                          Status: {user.isVatVerified ? 'Verified' : 'Not Verified'}
-                        </p>
-                      </div>
+                {/* Account Stats Card */}
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5" />
+                      Account Stats
+                    </CardTitle>
+                    <CardDescription>Your account activity</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Member Since</span>
+                      <span className="text-sm font-medium">
+                        {new Date(user?.createdAt || '').toLocaleDateString()}
+                      </span>
                     </div>
-                  </div>
-                )}
-
-                {/* Action buttons */}
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={saveVatNumber}
-                    disabled={!hasVatChanges || vatSaving}
-                    className="flex-1"
-                  >
-                    {vatSaving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Saving...
-                      </>
-                    ) : (
-                      vatNumber ? 'Save VAT Number' : 'Remove VAT Number'
-                    )}
-                  </Button>
-                  {user?.vatNumber && (
-                    <Button 
-                      onClick={removeVatNumber}
-                      disabled={vatSaving}
-                      variant="outline"
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Account Stats */}
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Account Stats
-              </CardTitle>
-              <CardDescription>Your account activity</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Member Since</span>
-                <span className="text-sm font-medium">
-                  {new Date(user?.createdAt || '').toLocaleDateString()}
-                </span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Last Updated</span>
+                      <span className="text-sm font-medium">
+                        {new Date(user?.updatedAt || '').toLocaleDateString()}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Last Updated</span>
-                <span className="text-sm font-medium">
-                  {new Date(user?.updatedAt || '').toLocaleDateString()}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
             </TabsContent>
 
             {/* Business Info Tab */}
-            <TabsContent value="business" className="space-y-6">
+            < TabsContent value="business" className="space-y-6" >
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1438,7 +1435,7 @@ export default function ProfilePage() {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="description">Business Description</Label>
                     <Textarea
@@ -1539,7 +1536,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  <Button 
+                  <Button
                     onClick={saveBusinessInfo}
                     disabled={profileSaving}
                     className="w-full"
@@ -1555,10 +1552,10 @@ export default function ProfilePage() {
                   </Button>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent >
 
             {/* Documents Tab */}
-            <TabsContent value="documents" className="space-y-6">
+            < TabsContent value="documents" className="space-y-6" >
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1691,10 +1688,10 @@ export default function ProfilePage() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent >
 
             {/* Personal Availability Tab */}
-            <TabsContent value="personal-availability" className="space-y-6">
+            < TabsContent value="personal-availability" className="space-y-6" >
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1719,45 +1716,45 @@ export default function ProfilePage() {
                         <Input
                           id="startDate"
                           type="datetime-local"
-                        value={newBlockedRange.startDate}
-                        onChange={(e) => setNewBlockedRange(prev => ({ ...prev, startDate: e.target.value }))}
-                        min={toLocalInputValue(new Date().toISOString())}
-                      />
+                          value={newBlockedRange.startDate}
+                          onChange={(e) => setNewBlockedRange(prev => ({ ...prev, startDate: e.target.value }))}
+                          min={toLocalInputValue(new Date().toISOString())}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="endDate">End Date</Label>
+                        <Input
+                          id="endDate"
+                          type="datetime-local"
+                          value={newBlockedRange.endDate}
+                          onChange={(e) => setNewBlockedRange(prev => ({ ...prev, endDate: e.target.value }))}
+                          min={newBlockedRange.startDate || toLocalInputValue(new Date().toISOString())}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="reason">Reason (Optional)</Label>
+                        <Input
+                          id="reason"
+                          placeholder="Vacation, Holiday, etc."
+                          value={newBlockedRange.reason}
+                          onChange={(e) => setNewBlockedRange(prev => ({ ...prev, reason: e.target.value }))}
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="endDate">End Date</Label>
-                      <Input
-                        id="endDate"
-                        type="datetime-local"
-                        value={newBlockedRange.endDate}
-                        onChange={(e) => setNewBlockedRange(prev => ({ ...prev, endDate: e.target.value }))}
-                        min={newBlockedRange.startDate || toLocalInputValue(new Date().toISOString())}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reason">Reason (Optional)</Label>
-                      <Input
-                        id="reason"
-                        placeholder="Vacation, Holiday, etc."
-                        value={newBlockedRange.reason}
-                        onChange={(e) => setNewBlockedRange(prev => ({ ...prev, reason: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={addBlockedRange}
-                      disabled={
-                        profileSaving ||
-                        !newBlockedRange.startDate ||
-                        !newBlockedRange.endDate ||
-                        newBlockedRange.endDate <= newBlockedRange.startDate
-                      }
-                      variant="outline"
-                    >
-                      <CalendarX className="h-4 w-4 mr-2" />
-                      Block Period
-                    </Button>
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={addBlockedRange}
+                        disabled={
+                          profileSaving ||
+                          !newBlockedRange.startDate ||
+                          !newBlockedRange.endDate ||
+                          newBlockedRange.endDate <= newBlockedRange.startDate
+                        }
+                        variant="outline"
+                      >
+                        <CalendarX className="h-4 w-4 mr-2" />
+                        Block Period
+                      </Button>
                     </div>
                   </div>
 
@@ -1834,10 +1831,10 @@ export default function ProfilePage() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent >
 
             {/* Company Availability Tab */}
-            <TabsContent value="company-availability" className="space-y-6">
+            < TabsContent value="company-availability" className="space-y-6" >
               <div className="mb-6">
                 <h3 className="text-lg font-semibold">Company Availability & Holidays</h3>
                 <p className="text-sm text-muted-foreground">Set company-wide schedule that team members can inherit</p>
@@ -1952,7 +1949,7 @@ export default function ProfilePage() {
                           id="company-range-start"
                           type="date"
                           value={newCompanyBlockedRange.startDate}
-                          onChange={(e) => setNewCompanyBlockedRange(prev => ({...prev, startDate: e.target.value}))}
+                          onChange={(e) => setNewCompanyBlockedRange(prev => ({ ...prev, startDate: e.target.value }))}
                           min={toLocalInputValue(new Date().toISOString()).split('T')[0]}
                         />
                       </div>
@@ -1962,7 +1959,7 @@ export default function ProfilePage() {
                           id="company-range-end"
                           type="date"
                           value={newCompanyBlockedRange.endDate}
-                          onChange={(e) => setNewCompanyBlockedRange(prev => ({...prev, endDate: e.target.value}))}
+                          onChange={(e) => setNewCompanyBlockedRange(prev => ({ ...prev, endDate: e.target.value }))}
                           min={newCompanyBlockedRange.startDate
                             ? getNextDateValue(newCompanyBlockedRange.startDate)
                             : toLocalInputValue(new Date().toISOString()).split('T')[0]}
@@ -1974,7 +1971,7 @@ export default function ProfilePage() {
                           id="company-range-reason"
                           placeholder="Holiday period"
                           value={newCompanyBlockedRange.reason}
-                          onChange={(e) => setNewCompanyBlockedRange(prev => ({...prev, reason: e.target.value}))}
+                          onChange={(e) => setNewCompanyBlockedRange(prev => ({ ...prev, reason: e.target.value }))}
                         />
                       </div>
                       <div className="md:col-span-2 flex items-end">
@@ -1996,7 +1993,7 @@ export default function ProfilePage() {
                         type="checkbox"
                         id="company-range-is-holiday"
                         checked={newCompanyBlockedRange.isHoliday}
-                        onChange={(e) => setNewCompanyBlockedRange(prev => ({...prev, isHoliday: e.target.checked}))}
+                        onChange={(e) => setNewCompanyBlockedRange(prev => ({ ...prev, isHoliday: e.target.checked }))}
                         className="rounded"
                       />
                       <Label htmlFor="company-range-is-holiday" className="text-sm font-normal cursor-pointer">
@@ -2045,18 +2042,18 @@ export default function ProfilePage() {
 
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent >
 
             {/* Employees Tab */}
-            <TabsContent value="employees" className="space-y-6">
+            < TabsContent value="employees" className="space-y-6" >
               <EmployeeManagement />
-            </TabsContent>
+            </TabsContent >
 
             {/* Security Tab */}
-            <TabsContent value="security" className="space-y-6">
+            < TabsContent value="security" className="space-y-6" >
               <PasswordChange />
-            </TabsContent>
-          </Tabs>
+            </TabsContent >
+          </Tabs >
         ) : (
           // Non-professional users (customers, employees, etc.)
           <Tabs defaultValue="profile" className="w-full">
@@ -2067,7 +2064,7 @@ export default function ProfilePage() {
                 <TabsTrigger value="availability">Availability</TabsTrigger>
               )}
             </TabsList>
-            
+
             <TabsContent value="profile" className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
                 {/* User Profile Card */}
@@ -2086,25 +2083,25 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Phone className="h-4 w-4 text-gray-500" />
-                      {editingPhone ? (
+                      {isEditingPhone ? (
                         <div className="flex items-center gap-2 flex-1">
                           <Input
-                            value={newPhone}
-                            onChange={(e) => setNewPhone(e.target.value)}
+                            value={newPhoneNumber}
+                            onChange={(e) => setNewPhoneNumber(e.target.value)}
                             placeholder="+32123456789"
                             className="h-8 text-sm flex-1"
                           />
-                          <Button size="sm" onClick={handlePhoneUpdate} disabled={phoneSaving} className="h-8">
-                            {phoneSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+                          <Button size="sm" onClick={handleUpdatePhone} disabled={phoneUpdating} className="h-8">
+                            {phoneUpdating ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setEditingPhone(false); setNewPhone(user?.phone || '') }} className="h-8">
+                          <Button size="sm" variant="ghost" onClick={() => { setIsEditingPhone(false); setNewPhoneNumber(user?.phone || '') }} className="h-8">
                             Cancel
                           </Button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 flex-1">
                           <span className="text-sm">{user?.phone?.startsWith('+1000000') ? 'Not provided' : user?.phone}</span>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingPhone(true)} className="h-6 w-6 p-0">
+                          <Button size="sm" variant="ghost" onClick={() => setIsEditingPhone(true)} className="h-6 w-6 p-0">
                             <Pencil className="h-3 w-3" />
                           </Button>
                           {!user?.isPhoneVerified && (
@@ -2121,7 +2118,7 @@ export default function ProfilePage() {
                 </Card>
 
                 {/* Verification Status */}
-                <Card>
+                < Card >
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Shield className="h-5 w-5" />
@@ -2143,198 +2140,204 @@ export default function ProfilePage() {
                       </span>
                     </div>
                   </CardContent>
-                </Card>
-              </div>
+                </Card >
+              </div >
 
               {/* Customer Address Section */}
-              {user?.role === 'customer' && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin className="h-5 w-5" />
-                      Address Information
-                    </CardTitle>
-                    <CardDescription>
-                      Your address details
-                      {user.customerType === 'business' && ' and business information'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="customer-address">Address</Label>
-                        <Input
-                          id="customer-address"
-                          value={customerAddress.address}
-                          onChange={(e) => setCustomerAddress(prev => ({ ...prev, address: e.target.value }))}
-                          placeholder="Street address"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="customer-city">City</Label>
-                        <Input
-                          id="customer-city"
-                          value={customerAddress.city}
-                          onChange={(e) => setCustomerAddress(prev => ({ ...prev, city: e.target.value }))}
-                          placeholder="City"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="customer-country">Country</Label>
-                        <Input
-                          id="customer-country"
-                          value={customerAddress.country}
-                          onChange={(e) => setCustomerAddress(prev => ({ ...prev, country: e.target.value }))}
-                          placeholder="Country"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="customer-postalCode">Postal Code</Label>
-                        <Input
-                          id="customer-postalCode"
-                          value={customerAddress.postalCode}
-                          onChange={(e) => setCustomerAddress(prev => ({ ...prev, postalCode: e.target.value }))}
-                          placeholder="Postal Code"
-                        />
-                      </div>
-                    </div>
-
-                    {user.customerType === 'business' && (
-                      <>
-                        <div className="border-t pt-4 mt-4">
-                          <h4 className="text-sm font-medium mb-3">Business Information</h4>
-                          <div className="space-y-2">
-                            <Label htmlFor="customer-businessName">Business Name</Label>
-                            <Input
-                              id="customer-businessName"
-                              value={customerBusinessName}
-                              onChange={(e) => setCustomerBusinessName(e.target.value)}
-                              placeholder="Your business name"
-                            />
-                          </div>
+              {
+                user?.role === 'customer' && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <MapPin className="h-5 w-5" />
+                        Address Information
+                      </CardTitle>
+                      <CardDescription>
+                        Your address details
+                        {user.customerType === 'business' && ' and business information'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="customer-address">Address</Label>
+                          <Input
+                            id="customer-address"
+                            value={customerAddress.address}
+                            onChange={(e) => setCustomerAddress(prev => ({ ...prev, address: e.target.value }))}
+                            placeholder="Street address"
+                          />
                         </div>
-                      </>
-                    )}
+                        <div className="space-y-2">
+                          <Label htmlFor="customer-city">City</Label>
+                          <Input
+                            id="customer-city"
+                            value={customerAddress.city}
+                            onChange={(e) => setCustomerAddress(prev => ({ ...prev, city: e.target.value }))}
+                            placeholder="City"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="customer-country">Country</Label>
+                          <Input
+                            id="customer-country"
+                            value={customerAddress.country}
+                            onChange={(e) => setCustomerAddress(prev => ({ ...prev, country: e.target.value }))}
+                            placeholder="Country"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="customer-postalCode">Postal Code</Label>
+                          <Input
+                            id="customer-postalCode"
+                            value={customerAddress.postalCode}
+                            onChange={(e) => setCustomerAddress(prev => ({ ...prev, postalCode: e.target.value }))}
+                            placeholder="Postal Code"
+                          />
+                        </div>
+                      </div>
 
-                    <Button
-                      onClick={handleCustomerProfileUpdate}
-                      disabled={customerProfileSaving}
-                      className="w-full"
-                    >
-                      {customerProfileSaving ? (
+                      {user.customerType === 'business' && (
                         <>
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          Saving...
-                        </>
-                      ) : (
-                        'Save Profile'
-                      )}
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* VAT for business customers */}
-              {user?.role === 'customer' && user.customerType === 'business' && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Building className="h-5 w-5" />
-                      VAT Information
-                    </CardTitle>
-                    <CardDescription>
-                      Add your VAT number for EU tax compliance and invoicing.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="customer-vatNumber">VAT Number</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="customer-vatNumber"
-                          placeholder="e.g., DE123456789"
-                          value={vatNumber}
-                          onChange={(e) => handleVatNumberChange(e.target.value.toUpperCase())}
-                          className="flex-1"
-                        />
-                        <Button
-                          onClick={validateVatNumber}
-                          disabled={!canValidate || vatValidating}
-                          variant="outline"
-                          className="shrink-0"
-                        >
-                          {vatValidating ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                              Validating
-                            </>
-                          ) : (
-                            'Validate'
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {vatValidation.valid !== undefined && (
-                      <div className={`p-3 rounded-lg border ${
-                        vatValidation.valid
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-red-50 border-red-200'
-                      }`}>
-                        <div className="flex items-start gap-2">
-                          {vatValidation.valid ? (
-                            <Check className="h-4 w-4 text-green-600 mt-0.5" />
-                          ) : (
-                            <X className="h-4 w-4 text-red-600 mt-0.5" />
-                          )}
-                          <div className="flex-1 text-sm">
-                            {vatValidation.valid ? (
-                              <p className="font-medium text-green-800">VAT number is valid</p>
-                            ) : (
-                              <p className="text-red-700">{vatValidation.error}</p>
-                            )}
+                          <div className="border-t pt-4 mt-4">
+                            <h4 className="text-sm font-medium mb-3">Business Information</h4>
+                            <div className="space-y-2">
+                              <Label htmlFor="customer-businessName">Business Name</Label>
+                              <Input
+                                id="customer-businessName"
+                                value={customerBusinessName}
+                                onChange={(e) => setCustomerBusinessName(e.target.value)}
+                                placeholder="Your business name"
+                              />
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    )}
+                        </>
+                      )}
 
-                    <div className="flex gap-2">
                       <Button
-                        onClick={saveVatNumber}
-                        disabled={!hasVatChanges || vatSaving}
-                        className="flex-1"
+                        onClick={handleCustomerProfileUpdate}
+                        disabled={customerProfileSaving}
+                        className="w-full"
                       >
-                        {vatSaving ? (
+                        {customerProfileSaving ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             Saving...
                           </>
                         ) : (
-                          vatNumber ? 'Save VAT Number' : 'Remove VAT Number'
+                          'Save Profile'
                         )}
                       </Button>
-                      {user?.vatNumber && (
-                        <Button onClick={removeVatNumber} disabled={vatSaving} variant="outline">
-                          Remove
-                        </Button>
+                    </CardContent>
+                  </Card>
+                )
+              }
+
+              {/* VAT for business customers */}
+              {
+                user?.role === 'customer' && user.customerType === 'business' && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Building className="h-5 w-5" />
+                        VAT Information
+                      </CardTitle>
+                      <CardDescription>
+                        Add your VAT number for EU tax compliance and invoicing.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="customer-vatNumber">VAT Number</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="customer-vatNumber"
+                            placeholder="e.g., DE123456789"
+                            value={vatNumber}
+                            onChange={(e) => handleVatNumberChange(e.target.value.toUpperCase())}
+                            className="flex-1"
+                          />
+                          <Button
+                            onClick={validateVatNumber}
+                            disabled={!canValidate || vatValidating}
+                            variant="outline"
+                            className="shrink-0"
+                          >
+                            {vatValidating ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                Validating
+                              </>
+                            ) : (
+                              'Validate'
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {vatValidation.valid !== undefined && (
+                        <div className={`p-3 rounded-lg border ${vatValidation.valid
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-red-50 border-red-200'
+                          }`}>
+                          <div className="flex items-start gap-2">
+                            {vatValidation.valid ? (
+                              <Check className="h-4 w-4 text-green-600 mt-0.5" />
+                            ) : (
+                              <X className="h-4 w-4 text-red-600 mt-0.5" />
+                            )}
+                            <div className="flex-1 text-sm">
+                              {vatValidation.valid ? (
+                                <p className="font-medium text-green-800">VAT number is valid</p>
+                              ) : (
+                                <p className="text-red-700">{vatValidation.error}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
+
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={saveVatNumber}
+                          disabled={!hasVatChanges || vatSaving}
+                          className="flex-1"
+                        >
+                          {vatSaving ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              Saving...
+                            </>
+                          ) : (
+                            vatNumber ? 'Save VAT Number' : 'Remove VAT Number'
+                          )}
+                        </Button>
+                        {user?.vatNumber && (
+                          <Button onClick={removeVatNumber} disabled={vatSaving} variant="outline">
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              }
+            </TabsContent >
 
             <TabsContent value="security" className="space-y-6">
               <PasswordChange />
             </TabsContent>
 
-            {user?.role === 'employee' && (
-              <TabsContent value="availability" className="space-y-6">
-                <EmployeeAvailability />
-              </TabsContent>
-            )}
-          </Tabs>
-        )}
+            {
+              user?.role === 'employee' && (
+                <TabsContent value="availability" className="space-y-6">
+                  <EmployeeAvailability />
+                </TabsContent>
+              )
+            }
+          </Tabs >
+        )
+        }
 
         {/* Back to Dashboard */}
         <div className="mt-8">
@@ -2413,79 +2416,81 @@ export default function ProfilePage() {
             </div>
           </DialogContent>
         </Dialog>
-        
+
         {/* PHASE 2: Auto-populate Dialog */}
-        {showAutoPopulateDialog && pendingVatData && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-md">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building className="h-5 w-5 text-blue-600" />
-                  Auto-populate Business Information?
-                </CardTitle>
-                <CardDescription>
-                  We found company information from your VAT registration. Would you like to auto-fill your business details?
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Preview of data to be populated */}
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 className="text-sm font-medium text-blue-800 mb-2">Company Information Found:</h4>
-                  {pendingVatData.companyName && (
-                    <p className="text-sm text-blue-700"><strong>Company Name:</strong> {pendingVatData.companyName}</p>
-                  )}
-                  {pendingVatData.parsedAddress && (
-                    <>
-                      {pendingVatData.parsedAddress.streetAddress && (
-                        <p className="text-sm text-blue-700"><strong>Address:</strong> {pendingVatData.parsedAddress.streetAddress}</p>
-                      )}
-                      {pendingVatData.parsedAddress.city && (
-                        <p className="text-sm text-blue-700"><strong>City:</strong> {pendingVatData.parsedAddress.city}</p>
-                      )}
-                      {pendingVatData.parsedAddress.postalCode && (
-                        <p className="text-sm text-blue-700"><strong>Postal Code:</strong> {pendingVatData.parsedAddress.postalCode}</p>
-                      )}
-                      {pendingVatData.parsedAddress.country && (
-                        <p className="text-sm text-blue-700"><strong>Country:</strong> {getVATCountryName(pendingVatData.parsedAddress.country)}</p>
-                      )}
-                    </>
-                  )}
-                </div>
-                
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-xs text-amber-700">
-                    Only empty fields will be filled. Your existing data will not be overwritten.
-                  </p>
-                </div>
-                
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleAutoPopulate(true)}
-                    disabled={vatSaving}
-                    className="flex-1"
-                  >
-                    {vatSaving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Auto-filling...
-                      </>
-                    ) : (
-                      'Yes, Auto-fill'
+        {
+          showAutoPopulateDialog && pendingVatData && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <Card className="w-full max-w-md">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building className="h-5 w-5 text-blue-600" />
+                    Auto-populate Business Information?
+                  </CardTitle>
+                  <CardDescription>
+                    We found company information from your VAT registration. Would you like to auto-fill your business details?
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Preview of data to be populated */}
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">Company Information Found:</h4>
+                    {pendingVatData.companyName && (
+                      <p className="text-sm text-blue-700"><strong>Company Name:</strong> {pendingVatData.companyName}</p>
                     )}
-                  </Button>
-                  <Button
-                    onClick={() => handleAutoPopulate(false)}
-                    variant="outline"
-                    disabled={vatSaving}
-                    className="flex-1"
-                  >
-                    No, Skip
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                    {pendingVatData.parsedAddress && (
+                      <>
+                        {pendingVatData.parsedAddress.streetAddress && (
+                          <p className="text-sm text-blue-700"><strong>Address:</strong> {pendingVatData.parsedAddress.streetAddress}</p>
+                        )}
+                        {pendingVatData.parsedAddress.city && (
+                          <p className="text-sm text-blue-700"><strong>City:</strong> {pendingVatData.parsedAddress.city}</p>
+                        )}
+                        {pendingVatData.parsedAddress.postalCode && (
+                          <p className="text-sm text-blue-700"><strong>Postal Code:</strong> {pendingVatData.parsedAddress.postalCode}</p>
+                        )}
+                        {pendingVatData.parsedAddress.country && (
+                          <p className="text-sm text-blue-700"><strong>Country:</strong> {getVATCountryName(pendingVatData.parsedAddress.country)}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-xs text-amber-700">
+                      Only empty fields will be filled. Your existing data will not be overwritten.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleAutoPopulate(true)}
+                      disabled={vatSaving}
+                      className="flex-1"
+                    >
+                      {vatSaving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Auto-filling...
+                        </>
+                      ) : (
+                        'Yes, Auto-fill'
+                      )}
+                    </Button>
+                    <Button
+                      onClick={() => handleAutoPopulate(false)}
+                      variant="outline"
+                      disabled={vatSaving}
+                      className="flex-1"
+                    >
+                      No, Skip
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )
+        }
 
         {/* ID Change Warning Dialog */}
         <Dialog open={showIdChangeWarning} onOpenChange={setShowIdChangeWarning}>
@@ -2540,7 +2545,7 @@ export default function ProfilePage() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
-    </div>
+      </div >
+    </div >
   )
 }
