@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Switch } from "@/components/ui/switch"
+import WeeklyAvailabilityCalendar, { CalendarEvent } from "@/components/calendar/WeeklyAvailabilityCalendar"
 import {
   User,
   Mail,
@@ -20,10 +22,15 @@ import {
   Loader2,
   Users,
   Trash2,
+  UserX,
   X,
-  Plus
+  Plus,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react"
 import { toast } from "sonner"
+import { toLocalInputValue, getDateValue, toIsoDateTime, type DateInput } from "@/lib/dateUtils"
+import { parseTimeToMinutes, minutesToTime, getScheduleWindow } from "@/lib/scheduleUtils"
 
 type Day =
   | 'monday'
@@ -44,7 +51,6 @@ type WeeklyAvailability = {
   [day in Day]: DayAvailability;
 };
 
-
 interface Employee {
   _id: string
   name: string
@@ -63,13 +69,22 @@ interface Employee {
     endDate: string;
     reason?: string;
   }[]
+  bookingBlockedRanges?: {
+    startDate: string;
+    endDate: string;
+    reason?: string;
+    bookingId?: string;
+    location?: {
+      address?: string;
+      city?: string;
+      country?: string;
+      postalCode?: string;
+    };
+  }[]
 }
 
-interface EmployeeManagementProps {
-  companyName: string
-}
-
-export default function EmployeeManagement({ companyName: _ }: EmployeeManagementProps) {
+export default function EmployeeManagement() {
+  const router = useRouter()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
@@ -87,33 +102,55 @@ export default function EmployeeManagement({ companyName: _ }: EmployeeManagemen
   const [newPassword, setNewPassword] = useState('')
   const [resettingPassword, setResettingPassword] = useState(false)
 
+  // Email update states
+  const [emailDialog, setEmailDialog] = useState<{memberId: string, memberName: string, currentEmail?: string} | null>(null)
+  const [emailValue, setEmailValue] = useState('')
+  const [updatingEmail, setUpdatingEmail] = useState(false)
+
   // Deactivation confirmation states
   const [deactivateDialog, setDeactivateDialog] = useState<{memberId: string, memberName: string} | null>(null)
   const [deactivating, setDeactivating] = useState(false)
 
+  // Removal confirmation states
+  const [removeDialog, setRemoveDialog] = useState<{memberId: string, memberName: string} | null>(null)
+  const [removing, setRemoving] = useState(false)
+
   // Availability management states
   const [availabilityDialog, setAvailabilityDialog] = useState<Employee | null>(null)
   const [savingAvailability, setSavingAvailability] = useState(false)
-const [availability, setAvailability] = useState<WeeklyAvailability>({
-  monday: { available: false, startTime: '09:00', endTime: '17:00' },
-  tuesday: { available: false, startTime: '09:00', endTime: '17:00' },
-  wednesday: { available: false, startTime: '09:00', endTime: '17:00' },
-  thursday: { available: false, startTime: '09:00', endTime: '17:00' },
-  friday: { available: false, startTime: '09:00', endTime: '17:00' },
-  saturday: { available: false, startTime: '09:00', endTime: '17:00' },
-  sunday: { available: false, startTime: '09:00', endTime: '17:00' },
-});
 
-  const [blockedDates, setBlockedDates] = useState<{date: string, reason?: string}[]>([])
   const [blockedRanges, setBlockedRanges] = useState<{startDate: string, endDate: string, reason?: string}[]>([])
-  const [newBlockedDate, setNewBlockedDate] = useState({date: '', reason: ''})
   const [newBlockedRange, setNewBlockedRange] = useState({startDate: '', endDate: '', reason: ''})
+  const [editingRange, setEditingRange] = useState<{
+    index: number;
+    startValue: string;
+    endValue: string;
+    reason: string;
+  } | null>(null)
+
+  const scheduleWindow = useMemo(
+    () => getScheduleWindow(availabilityDialog?.availability),
+    [availabilityDialog?.availability]
+  )
+
+  // Pagination states
+  const EMPLOYEES_PER_PAGE = 10
+  const [employeesPage, setEmployeesPage] = useState(1)
+
+  // Clamp pagination states when list lengths shrink
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(employees.length / EMPLOYEES_PER_PAGE))
+    if (employeesPage > maxPage) {
+      setEmployeesPage(maxPage)
+    }
+  }, [employees.length, employeesPage])
+
 
   // Fetch employees
   const fetchEmployees = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/employee/list`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/employee/list?includeInactive=true`, {
         method: 'GET',
         credentials: 'include'
       })
@@ -252,58 +289,140 @@ const [availability, setAvailability] = useState<WeeklyAvailability>({
     }
   }
 
+  const openEmailDialog = (employee: Employee) => {
+    setEmailDialog({
+      memberId: employee._id,
+      memberName: employee.name,
+      currentEmail: employee.email
+    })
+    setEmailValue(employee.email || '')
+  }
+
+  const updateEmployeeEmail = async () => {
+    if (!emailDialog) return
+    if (!emailValue.trim()) {
+      toast.error('Email is required')
+      return
+    }
+
+    try {
+      setUpdatingEmail(true)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/employee/${emailDialog.memberId}/email`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email: emailValue.trim() })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success('Employee email updated successfully')
+        setEmailDialog(null)
+        setEmailValue('')
+        fetchEmployees()
+      } else {
+        toast.error(data.msg || 'Failed to update employee email')
+      }
+    } catch (error) {
+      console.error('Error updating employee email:', error)
+      toast.error('Failed to update employee email')
+    } finally {
+      setUpdatingEmail(false)
+    }
+  }
+
+  const handleRemove = (employeeId: string, employeeName: string) => {
+    setRemoveDialog({ memberId: employeeId, memberName: employeeName })
+  }
+
+  const confirmRemove = async () => {
+    if (!removeDialog) return
+
+    try {
+      setRemoving(true)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/employee/${removeDialog.memberId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success('Employee removed successfully')
+        setRemoveDialog(null)
+        fetchEmployees()
+      } else {
+        toast.error(data.msg || 'Failed to remove employee')
+      }
+    } catch (error) {
+      console.error('Error removing employee:', error)
+      toast.error('Failed to remove employee')
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  const formatDateTimeSafe = (value: DateInput): string => {
+    const dateStr = getDateValue(value);
+    if (!dateStr) return 'Invalid Date';
+    const parsed = new Date(dateStr);
+    if (Number.isNaN(parsed.getTime())) return 'Invalid Date';
+    return parsed.toLocaleString();
+  };
+
   // Open availability dialog
   const openAvailabilityDialog = (employee: Employee) => {
     setAvailabilityDialog(employee)
-    // Load employee's blocked dates
-    if (employee.blockedDates) {
-      setBlockedDates(employee.blockedDates.map(d => ({
-        date: typeof d === 'string' ? d : new Date(d).toISOString().split('T')[0],
-        reason: undefined
-      })))
-    }
-    if (employee.blockedRanges) {
-      setBlockedRanges(employee.blockedRanges)
-    }
-  }
-
-  // Update availability day
-  const updateAvailability = (day: string, field: string, value: boolean | string) => {
-    setAvailability(prev => ({
-      ...prev,
-      [day]: {
-        ...prev[day as keyof typeof prev],
-        [field]: value
+    // Reset pagination pages
+    const mergedRanges = new Map<string, { startDate: string; endDate: string; reason?: string }>();
+    const addRange = (range: { startDate: string; endDate: string; reason?: string }) => {
+      const key = `${range.startDate}-${range.endDate}-${range.reason || ''}`;
+      if (!mergedRanges.has(key)) {
+        mergedRanges.set(key, range);
       }
-    }))
-  }
+    };
 
-  // Add blocked date
-  const addBlockedDate = () => {
-    if (!newBlockedDate.date) {
-      toast.error('Please select a date')
-      return
+    if (employee.blockedRanges) {
+      employee.blockedRanges.forEach((range) => {
+        const startDate = toIsoDateTime(range.startDate, false);
+        const endDate = toIsoDateTime(range.endDate, true);
+        if (startDate && endDate) {
+          addRange({ startDate, endDate, reason: range.reason });
+        }
+      });
     }
-    setBlockedDates(prev => [...prev, newBlockedDate])
-    setNewBlockedDate({date: '', reason: ''})
-  }
 
-  // Remove blocked date
-  const removeBlockedDate = (dateToRemove: string) => {
-    setBlockedDates(prev => prev.filter(d => d.date !== dateToRemove))
+    if (employee.blockedDates) {
+      employee.blockedDates.forEach((dateValue) => {
+        const startDate = toIsoDateTime(dateValue, false);
+        const endDate = toIsoDateTime(dateValue, true);
+        if (startDate && endDate) {
+          addRange({ startDate, endDate });
+        }
+      });
+    }
+
+    setBlockedRanges(Array.from(mergedRanges.values()))
   }
 
   // Add blocked range
   const addBlockedRange = () => {
     if (!newBlockedRange.startDate || !newBlockedRange.endDate) {
-      toast.error('Please select both start and end dates')
+      toast.error('Please select both start and end times')
       return
     }
-    if (new Date(newBlockedRange.startDate) > new Date(newBlockedRange.endDate)) {
-      toast.error('Start date must be before end date')
+    if (new Date(newBlockedRange.startDate) >= new Date(newBlockedRange.endDate)) {
+      toast.error('Start time must be before end time')
       return
     }
-    setBlockedRanges(prev => [...prev, newBlockedRange])
+    setBlockedRanges(prev => [...prev, {
+      startDate: new Date(newBlockedRange.startDate).toISOString(),
+      endDate: new Date(newBlockedRange.endDate).toISOString(),
+      reason: newBlockedRange.reason || undefined
+    }])
     setNewBlockedRange({startDate: '', endDate: '', reason: ''})
   }
 
@@ -311,6 +430,92 @@ const [availability, setAvailability] = useState<WeeklyAvailability>({
   const removeBlockedRange = (index: number) => {
     setBlockedRanges(prev => prev.filter((_, i) => i !== index))
   }
+
+  const openEditRange = (index: number) => {
+    const range = blockedRanges[index]
+    if (!range) return
+    setEditingRange({
+      index,
+      startValue: toLocalInputValue(range.startDate),
+      endValue: toLocalInputValue(range.endDate),
+      reason: range.reason || ''
+    })
+  }
+
+  const applyEditRange = () => {
+    if (!editingRange) return
+    const { index, startValue, endValue, reason } = editingRange
+    if (!startValue || !endValue) {
+      toast.error('Select start and end values')
+      return
+    }
+    const startDate = new Date(startValue)
+    const endDate = new Date(endValue)
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      toast.error('Please provide valid start and end times')
+      return
+    }
+    if (startDate >= endDate) {
+      toast.error('Start time must be before end time')
+      return
+    }
+    setBlockedRanges(prev =>
+      prev.map((range, idx) =>
+        idx === index
+          ? {
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString(),
+              reason: reason || undefined
+            }
+          : range
+      )
+    )
+    setEditingRange(null)
+  }
+
+  const removeEditingRange = () => {
+    if (!editingRange) return
+    setBlockedRanges(prev => prev.filter((_, idx) => idx !== editingRange.index))
+    setEditingRange(null)
+  }
+
+  const calendarEvents = useMemo<CalendarEvent[]>(() => {
+    const events: CalendarEvent[] = []
+
+    blockedRanges.forEach((range, index) => {
+      const start = new Date(range.startDate)
+      const end = new Date(range.endDate)
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return
+      events.push({
+        id: `personal-${index}`,
+        type: 'personal',
+        title: 'Personal Block',
+        start,
+        end,
+        meta: { note: range.reason, rangeIndex: index }
+      })
+    })
+
+    availabilityDialog?.bookingBlockedRanges?.forEach((range, index) => {
+      const start = new Date(range.startDate)
+      const end = new Date(range.endDate)
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return
+      const type = range.reason === 'booking-buffer' ? 'booking-buffer' : 'booking'
+      events.push({
+        id: `booking-${range.bookingId || index}`,
+        type,
+        title: type === 'booking-buffer' ? 'Buffer' : 'Booking',
+        start,
+        end,
+        meta: {
+          bookingId: range.bookingId,
+          location: range.location
+        }
+      })
+    })
+
+    return events
+  }, [availabilityDialog?.bookingBlockedRanges, blockedRanges])
 
   // Save employee blocked dates (employees follow company weekly schedule)
   const saveEmployeeAvailability = async () => {
@@ -326,7 +531,7 @@ const [availability, setAvailability] = useState<WeeklyAvailability>({
         },
         credentials: 'include',
         body: JSON.stringify({
-          blockedDates,
+          blockedDates: [],
           blockedRanges
         })
       })
@@ -505,19 +710,26 @@ const [availability, setAvailability] = useState<WeeklyAvailability>({
                 </Button>
               </div>
 
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Availability</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {employees.map((member) => (
+              {(() => {
+                const totalEmployeesPages = Math.ceil(employees.length / EMPLOYEES_PER_PAGE)
+                const paginatedEmployees = employees.slice(
+                  (employeesPage - 1) * EMPLOYEES_PER_PAGE,
+                  employeesPage * EMPLOYEES_PER_PAGE
+                )
+                return (
+                  <>
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Contact</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedEmployees.map((member) => (
                       <TableRow key={member._id}>
                         <TableCell>
                           <div className="flex items-center gap-3">
@@ -544,17 +756,6 @@ const [availability, setAvailability] = useState<WeeklyAvailability>({
                               No Email
                             </Badge>
                           )}
-                        </TableCell>
-                        
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm capitalize">
-                              {member.availabilityPreference === 'same_as_company' 
-                                ? 'Same as Company' 
-                                : 'Personal Schedule'}
-                            </span>
-                          </div>
                         </TableCell>
                         
                         <TableCell>
@@ -589,16 +790,27 @@ const [availability, setAvailability] = useState<WeeklyAvailability>({
                               <Calendar className="h-4 w-4" />
                             </Button>
 
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEmailDialog(member)}
+                              className="h-8 px-2"
+                              disabled={updatingEmail}
+                              title={member.hasEmail ? 'Change Email' : 'Link Email'}
+                            >
+                              <Mail className="h-4 w-4" />
+                            </Button>
+
                             {member.isActive ? (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDeactivate(member._id, member.name)}
-                                className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="h-8 px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
                                 disabled={deactivating}
                                 title="Deactivate"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <UserX className="h-4 w-4" />
                               </Button>
                             ) : (
                               <Button
@@ -613,7 +825,7 @@ const [availability, setAvailability] = useState<WeeklyAvailability>({
                               </Button>
                             )}
 
-                            {member.managedByCompany && (
+                            {member.hasEmail && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -624,13 +836,60 @@ const [availability, setAvailability] = useState<WeeklyAvailability>({
                                 <RotateCcw className="h-4 w-4" />
                               </Button>
                             )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemove(member._id, member.name)}
+                              className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              disabled={removing}
+                              title="Remove"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Employees Pagination */}
+                  {totalEmployeesPages > 1 && (
+                    <div className="flex items-center justify-between pt-4">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {(employeesPage - 1) * EMPLOYEES_PER_PAGE + 1} to{' '}
+                        {Math.min(employeesPage * EMPLOYEES_PER_PAGE, employees.length)} of {employees.length}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEmployeesPage(p => Math.max(1, p - 1))}
+                          disabled={employeesPage === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          Previous
+                        </Button>
+                        <span className="text-sm">
+                          Page {employeesPage} of {totalEmployeesPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEmployeesPage(p => Math.min(totalEmployeesPages, p + 1))}
+                          disabled={employeesPage === totalEmployeesPages}
+                        >
+                          Next
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
             </div>
           )}
         </CardContent>
@@ -642,7 +901,7 @@ const [availability, setAvailability] = useState<WeeklyAvailability>({
           <DialogHeader>
             <DialogTitle>Reset Employee Password</DialogTitle>
             <DialogDescription>
-              Set a new password for this company-managed employee
+              Set a new password for this employee
             </DialogDescription>
           </DialogHeader>
           
@@ -679,6 +938,65 @@ const [availability, setAvailability] = useState<WeeklyAvailability>({
               >
                 {resettingPassword && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Reset Password
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Update Dialog */}
+      <Dialog
+        open={!!emailDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEmailDialog(null)
+            setEmailValue('')
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {emailDialog?.currentEmail ? 'Change Employee Email' : 'Link Employee Email'}
+            </DialogTitle>
+            <DialogDescription>
+              {emailDialog?.currentEmail
+                ? `Update the email for ${emailDialog?.memberName}.`
+                : `Link an email address for ${emailDialog?.memberName}.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="employeeEmail">Email Address</Label>
+              <Input
+                id="employeeEmail"
+                type="email"
+                value={emailValue}
+                onChange={(e) => setEmailValue(e.target.value)}
+                placeholder="name@company.com"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              After linking an email, you can reset the employee&apos;s password from the actions menu.
+            </p>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEmailDialog(null)
+                  setEmailValue('')
+                }}
+                disabled={updatingEmail}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={updateEmployeeEmail}
+                disabled={!emailValue.trim() || updatingEmail}
+              >
+                {updatingEmail && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Save Email
               </Button>
             </div>
           </div>
@@ -732,120 +1050,165 @@ const [availability, setAvailability] = useState<WeeklyAvailability>({
         </DialogContent>
       </Dialog>
 
+      {/* Removal Confirmation Dialog */}
+      <Dialog open={!!removeDialog} onOpenChange={() => setRemoveDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Employee</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove <strong>{removeDialog?.memberName}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-red-800">
+                    This will permanently remove the employee
+                  </p>
+                  <p className="text-sm text-red-700 mt-1">
+                    The employee will be deleted from your company and cannot be restored.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setRemoveDialog(null)}
+                disabled={removing}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmRemove}
+                disabled={removing}
+              >
+                {removing && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Remove Employee
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Availability Management Dialog */}
       <Dialog open={!!availabilityDialog} onOpenChange={() => setAvailabilityDialog(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manage Availability - {availabilityDialog?.name}</DialogTitle>
             <DialogDescription>
-              Set blocked dates for this employee. They will follow the company&apos;s weekly schedule.
+              Set blocked periods for this employee. Working hours follow the company schedule and are read-only.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6">
-            {/* Blocked Dates */}
             <div className="space-y-3">
-              <Label className="text-base font-medium">Blocked Dates</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="date"
-                  value={newBlockedDate.date}
-                  onChange={(e) => setNewBlockedDate(prev => ({...prev, date: e.target.value}))}
-                  className="flex-1"
-                />
-                <Input
-                  type="text"
-                  placeholder="Reason (optional)"
-                  value={newBlockedDate.reason}
-                  onChange={(e) => setNewBlockedDate(prev => ({...prev, reason: e.target.value}))}
-                  className="flex-1"
-                />
-                <Button onClick={addBlockedDate} size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add
-                </Button>
-              </div>
-              {blockedDates.length > 0 && (
-                <div className="space-y-2">
-                  {blockedDates.map((blocked, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 border rounded">
-                      <div>
-                        <span className="text-sm font-medium">
-                          {new Date(blocked.date).toLocaleDateString()}
-                        </span>
-                        {blocked.reason && <span className="text-xs text-muted-foreground ml-2">{blocked.reason}</span>}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeBlockedDate(blocked.date)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Blocked Ranges */}
-            <div className="space-y-3">
-              <Label className="text-base font-medium">Blocked Date Ranges</Label>
-              <div className="space-y-2">
-                <div className="flex gap-2">
+              <Label className="text-base font-medium">Manual Blocked Periods</Label>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="space-y-1">
+                  <Label htmlFor="employee-range-start">Start</Label>
                   <Input
-                    type="date"
+                    id="employee-range-start"
+                    type="datetime-local"
                     value={newBlockedRange.startDate}
                     onChange={(e) => setNewBlockedRange(prev => ({...prev, startDate: e.target.value}))}
-                    placeholder="Start date"
-                    className="flex-1"
                   />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="employee-range-end">End</Label>
                   <Input
-                    type="date"
+                    id="employee-range-end"
+                    type="datetime-local"
                     value={newBlockedRange.endDate}
                     onChange={(e) => setNewBlockedRange(prev => ({...prev, endDate: e.target.value}))}
-                    placeholder="End date"
-                    className="flex-1"
                   />
                 </div>
-                <div className="flex gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="employee-range-reason">Reason (optional)</Label>
                   <Input
-                    type="text"
-                    placeholder="Reason (optional)"
+                    id="employee-range-reason"
                     value={newBlockedRange.reason}
                     onChange={(e) => setNewBlockedRange(prev => ({...prev, reason: e.target.value}))}
-                    className="flex-1"
+                    placeholder="Vacation, appointment, etc."
                   />
-                  <Button onClick={addBlockedRange} size="sm">
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Range
-                  </Button>
                 </div>
               </div>
-              {blockedRanges.length > 0 && (
+              <div className="flex justify-end">
+                <Button onClick={addBlockedRange} size="sm">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Block
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {blockedRanges.length > 0 ? (
                 <div className="space-y-2">
                   {blockedRanges.map((range, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 border rounded">
+                    <div key={`range-${index}`} className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 p-3">
                       <div>
-                        <span className="text-sm font-medium">
-                          {new Date(range.startDate).toLocaleDateString()} - {new Date(range.endDate).toLocaleDateString()}
-                        </span>
-                        {range.reason && <span className="text-xs text-muted-foreground ml-2">{range.reason}</span>}
+                        <div className="text-sm font-medium text-rose-900">
+                          {formatDateTimeSafe(range.startDate)}{" -> "}{formatDateTimeSafe(range.endDate)}
+                        </div>
+                        {range.reason && <div className="text-xs text-rose-700">{range.reason}</div>}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeBlockedRange(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => openEditRange(index)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-rose-700 hover:text-rose-900 hover:bg-rose-100"
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          onClick={() => removeBlockedRange(index)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-rose-700 hover:text-rose-900 hover:bg-rose-100"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-muted-foreground">
+                  No manual blocks yet.
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
+            <WeeklyAvailabilityCalendar
+              title="Weekly Availability"
+              description="Hover for details. Click personal blocks to edit. Click bookings to view."
+              events={calendarEvents}
+              dayStart={scheduleWindow.dayStart}
+              dayEnd={scheduleWindow.dayEnd}
+              onEventClick={(event) => {
+                if (event.type === 'personal' && typeof event.meta?.rangeIndex === 'number') {
+                  openEditRange(event.meta.rangeIndex)
+                }
+                if (
+                  (event.type === 'booking' || event.type === 'booking-buffer') &&
+                  event.meta?.bookingId
+                ) {
+                  router.push(`/bookings/${event.meta.bookingId}`)
+                }
+              }}
+            />
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              Working hours follow the company schedule and are read-only.
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
               <Button
                 variant="outline"
                 onClick={() => setAvailabilityDialog(null)}
@@ -858,8 +1221,77 @@ const [availability, setAvailability] = useState<WeeklyAvailability>({
                 disabled={savingAvailability}
               >
                 {savingAvailability && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Save Blocked Dates
+                Save Availability
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Blocked Period Dialog */}
+      <Dialog
+        open={!!editingRange}
+        onOpenChange={(open) => {
+          if (!open) setEditingRange(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Blocked Period</DialogTitle>
+            <DialogDescription>Adjust the time range or remove the block.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-employee-start">Start</Label>
+                <Input
+                  id="edit-employee-start"
+                  type="datetime-local"
+                  value={editingRange?.startValue || ''}
+                  onChange={(e) =>
+                    setEditingRange((prev) =>
+                      prev ? { ...prev, startValue: e.target.value } : prev
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-employee-end">End</Label>
+                <Input
+                  id="edit-employee-end"
+                  type="datetime-local"
+                  value={editingRange?.endValue || ''}
+                  onChange={(e) =>
+                    setEditingRange((prev) =>
+                      prev ? { ...prev, endValue: e.target.value } : prev
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-employee-reason">Reason (optional)</Label>
+                <Input
+                  id="edit-employee-reason"
+                  value={editingRange?.reason || ''}
+                  onChange={(e) =>
+                    setEditingRange((prev) =>
+                      prev ? { ...prev, reason: e.target.value } : prev
+                    )
+                  }
+                  placeholder="Vacation, appointment, etc."
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <Button variant="destructive" onClick={removeEditingRange}>
+                Remove Block
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => setEditingRange(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={applyEditRange}>Save Changes</Button>
+              </div>
             </div>
           </div>
         </DialogContent>

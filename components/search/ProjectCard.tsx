@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Euro, ArrowRight, Clock } from 'lucide-react';
+import { MapPin, ArrowRight, Clock, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { isQualityCertificate, getCertificateGradient, formatPriceModelLabel } from '@/lib/projectHighlights';
+import { formatUtcViewerLabel, formatWindowUtcViewer, getViewerTimezone } from '@/lib/timezoneDisplay';
 
 interface ProjectCardProps {
   project: {
@@ -12,6 +14,11 @@ interface ProjectCardProps {
     description: string;
     category: string;
     service: string;
+    areaOfWork?: string;
+    services?: Array<{
+      service?: string;
+      areaOfWork?: string;
+    }>;
     timeMode?: 'hours' | 'days';
     executionDuration?: {
       value: number;
@@ -26,6 +33,11 @@ interface ProjectCardProps {
       amount?: number;
       priceRange?: { min: number; max: number };
     };
+    priceModel?: string;
+    certifications?: Array<{
+      name: string;
+      fileUrl: string;
+    }>;
     media?: {
       images?: string[];
       video?: string;
@@ -55,22 +67,115 @@ interface ProjectCardProps {
         value: number;
         unit: 'hours' | 'days';
       };
+      warrantyPeriod?: {
+        value: number;
+        unit: 'months' | 'years';
+      };
+      projectType?: string[];
+      included?: Array<{
+        name?: string;
+        description?: string;
+      }>;
+      firstAvailableDate?: string | null;
     }>;
+    firstAvailableDate?: string | null;
+    firstAvailableWindow?: {
+      start: string;
+      end: string;
+    } | null;
+    shortestThroughputWindow?: {
+      start: string;
+      end: string;
+    } | null;
   };
 }
 
+const toHours = (duration?: { value: number; unit: 'hours' | 'days' } | null) => {
+  if (!duration || typeof duration.value !== 'number') {
+    return 0;
+  }
+  return duration.unit === 'hours' ? duration.value : duration.value * 24;
+};
+
+const getResolvedShortestThroughputWindow = (project: ProjectCardProps['project']) => {
+  const hasCompleteWindow = (window?: { start?: string; end?: string } | null) => {
+    return Boolean(window?.start && window?.end);
+  };
+
+  if (hasCompleteWindow(project.shortestThroughputWindow)) {
+    return project.shortestThroughputWindow;
+  }
+
+  if (hasCompleteWindow(project.firstAvailableWindow)) {
+    return project.firstAvailableWindow;
+  }
+
+  if (!project.firstAvailableDate || !project.executionDuration?.value) {
+    return null;
+  }
+
+  const startDate = new Date(project.firstAvailableDate);
+  if (Number.isNaN(startDate.getTime())) {
+    return null;
+  }
+
+  const executionHours = toHours(project.executionDuration);
+  if (!executionHours) {
+    return null;
+  }
+
+  const bufferHours = toHours(project.bufferDuration);
+  const effectiveMode = project.timeMode || project.executionDuration.unit;
+
+  if (effectiveMode === 'hours') {
+    const endDate = new Date(startDate);
+    endDate.setHours(endDate.getHours() + executionHours);
+    return {
+      start: startDate.toISOString(),
+      end: endDate.toISOString(),
+    };
+  }
+
+  const executionDays = Math.max(1, Math.ceil(executionHours / 24));
+  const bufferDays = Math.ceil(bufferHours / 24);
+  const completionDate = new Date(startDate);
+  completionDate.setDate(completionDate.getDate() + Math.max(0, executionDays - 1));
+  const endDate = new Date(completionDate);
+  endDate.setDate(endDate.getDate() + bufferDays + 1);
+
+  return {
+    start: startDate.toISOString(),
+    end: endDate.toISOString(),
+  };
+};
+
 const ProjectCard = ({ project }: ProjectCardProps) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [viewerTimeZone, setViewerTimeZone] = useState('UTC');
   const professional = project.professionalId;
   const professionalName = professional?.businessInfo?.companyName || professional?.name || 'Professional';
   const location = [professional?.businessInfo?.city, professional?.businessInfo?.country]
     .filter(Boolean)
     .join(', ');
+  const qualityCertificates = (project.certifications || []).filter((cert) => isQualityCertificate(cert.name));
+
+  const images = project.media?.images || [];
+  const hasMultipleImages = images.length > 1;
+
+  useEffect(() => {
+    setViewerTimeZone(getViewerTimezone());
+  }, []);
+
+  // Pre-compute timezone labels for first available date and windows
+  const firstAvailableDateLabels = formatUtcViewerLabel(project.firstAvailableDate, viewerTimeZone);
+  const firstAvailableWindowLabels = formatWindowUtcViewer(project.firstAvailableWindow, viewerTimeZone);
+  const resolvedShortestThroughputWindow = getResolvedShortestThroughputWindow(project);
+  const shortestThroughputLabels = formatWindowUtcViewer(resolvedShortestThroughputWindow, viewerTimeZone);
 
   const getProjectDuration = () => {
     if (project.executionDuration) {
       const exec = project.executionDuration;
       const buffer = project.bufferDuration;
-      const total = exec.value + (buffer?.value || 0);
       return `${exec.value}${buffer?.value ? `+${buffer.value}` : ''} ${exec.unit}`;
     }
     return null;
@@ -87,26 +192,92 @@ const ProjectCard = ({ project }: ProjectCardProps) => {
     return 'Contact';
   };
 
-  const mainImage = project.media?.images?.[0];
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+  };
+
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));
+  };
+
+  const currentImage = images[currentImageIndex];
 
   return (
     <Card className="group overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 border-gray-200 flex flex-col h-full">
-      {/* Image Section */}
+      {/* Image Section with Carousel */}
       <div className="relative h-48 bg-gradient-to-br from-blue-50 to-purple-50">
-        {mainImage ? (
+        {currentImage ? (
           <img
-            src={mainImage}
+            src={currentImage}
             alt={project.title}
             className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <div className="text-6xl text-gray-300">🏗️</div>
+            <div className="text-6xl text-gray-300">???</div>
           </div>
         )}
+
+        {/* Category Badge */}
         <Badge className="absolute top-3 right-3 bg-blue-600 text-white">
           {project.category}
         </Badge>
+
+        {/* First Available Date Badge */}
+        {project.firstAvailableDate && (
+          <Badge className="absolute top-3 left-3 bg-emerald-600 text-white flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            {new Date(project.firstAvailableDate).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+            })}
+          </Badge>
+        )}
+
+        {/* Navigation Arrows - Only show if there are multiple images */}
+        {hasMultipleImages && (
+          <>
+            <button
+              onClick={handlePrevImage}
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-1.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleNextImage}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-800 rounded-full p-1.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+              aria-label="Next image"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </>
+        )}
+
+        {/* Image Indicators - Only show if there are multiple images */}
+        {hasMultipleImages && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+            {images.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setCurrentImageIndex(idx);
+                }}
+                className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${idx === currentImageIndex
+                    ? 'bg-white w-4'
+                    : 'bg-white/60 hover:bg-white/80'
+                  }`}
+                aria-label={`Go to image ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Content Section */}
@@ -121,23 +292,39 @@ const ProjectCard = ({ project }: ProjectCardProps) => {
           </p>
 
           <div className="flex flex-wrap gap-2 mb-4">
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="outline" className="text-xs">
               {project.service}
             </Badge>
-            {project.pricing && (
-              <Badge variant="outline" className="text-xs">
-                {project.pricing.type === 'fixed' ? 'Fixed Price' :
-                 project.pricing.type === 'unit' ? 'Unit Price' : 'Quote'}
+            {project.priceModel && (
+              <Badge className="text-xs bg-gradient-to-r from-blue-600 to-cyan-500 text-white border-0">
+                {formatPriceModelLabel(project.priceModel)}
+              </Badge>
+            )}
+            {qualityCertificates.slice(0, 3).map((cert, idx) => (
+              <span
+                key={`${cert.name}-${idx}`}
+                className={`text-xs py-1 px-2 rounded-full text-white font-semibold bg-gradient-to-r ${getCertificateGradient(cert.name)}`}
+              >
+                {cert.name}
+              </span>
+            ))}
+            {qualityCertificates.length > 3 && (
+              <Badge variant="secondary" className="text-xs">
+                +{qualityCertificates.length - 3} more
               </Badge>
             )}
           </div>
         </div>
 
-        {/* Project Duration */}
-        {getProjectDuration() && (
-          <div className="flex items-center gap-2 mb-3 text-sm text-gray-700">
-            <Clock className="w-4 h-4 text-blue-600" />
-            <span className="font-medium">Duration: {getProjectDuration()}</span>
+        {/* Project Duration & Availability */}
+        {(getProjectDuration() || firstAvailableDateLabels || firstAvailableWindowLabels || shortestThroughputLabels) && (
+          <div className="space-y-2 mb-3 text-sm text-gray-700">
+            {getProjectDuration() && (
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-blue-600" />
+                <span className="font-medium">Duration: {getProjectDuration()}</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -150,9 +337,25 @@ const ProjectCard = ({ project }: ProjectCardProps) => {
                 <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs border border-gray-200">
                   <div className="flex-1 min-w-0 mr-2">
                     <p className="font-medium text-gray-900 truncate">{subproject.name}</p>
-                    {subproject.executionDuration && (
-                      <p className="text-gray-500 text-[10px]">
-                        {subproject.executionDuration.value} {subproject.executionDuration.unit}
+                    <div className="flex flex-wrap items-center gap-x-2 text-[10px] text-gray-500">
+                      {subproject.executionDuration && (
+                        <span>
+                          {subproject.executionDuration.value} {subproject.executionDuration.unit}
+                        </span>
+                      )}
+                      {subproject.warrantyPeriod && (
+                        <span>
+                          {subproject.warrantyPeriod.value} {subproject.warrantyPeriod.unit} warranty
+                        </span>
+                      )}
+                    </div>
+                    {subproject.firstAvailableDate && (
+                      <p className="text-[10px] text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
+                        <Calendar className="w-3 h-3" />
+                        Available: {new Date(subproject.firstAvailableDate).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
                       </p>
                     )}
                   </div>

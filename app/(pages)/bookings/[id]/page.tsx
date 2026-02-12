@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,10 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Calendar, Clock, Package, Briefcase, User, Mail, Phone, Shield, CreditCard, FileText, CheckCircle, XCircle, Play, CheckCheck, Loader2 } from "lucide-react"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { ArrowLeft, Calendar, Clock, Package, Briefcase, User, Mail, Phone, Shield, CheckCircle, XCircle, Play, CheckCheck, CreditCard, FileText, Loader2, Upload } from "lucide-react"
+import { toast } from "sonner"
+import { getAuthToken } from "@/lib/utils"
 
 type BookingStatus =
   | "rfq"
@@ -23,7 +26,21 @@ type BookingStatus =
   | "cancelled"
   | "dispute"
   | "refunded"
-  | string
+
+interface PostBookingQuestion {
+  _id?: string
+  id?: string
+  question: string
+  type: "text" | "multiple_choice" | "attachment"
+  options?: string[]
+  isRequired: boolean
+}
+
+interface PostBookingAnswer {
+  questionId: string
+  question: string
+  answer: string
+}
 
 interface BookingDetail {
   _id: string
@@ -49,17 +66,20 @@ interface BookingDetail {
     termsAndConditions?: string
     estimatedDuration?: string
     submittedAt?: string
+    submittedBy?: string
   }
   scheduledStartDate?: string
   scheduledEndDate?: string
   createdAt?: string
   updatedAt?: string
+  postBookingData?: PostBookingAnswer[]
   project?: {
     _id: string
     title?: string
     category?: string
     service?: string
     description?: string
+    postBookingQuestions?: PostBookingQuestion[]
   }
   professional?: {
     _id: string
@@ -83,6 +103,7 @@ const DETAIL_STATUS_STYLES: Record<string, string> = {
   rfq: "bg-indigo-50 text-indigo-700 border border-indigo-100",
   quoted: "bg-blue-50 text-blue-700 border border-blue-100",
   quote_accepted: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+  quote_rejected: "bg-rose-50 text-rose-700 border border-rose-100",
   payment_pending: "bg-amber-50 text-amber-700 border border-amber-100",
   booked: "bg-emerald-50 text-emerald-700 border border-emerald-100",
   in_progress: "bg-sky-50 text-sky-700 border border-sky-100",
@@ -105,11 +126,25 @@ const formatCurrencyRange = (booking: BookingDetail): string | null => {
   return `${currency}${value.toLocaleString()}`
 }
 
+type BookingApiResponse = {
+  success: boolean
+  booking?: BookingDetail
+  msg?: string
+}
+
+const isBookingApiResponse = (value: unknown): value is BookingApiResponse => {
+  if (!value || typeof value !== "object") return false
+  const record = value as Record<string, unknown>
+  return typeof record.success === "boolean"
+}
+
 export default function BookingDetailPage() {
   const { user, isAuthenticated, loading } = useAuth()
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const bookingId = (params?.id || params?.bookingId) as string | undefined
+  const showPostBookingQuestions = searchParams?.get("postBookingQuestions") === "true"
 
   const [booking, setBooking] = useState<BookingDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -120,6 +155,10 @@ export default function BookingDetailPage() {
   const [submittingQuote, setSubmittingQuote] = useState(false)
   const [respondingToQuote, setRespondingToQuote] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [postBookingAnswers, setPostBookingAnswers] = useState<Record<number, string>>({})
+  const [submittingAnswers, setSubmittingAnswers] = useState(false)
+  const [answersSubmitted, setAnswersSubmitted] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<number[]>([])
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -134,19 +173,33 @@ export default function BookingDetailPage() {
       setIsLoading(true)
       setError(null)
       try {
+        // Get token for Authorization header fallback
+        const token = getAuthToken()
+        const headers: Record<string, string> = {}
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+
         const response = await fetch(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/${bookingId}`,
-          { credentials: "include" }
+          {
+            credentials: "include",
+            headers
+          }
         )
         const data = await response.json()
+        if (!isBookingApiResponse(data)) {
+          setError("Unexpected response from server.")
+          return
+        }
 
-        if (response.ok && data.success) {
+        if (response.ok && data.success && data.booking) {
           setBooking(data.booking)
         } else {
           setError(data.msg || "Failed to load booking details.")
         }
       } catch (err) {
-        console.error("Failed to fetch booking:", err)
+        console.error("Failed to fetch booking:", err instanceof Error ? err.message : err)
         setError("Failed to load booking details.")
       } finally {
         setIsLoading(false)
@@ -156,19 +209,102 @@ export default function BookingDetailPage() {
     fetchBooking()
   }, [bookingId, isAuthenticated])
 
-  const handleSubmitQuote = async () => {
-    if (!quoteAmount || parseFloat(quoteAmount) <= 0) {
-      alert("Please enter a valid quote amount")
+  // Check if post-booking questions need to be answered
+  const postBookingQuestions = booking?.project?.postBookingQuestions || []
+  const hasPostBookingQuestions = postBookingQuestions.length > 0
+  const alreadyAnswered = (booking?.postBookingData?.length || 0) > 0
+  const shouldShowPostBookingForm = showPostBookingQuestions && hasPostBookingQuestions && !alreadyAnswered && !answersSubmitted
+  const currencyRange = booking ? formatCurrencyRange(booking) : null
+
+  const handleAnswerChange = (index: number, answer: string) => {
+    setPostBookingAnswers(prev => ({ ...prev, [index]: answer }))
+    setValidationErrors(prev => prev.filter((item) => item !== index))
+  }
+
+  const handleSubmitPostBookingAnswers = async () => {
+    if (!booking || !bookingId) return
+
+    // Validate required answers
+    const missingRequired = postBookingQuestions
+      .map((q, index) => (q.isRequired && !postBookingAnswers[index]?.trim() ? index : null))
+      .filter((index): index is number => index != null)
+
+    if (missingRequired.length > 0) {
+      setValidationErrors(missingRequired)
+      const firstMissing = missingRequired[0]
+      const focusId = postBookingQuestions[firstMissing]?.type === "multiple_choice"
+        ? `q${firstMissing}-opt0`
+        : `q${firstMissing}-field`
+      setTimeout(() => document.getElementById(focusId)?.focus(), 0)
+      toast.error(`Please answer required questions: ${missingRequired.map((index) => index + 1).join(', ')}`)
       return
     }
+    setValidationErrors([])
+
+    setSubmittingAnswers(true)
+
+    try {
+      const answers = postBookingQuestions.map((q, index) => ({
+        questionId: q._id || q.id || `q-${index}`,
+        question: q.question,
+        answer: postBookingAnswers[index] || ""
+      })).filter(a => a.answer.trim())
+
+      // Get token for Authorization header fallback
+      const token = getAuthToken()
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/${bookingId}/post-booking-answers`,
+        {
+          method: "POST",
+          headers,
+          credentials: "include",
+          body: JSON.stringify({ answers })
+        }
+      )
+
+      const data = await response.json() as { success?: boolean; postBookingData?: PostBookingAnswer[]; msg?: string }
+
+      if (response.ok && data.success) {
+        toast.success("Thank you! Your answers have been submitted.")
+        setAnswersSubmitted(true)
+        // Update the local booking state
+        setBooking(prev => prev ? { ...prev, postBookingData: data.postBookingData || answers } : prev)
+      } else {
+        toast.error(data.msg || "Failed to submit answers. Please try again.")
+      }
+    } catch (err) {
+      console.error("Failed to submit post-booking answers:", err)
+      toast.error("Failed to submit answers. Please try again.")
+    } finally {
+      setSubmittingAnswers(false)
+    }
+  }
+
+  const handleSubmitQuote = async () => {
+    if (!quoteAmount || parseFloat(quoteAmount) <= 0) {
+      toast.error("Please enter a valid quote amount.")
+      return
+    }
+    if (!bookingId) return
 
     setSubmittingQuote(true)
     try {
+      const token = getAuthToken()
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/${bookingId}/quote`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           credentials: "include",
           body: JSON.stringify({
             amount: parseFloat(quoteAmount),
@@ -177,32 +313,38 @@ export default function BookingDetailPage() {
           })
         }
       )
-
       const data = await response.json()
       if (response.ok && data.success) {
-        alert("Quote submitted successfully!")
+        toast.success("Quote submitted successfully!")
         setShowQuoteForm(false)
-        // Refresh booking data
         window.location.reload()
       } else {
-        alert(data.msg || "Failed to submit quote")
+        toast.error(data.msg || "Failed to submit quote.")
       }
     } catch (err) {
       console.error("Error submitting quote:", err)
-      alert("Failed to submit quote. Please try again.")
+      toast.error("Failed to submit quote. Please try again.")
     } finally {
       setSubmittingQuote(false)
     }
   }
 
   const handleRespondToQuote = async (action: "accept" | "reject") => {
+    if (!bookingId) return
+
     setRespondingToQuote(true)
     try {
+      const token = getAuthToken()
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/${bookingId}/respond`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           credentials: "include",
           body: JSON.stringify({ action })
         }
@@ -211,18 +353,18 @@ export default function BookingDetailPage() {
       const data = await response.json()
       if (response.ok && data.success) {
         if (action === "accept") {
-          alert("Quote accepted! Redirecting to payment...")
+          toast.success("Quote accepted! Redirecting to payment...")
           router.push(`/bookings/${bookingId}/payment`)
         } else {
-          alert("Quote rejected")
+          toast.success("Quote rejected.")
           window.location.reload()
         }
       } else {
-        alert(data.msg || `Failed to ${action} quote`)
+        toast.error(data.msg || `Failed to ${action} quote.`)
       }
     } catch (err) {
       console.error(`Error ${action}ing quote:`, err)
-      alert(`Failed to ${action} quote. Please try again.`)
+      toast.error(`Failed to ${action} quote. Please try again.`)
     } finally {
       setRespondingToQuote(false)
     }
@@ -232,14 +374,21 @@ export default function BookingDetailPage() {
     if (confirmMessage && !confirm(confirmMessage)) {
       return
     }
+    if (!bookingId) return
 
     setUpdatingStatus(true)
     try {
+      const token = getAuthToken()
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/${bookingId}/status`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers,
           credentials: "include",
           body: JSON.stringify({ status: newStatus })
         }
@@ -247,22 +396,20 @@ export default function BookingDetailPage() {
 
       const data = await response.json()
       if (response.ok && data.success) {
-        // Show success message based on status
         if (newStatus === "completed") {
-          alert("✅ Booking marked as completed!\n\nPayment has been transferred to the professional.\nFunds will arrive in the professional's bank account within 2-7 business days.")
+          toast.success("Booking marked as completed. Payment has been released.")
         } else if (newStatus === "in_progress") {
-          alert("✅ Work started! Good luck with the project.")
+          toast.success("Work started! Good luck with the project.")
+        } else {
+          toast.success("Booking status updated.")
         }
-
-        // Reload to show updated status
         window.location.reload()
       } else {
-        const errorMsg = data.error?.message || data.msg || `Failed to update booking status`
-        alert(`❌ Error: ${errorMsg}`)
+        toast.error(data.msg || "Failed to update booking status.")
       }
     } catch (err) {
-      console.error("Error updating status:", err)
-      alert("❌ Failed to update booking status. Please try again.")
+      console.error("Failed to update booking status:", err)
+      toast.error("Failed to update booking status. Please try again.")
     } finally {
       setUpdatingStatus(false)
     }
@@ -313,6 +460,135 @@ export default function BookingDetailPage() {
           </Card>
         )}
 
+        {/* Post-Booking Questions Form */}
+        {!error && booking && shouldShowPostBookingForm && (
+          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-6 w-6 text-green-600" />
+                <div>
+                  <CardTitle className="text-lg text-green-800">Booking Confirmed!</CardTitle>
+                  <CardDescription className="text-green-700">
+                    Please answer the following questions to help the service provider prepare for your appointment.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {postBookingQuestions.map((question, index) => {
+                const hasError = validationErrors.includes(index)
+                const errorId = hasError ? `q${index}-error` : undefined
+                return (
+                  <div key={index} className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-900">
+                    {question.question}
+                    {question.isRequired && <span className="text-red-500 ml-1">*</span>}
+                  </Label>
+
+                  {question.type === "text" && (
+                    <Textarea
+                      id={`q${index}-field`}
+                      placeholder="Your answer..."
+                      value={postBookingAnswers[index] || ""}
+                      onChange={(e) => handleAnswerChange(index, e.target.value)}
+                      rows={3}
+                      className="bg-white"
+                      aria-invalid={hasError}
+                      aria-describedby={errorId}
+                      aria-required={question.isRequired}
+                    />
+                  )}
+
+                  {question.type === "multiple_choice" && question.options && (
+                    <RadioGroup
+                      value={postBookingAnswers[index] || ""}
+                      onValueChange={(value) => handleAnswerChange(index, value)}
+                      aria-invalid={hasError}
+                      aria-describedby={errorId}
+                      aria-required={question.isRequired}
+                    >
+                      {question.options.map((option, optIdx) => (
+                        <div key={optIdx} className="flex items-center space-x-2">
+                          <RadioGroupItem value={option} id={`q${index}-opt${optIdx}`} />
+                          <Label htmlFor={`q${index}-opt${optIdx}`} className="font-normal cursor-pointer">
+                            {option}
+                          </Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  )}
+
+                  {question.type === "attachment" && (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center bg-white">
+                      <Upload className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">File upload coming soon</p>
+                      <Input
+                        id={`q${index}-field`}
+                        type="text"
+                        placeholder="For now, please describe or provide a link"
+                        value={postBookingAnswers[index] || ""}
+                        onChange={(e) => handleAnswerChange(index, e.target.value)}
+                        className="mt-2"
+                        aria-invalid={hasError}
+                        aria-describedby={errorId}
+                        aria-required={question.isRequired}
+                      />
+                    </div>
+                  )}
+                  {hasError && (
+                    <p id={errorId} role="alert" className="text-xs text-red-600">
+                      This question is required.
+                    </p>
+                  )}
+                </div>
+                )
+              })}
+
+              <div className="flex gap-3 pt-4 border-t">
+                <Button
+                  onClick={handleSubmitPostBookingAnswers}
+                  disabled={submittingAnswers}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {submittingAnswers ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Submit Answers
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push("/dashboard")}
+                >
+                  Skip for Now
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Success message after submitting answers */}
+        {!error && booking && answersSubmitted && (
+          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200">
+            <CardContent className="py-8 text-center">
+              <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-green-800 mb-2">Thank You!</h3>
+              <p className="text-green-700 mb-4">
+                Your answers have been submitted successfully. The service provider will review them shortly.
+              </p>
+              <Button onClick={() => router.push("/dashboard")} className="bg-green-600 hover:bg-green-700">
+                Go to Dashboard
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {!error && booking && (
           <div className="bg-gradient-to-r from-pink-100 via-purple-100 to-blue-100 rounded-2xl p-[1px]">
             <Card className="bg-white/90 backdrop-blur rounded-[1rem] shadow-sm">
@@ -352,7 +628,7 @@ export default function BookingDetailPage() {
 
               <CardContent className="pt-4 space-y-6">
                 {/* Payment Action - Show when quote is accepted but not yet paid (CUSTOMER ONLY) */}
-                {user?.role === 'customer' && (booking.status === 'quote_accepted' || booking.status === 'payment_pending') && (
+                {user?.role === "customer" && (booking.status === "quote_accepted" || booking.status === "payment_pending") && (
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -376,7 +652,7 @@ export default function BookingDetailPage() {
                 )}
 
                 {/* Professional: Quote Accepted - Waiting for Payment */}
-                {user?.role === 'professional' && (booking.status === 'quote_accepted' || booking.status === 'payment_pending') && (
+                {user?.role === "professional" && (booking.status === "quote_accepted" || booking.status === "payment_pending") && (
                   <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg p-4">
                     <div className="flex items-start gap-3">
                       <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
@@ -393,7 +669,7 @@ export default function BookingDetailPage() {
                 )}
 
                 {/* Professional: Submit Quote (when status is RFQ) */}
-                {user?.role === 'professional' && booking.status === 'rfq' && (
+                {user?.role === "professional" && booking.status === "rfq" && (
                   <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
                     {!showQuoteForm ? (
                       <div className="flex items-start justify-between gap-4">
@@ -465,14 +741,14 @@ export default function BookingDetailPage() {
                 )}
 
                 {/* Customer: Quote Ready - Accept/Reject */}
-                {user?.role === 'customer' && booking.status === 'quoted' && booking.quote && (
+                {user?.role === "customer" && booking.status === "quoted" && booking.quote && (
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
                     <h3 className="text-sm font-semibold text-green-900 mb-3">Quote Received</h3>
                     <div className="bg-white rounded-lg p-4 mb-4 space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Quote Amount:</span>
                         <span className="text-2xl font-bold text-green-600">
-                          {booking.quote.currency || '€'}{booking.quote.amount?.toLocaleString()}
+                          {booking.quote.currency || "€"}{booking.quote.amount?.toLocaleString()}
                         </span>
                       </div>
                       {booking.quote.description && (
@@ -512,7 +788,7 @@ export default function BookingDetailPage() {
                 )}
 
                 {/* Professional: Start Work (when status is booked) */}
-                {user?.role === 'professional' && booking.status === 'booked' && (
+                {user?.role === "professional" && booking.status === "booked" && (
                   <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -546,7 +822,7 @@ export default function BookingDetailPage() {
                 )}
 
                 {/* Professional: Customer must confirm completion */}
-                {user?.role === 'professional' && booking.status === 'in_progress' && (
+                {user?.role === "professional" && booking.status === "in_progress" && (
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-start gap-4">
                       <div>
@@ -563,8 +839,9 @@ export default function BookingDetailPage() {
                     </div>
                   </div>
                 )}
+
                 {/* Customer: Confirm Work Completion (when status is in_progress) */}
-                {user?.role === 'customer' && booking.status === 'in_progress' && (
+                {user?.role === "customer" && booking.status === "in_progress" && (
                   <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-lg p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -575,13 +852,13 @@ export default function BookingDetailPage() {
                           The professional is currently working on your request. Once they complete the work, you can confirm completion.
                         </p>
                         <p className="text-xs text-teal-600 font-medium">
-                          💰 Payment will be released from escrow when you confirm completion
+                          Payment will be released from escrow when you confirm completion.
                         </p>
                       </div>
                       <Button
                         onClick={() => handleUpdateStatus(
                           "completed",
-                          "Are you satisfied with the work?\n\n✅ This will release the payment from escrow to the professional."
+                          "Are you satisfied with the work?\n\nThis will release the payment from escrow to the professional."
                         )}
                         disabled={updatingStatus}
                         className="bg-teal-600 hover:bg-teal-700 text-white shrink-0"
@@ -595,7 +872,7 @@ export default function BookingDetailPage() {
                         ) : (
                           <>
                             <CheckCheck className="h-4 w-4 mr-2" />
-                            Confirm Complete
+                            Confirm Completion
                           </>
                         )}
                       </Button>
@@ -604,20 +881,20 @@ export default function BookingDetailPage() {
                 )}
 
                 {/* Both: Work Completed */}
-                {booking.status === 'completed' && (
+                {booking.status === "completed" && (
                   <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-lg p-4">
                     <div className="flex items-start gap-3">
                       <CheckCircle className="h-6 w-6 text-emerald-600 mt-0.5" />
                       <div>
                         <h3 className="text-sm font-semibold text-emerald-900 mb-1">
-                          ✅ Work Completed
+                          Work Completed
                         </h3>
                         <p className="text-xs text-emerald-700">
                           This booking has been marked as completed. Payment has been transferred to the professional.
                         </p>
-                        {user?.role === 'professional' && (
+                        {user?.role === "professional" && (
                           <p className="text-xs text-emerald-600 font-medium mt-2">
-                            💰 Funds will arrive in your bank account within 2-7 business days
+                            Funds will arrive in your bank account within 2-7 business days.
                           </p>
                         )}
                       </div>
@@ -653,7 +930,7 @@ export default function BookingDetailPage() {
                     <div className="flex items-center gap-2">
                       <Calendar className="h-3 w-3 text-emerald-500" />
                       <span>
-                        Scheduled start:{" "}
+                        Start Date:{" "}
                         <span className="font-medium">
                           {new Date(booking.scheduledStartDate).toLocaleDateString()}
                         </span>
@@ -662,9 +939,9 @@ export default function BookingDetailPage() {
                   )}
                   {booking.scheduledEndDate && (
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-3 w-3 text-emerald-500" />
+                      <Calendar className="h-3 w-3 text-blue-500" />
                       <span>
-                        Scheduled end:{" "}
+                        Completion Date:{" "}
                         <span className="font-medium">
                           {new Date(booking.scheduledEndDate).toLocaleDateString()}
                         </span>
@@ -682,7 +959,7 @@ export default function BookingDetailPage() {
                       </span>
                     </div>
                   )}
-                  {formatCurrencyRange(booking) && (
+                  {currencyRange && (
                     <div className="flex items-center gap-2">
                       <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-semibold">
                         €
@@ -690,7 +967,7 @@ export default function BookingDetailPage() {
                       <span>
                         Budget:{" "}
                         <span className="font-medium">
-                          {formatCurrencyRange(booking)}
+                          {currencyRange}
                         </span>
                       </span>
                     </div>

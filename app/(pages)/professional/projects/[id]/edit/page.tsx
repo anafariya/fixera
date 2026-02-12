@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { ArrowLeft, Save, AlertTriangle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { getAuthToken } from '@/lib/utils';
 
 // -------------------------------------------
 // STANDALONE TYPES (NO BACKEND IMPORTS)
@@ -62,7 +63,7 @@ interface Subproject {
   pricing: Pricing;
   included?: IncludedItem[];
   materialsIncluded?: boolean;
-  deliveryPreparation?: number;
+  preparationDuration?: { value: number; unit: 'hours' | 'days' };
   executionDuration?: ExecutionDuration;
   buffer?: Buffer;
   intakeDuration?: IntakeDuration;
@@ -125,6 +126,7 @@ export interface Project {
   service: string;
   areaOfWork?: string;
   status: string;
+  timeMode?: 'hours' | 'days';
   media: Media;
   distance?: Distance;
   resources?: string[];
@@ -164,6 +166,42 @@ export default function ProjectEditPage() {
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [hasShownWarning, setHasShownWarning] = useState(false);
 
+  const normalizePreparationDuration = (subprojects: Subproject[]) =>
+    subprojects.map((subproject) => {
+      const preparationValue = subproject.preparationDuration?.value;
+      if (preparationValue == null) {
+        return subproject;
+      }
+
+      const preparationUnit =
+        subproject.preparationDuration?.unit ??
+        subproject.executionDuration?.unit ??
+        'days';
+
+      return {
+        ...subproject,
+        preparationDuration: {
+          value: preparationValue,
+          unit: preparationUnit,
+        },
+      };
+    });
+
+  const buildAuthHeaders = useCallback(
+    (headers: Record<string, string> = {}) => {
+      const token = getAuthToken();
+      if (!token) {
+        return headers;
+      }
+
+      return {
+        ...headers,
+        Authorization: `Bearer ${token}`,
+      };
+    },
+    []
+  );
+
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.push('/login');
@@ -179,6 +217,7 @@ export default function ProjectEditPage() {
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/projects/${params.id}`,
         {
           credentials: 'include',
+          headers: buildAuthHeaders(),
         }
       );
 
@@ -194,7 +233,7 @@ export default function ProjectEditPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [params.id]);
+  }, [params.id, buildAuthHeaders]);
 
   useEffect(() => {
     if (user?.role === 'professional' && params.id) {
@@ -260,11 +299,12 @@ export default function ProjectEditPage() {
       console.log('Saving project changes...');
       const saveResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/projects/draft`, {
         method: 'POST',
-        headers: {
+        headers: buildAuthHeaders({
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({
           ...project,
+          subprojects: normalizePreparationDuration(project.subprojects),
           // Ensure priceModel is always set when saving edits
           priceModel: (project.priceModel && project.priceModel.trim()) || ((project.category || '').toLowerCase() === 'renovation' ? 'rfq' : (project.subprojects?.some(s => s.pricing?.type === 'rfq') ? 'rfq' : 'fixed')),
           id: project._id,
@@ -284,9 +324,9 @@ export default function ProjectEditPage() {
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/projects/${project._id}/submit`,
         {
           method: 'POST',
-          headers: {
+          headers: buildAuthHeaders({
             'Content-Type': 'application/json',
-          },
+          }),
           credentials: 'include',
         }
       );
@@ -366,24 +406,26 @@ export default function ProjectEditPage() {
               </div>
               <DialogTitle className='text-xl'>Reapproval Required</DialogTitle>
             </div>
-            <DialogDescription className='text-base pt-2 space-y-3'>
-              <p className='text-gray-700 font-medium'>
-                You are editing a {project?.status === 'published' ? 'published' : 'on-hold'} project.
-              </p>
-              <div className='bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2'>
-                <p className='text-sm text-gray-700'>
-                  <strong>Important:</strong> Editing this project will move it back to
-                  <span className='font-semibold'> pending</span> status.
+            <DialogDescription asChild>
+              <div className='text-base pt-2 space-y-3'>
+                <p className='text-gray-700 font-medium'>
+                  You are editing a {project?.status === 'published' ? 'published' : 'on-hold'} project.
                 </p>
-                <p className='text-sm text-gray-700'>
-                  All changes require admin reapproval and may take up to{' '}
-                  <strong className='text-amber-700'>48 hours</strong>.
+                <div className='bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2'>
+                  <p className='text-sm text-gray-700'>
+                    <strong>Important:</strong> Editing this project will move it back to
+                    <span className='font-semibold'> pending</span> status.
+                  </p>
+                  <p className='text-sm text-gray-700'>
+                    All changes require admin reapproval and may take up to{' '}
+                    <strong className='text-amber-700'>48 hours</strong>.
+                  </p>
+                </div>
+                <p className='text-sm text-gray-600'>
+                  During this time, your project will not be visible to customers until it is
+                  re-approved by our admin team.
                 </p>
               </div>
-              <p className='text-sm text-gray-600'>
-                During this time, your project will not be visible to customers until it is
-                re-approved by our admin team.
-              </p>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className='gap-2 sm:gap-0'>
@@ -918,8 +960,8 @@ export default function ProjectEditPage() {
                   pricing: { type: 'fixed', amount: 0 },
                   included: [],
                   materialsIncluded: false,
-                  deliveryPreparation: 0,
-                  executionDuration: { value: 1, unit: 'days' },
+                  preparationDuration: { value: 1, unit: 'days' },
+                  executionDuration: { value: 1, unit: 'hours' },
                   warrantyPeriod: 0,
                 };
                 updateField('subprojects', [

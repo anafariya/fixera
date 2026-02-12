@@ -44,12 +44,15 @@ interface ISubproject {
   pricing: {
     type: 'fixed' | 'unit' | 'rfq'
     amount?: number
-    priceRange?: { min: number; max: number }
+    priceRange?: { min?: number; max?: number }
     minProjectValue?: number
   }
   included: IIncludedItem[]
   materialsIncluded: boolean
-  deliveryPreparation: number
+  preparationDuration?: {
+    value: number
+    unit: 'hours' | 'days'
+  }
   executionDuration: {
     value: number
     unit: 'hours' | 'days'
