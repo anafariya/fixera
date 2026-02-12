@@ -512,6 +512,7 @@ export default function ProfessionalOnboardingPage() {
             const StepIcon = step.icon
             return (
               <button
+                type="button"
                 key={step.id}
                 onClick={() => {
                   if (step.id < currentStep) setCurrentStep(step.id)
@@ -954,9 +955,12 @@ export default function ProfessionalOnboardingPage() {
               </div>
 
               <div className="space-y-3">
-                {AGREEMENTS.map((text, index) => (
+                {AGREEMENTS.map((text, index) => {
+                  const agreementId = `agreement-${index}`
+                  return (
                   <label
                     key={text}
+                    htmlFor={agreementId}
                     className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
                       agreements[index]
                         ? 'border-blue-200 bg-blue-50/50'
@@ -964,6 +968,7 @@ export default function ProfessionalOnboardingPage() {
                     }`}
                   >
                     <Checkbox
+                      id={agreementId}
                       checked={agreements[index]}
                       onCheckedChange={(checked) => {
                         setAgreements(prev => prev.map((val, idx) => idx === index ? Boolean(checked) : val))
@@ -972,7 +977,7 @@ export default function ProfessionalOnboardingPage() {
                     />
                     <span className="text-sm text-gray-700 leading-relaxed">{text}</span>
                   </label>
-                ))}
+                )})}
               </div>
 
               {submitErrors.length > 0 && (

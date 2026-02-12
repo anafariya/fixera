@@ -478,9 +478,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (idExpiryAlertRef.current === alertKey) return
     idExpiryAlertRef.current = alertKey
 
-    const message = daysLeft >= 0
+    const message = daysLeft > 0
       ? `Your ID expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Please update it.`
-      : 'Your ID has expired. Please update it to keep your profile active.'
+      : daysLeft === 0
+        ? 'Your ID expires today. Please update it.'
+        : 'Your ID has expired. Please update it to keep your profile active.'
 
     toast.warning(message, { duration: 8000 })
   }, [user])

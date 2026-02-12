@@ -291,6 +291,13 @@ export default function ProfilePage() {
   }, [user])
 
   useEffect(() => {
+    if (user?.role !== 'professional') {
+      setServiceCatalog([])
+      setServiceCatalogError(null)
+      setServiceCatalogLoading(false)
+      return
+    }
+
     const fetchServiceCatalog = async () => {
       try {
         setServiceCatalogLoading(true)
@@ -314,7 +321,7 @@ export default function ProfilePage() {
     }
 
     fetchServiceCatalog()
-  }, [user?.businessInfo?.country])
+  }, [user?.role, user?.businessInfo?.country])
 
   useEffect(() => {
     if (loading || !isAuthenticated || user?.role !== 'professional') {

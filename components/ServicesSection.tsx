@@ -84,9 +84,23 @@ const ServicesSection = () => {
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/service-categories/active?country=BE`
         )
         if (response.ok) {
-          const data: ApiCategory[] = await response.json()
+          const json: unknown = await response.json()
+          const categories: ApiCategory[] = Array.isArray(json)
+            ? (json as ApiCategory[])
+            : (
+              typeof json === 'object' &&
+              json !== null &&
+              Array.isArray((json as { data?: unknown }).data)
+                ? ((json as { data: ApiCategory[] }).data)
+                : []
+            )
+
+          if (!Array.isArray(json) && !(typeof json === 'object' && json !== null && Array.isArray((json as { data?: unknown }).data))) {
+            console.warn('Unexpected service category response shape:', json)
+          }
+
           // Flatten all services from all categories, take first 6 as featured
-          const allServices = data.flatMap(cat => cat.services)
+          const allServices = categories.flatMap((cat) => Array.isArray(cat?.services) ? cat.services : [])
           setServices(allServices.slice(0, 6))
         }
       } catch (error) {
