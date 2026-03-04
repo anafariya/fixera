@@ -547,7 +547,7 @@ export default function ManageProjectsPage() {
           </div>
           {/* Tabs Skeleton */}
           <div className="flex gap-2 mb-6">
-            {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-9 w-24 rounded-lg" />)}
+            {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-9 w-24 rounded-lg" />)}
           </div>
           {/* Project Cards Skeleton */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
