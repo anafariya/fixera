@@ -180,10 +180,10 @@ export default function DashboardPage() {
     }
   }, [user])
 
-  // Fetch bookings for customer and professional dashboard
+  // Fetch bookings for customer dashboard
   useEffect(() => {
     if (!user || !isAuthenticated) return
-    if (user.role !== "customer" && user.role !== "professional") return
+    if (user.role !== "customer") return
 
     const fetchBookings = async () => {
       setBookingsLoading(true)
@@ -1084,30 +1084,11 @@ export default function DashboardPage() {
                 <Briefcase className="h-8 w-8 text-blue-600" />
                 Professional Dashboard
               </h1>
-              <p className="text-gray-600">Manage your services and projects, {user?.name}!</p>
+              <p className="text-gray-600">Manage your profile, projects, bookings, and quotes, {user?.name}.</p>
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {/* Create New Project Card */}
-            <Card className="border-2 border-dashed border-blue-300 hover:border-blue-500 transition-colors">
-              <CardHeader className="text-center">
-                <CardTitle className="flex items-center justify-center gap-2 text-blue-600">
-                  <Plus className="h-6 w-6" />
-                  Create New Project
-                </CardTitle>
-                <CardDescription>Start offering a new service to customers</CardDescription>
-              </CardHeader>
-              <CardContent className="text-center">
-                <Button
-                  onClick={() => router.push('/projects/create')}
-                  className="w-full bg-blue-600 hover:bg-blue-700"
-                  size="lg"
-                >
-                  Create Project
-                </Button>
-              </CardContent>
-            </Card>
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
 
             {/* Profile Information */}
             <Card>
@@ -1167,15 +1148,7 @@ export default function DashboardPage() {
               <CardDescription>Common tasks for professionals</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button
-                  variant="outline"
-                  onClick={() => router.push('/projects/create')}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  New Project
-                </Button>
+              <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
                 <Button
                   variant="outline"
                   onClick={() => router.push('/profile')}
@@ -1191,6 +1164,22 @@ export default function DashboardPage() {
                 >
                   <Briefcase className="h-4 w-4" />
                   Manage Projects
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/dashboard/bookings')}
+                  className="flex items-center gap-2"
+                >
+                  <Package className="h-4 w-4" />
+                  Manage Bookings
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/dashboard/quotes')}
+                  className="flex items-center gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  Manage Quotes
                 </Button>
                 <Button
                   variant="outline"
@@ -1226,112 +1215,6 @@ export default function DashboardPage() {
                   {new Date(user?.updatedAt || '').toLocaleDateString()}
                 </span>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Bookings Section */}
-          <Card className="mt-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Client Bookings & Quotes
-              </CardTitle>
-              <CardDescription>Manage bookings from customers who booked your projects</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {bookingsLoading && (
-                <div className="text-center py-8 text-gray-500">
-                  Loading bookings...
-                </div>
-              )}
-
-              {!bookingsLoading && bookingsError && (
-                <div className="text-center py-4 text-red-600">
-                  {bookingsError}
-                </div>
-              )}
-
-              {!bookingsLoading && !bookingsError && bookings.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  No bookings yet. When customers book your projects, they&apos;ll appear here.
-                </div>
-              )}
-
-              {!bookingsLoading && !bookingsError && bookings.length > 0 && (
-                <div className="space-y-3">
-                  {bookings.slice(0, 5).map((booking) => {
-                    const isProject = booking.bookingType === "project"
-                    const title =
-                      (isProject ? booking.project?.title : booking.professional?.businessInfo?.companyName) ||
-                      booking.rfqData?.serviceType ||
-                      "Booking"
-
-                    const statusLabel = booking.status.replace(/_/g, " ")
-                    const statusClasses =
-                      BOOKING_STATUS_STYLES[booking.status] ||
-                      "bg-slate-50 text-slate-700 border border-slate-100"
-
-                    return (
-                      <div
-                        key={booking._id}
-                        className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              {isProject ? (
-                                <Package className="h-4 w-4 text-indigo-500" />
-                              ) : (
-                                <Briefcase className="h-4 w-4 text-indigo-500" />
-                              )}
-                              <h3 className="font-semibold text-sm">{title}</h3>
-                            </div>
-                            <div className="flex items-center gap-3 text-xs text-gray-600 mb-2">
-                              <span>Customer: {booking.customer?.name}</span>
-                              {booking.createdAt && (
-                                <span>• {new Date(booking.createdAt).toLocaleDateString()}</span>
-                              )}
-                            </div>
-                            <Badge
-                              variant="outline"
-                              className={`text-xs capitalize ${statusClasses}`}
-                            >
-                              {statusLabel}
-                            </Badge>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => router.push(`/bookings/${booking._id}`)}
-                              className="text-xs"
-                            >
-                              View
-                            </Button>
-                            {booking.status === 'rfq' && (
-                              <Button
-                                size="sm"
-                                onClick={() => router.push(`/bookings/${booking._id}`)}
-                                className="text-xs bg-purple-600 hover:bg-purple-700 text-white"
-                              >
-                                <FileText className="h-3 w-3 mr-1" />
-                                Quote
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                  {bookings.length > 5 && (
-                    <div className="text-center pt-2">
-                      <p className="text-xs text-gray-500">
-                        Showing 5 of {bookings.length} bookings
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
             </CardContent>
           </Card>
 
