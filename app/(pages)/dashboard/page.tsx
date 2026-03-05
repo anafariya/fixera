@@ -543,17 +543,6 @@ export default function DashboardPage() {
                               Pay Now
                             </Button>
                           )}
-                          {/* Professional: Submit Quote button */}
-                          {user?.role === 'professional' && booking.status === 'rfq' && (
-                            <Button
-                              size="sm"
-                              onClick={() => router.push(`/bookings/${booking._id}`)}
-                              className="text-xs bg-purple-600 hover:bg-purple-700 text-white"
-                            >
-                              <FileText className="h-3 w-3 mr-1" />
-                              Submit Quote
-                            </Button>
-                          )}
                         </div>
                       </CardContent>
                     </Card>
