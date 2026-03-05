@@ -90,12 +90,17 @@ interface ProfessionalBookingsQuotesManagerProps {
 }
 
 export default function ProfessionalBookingsQuotesManager({ mode }: ProfessionalBookingsQuotesManagerProps) {
+  const PAGE_SIZE = 20
   const router = useRouter()
   const { user, isAuthenticated, loading: authLoading } = useAuth()
 
   const [bookings, setBookings] = useState<Booking[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalBookings, setTotalBookings] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
 
   const pageCopy = mode === "bookings"
     ? {
@@ -126,11 +131,15 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
     }
   }, [authLoading, isAuthenticated, router, user?.role])
 
-  const fetchBookings = useCallback(async () => {
+  const fetchBookings = useCallback(async (pageToLoad = 1, append = false) => {
     if (!isAuthenticated || user?.role !== "professional") return
 
-    setIsLoading(true)
-    setError(null)
+    if (append) {
+      setIsLoadingMore(true)
+    } else {
+      setIsLoading(true)
+      setError(null)
+    }
 
     try {
       const token = getAuthToken()
@@ -140,13 +149,46 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/my-bookings?limit=100`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/my-bookings?page=${pageToLoad}&limit=${PAGE_SIZE}`,
         { credentials: "include", headers }
       )
       const data = await response.json()
 
       if (response.ok && data.success) {
-        setBookings(data.bookings || [])
+        const incomingBookings = Array.isArray(data.bookings) ? data.bookings : []
+        const pagination = data.pagination || {}
+        const totalFromApi = typeof pagination.total === "number" ? pagination.total : null
+        const totalPagesFromApi = typeof pagination.totalPages === "number" ? pagination.totalPages : null
+
+        if (totalFromApi != null) {
+          setTotalBookings(totalFromApi)
+        } else {
+          setTotalBookings((prevTotal) => append ? prevTotal + incomingBookings.length : incomingBookings.length)
+        }
+
+        setCurrentPage(pageToLoad)
+        if (totalPagesFromApi != null) {
+          setHasMore(pageToLoad < totalPagesFromApi)
+        } else if (totalFromApi != null) {
+          setHasMore(pageToLoad * PAGE_SIZE < totalFromApi)
+        } else {
+          setHasMore(incomingBookings.length === PAGE_SIZE)
+        }
+
+        setBookings((prevBookings) => {
+          if (!append) return incomingBookings
+          const merged = [...prevBookings]
+          const seen = new Set(prevBookings.map((booking) => booking._id))
+
+          for (const booking of incomingBookings) {
+            if (!seen.has(booking._id)) {
+              merged.push(booking)
+              seen.add(booking._id)
+            }
+          }
+
+          return merged
+        })
       } else {
         setError(data.msg || "Failed to load bookings.")
       }
@@ -154,12 +196,16 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
       console.error("Failed to fetch bookings:", fetchError)
       setError("Failed to load bookings.")
     } finally {
-      setIsLoading(false)
+      if (append) {
+        setIsLoadingMore(false)
+      } else {
+        setIsLoading(false)
+      }
     }
   }, [isAuthenticated, user?.role])
 
   useEffect(() => {
-    fetchBookings()
+    fetchBookings(1, false)
   }, [fetchBookings])
 
   const relevantBookings = useMemo(() => {
@@ -278,7 +324,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <Button variant="outline" onClick={fetchBookings} disabled={isLoading}>
+          <Button variant="outline" onClick={() => fetchBookings(1, false)} disabled={isLoading || isLoadingMore}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
@@ -292,9 +338,12 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
         <div className="grid md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Total</CardDescription>
+              <CardDescription>Total Loaded</CardDescription>
               <CardTitle>{relevantBookings.length}</CardTitle>
             </CardHeader>
+            <CardContent className="pt-0 text-xs text-gray-500">
+              {bookings.length} of {totalBookings}
+            </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
@@ -326,7 +375,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
           </Card>
         )}
 
-        {!isLoading && !error && (
+        {!isLoading && !error && relevantBookings.length > 0 && (
           <div className="grid lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -360,6 +409,18 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
               {pageCopy.empty}
             </CardContent>
           </Card>
+        )}
+
+        {!isLoading && !error && hasMore && (
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              onClick={() => fetchBookings(currentPage + 1, true)}
+              disabled={isLoadingMore}
+            >
+              {isLoadingMore ? "Loading..." : "Load more"}
+            </Button>
+          </div>
         )}
       </div>
     </div>
