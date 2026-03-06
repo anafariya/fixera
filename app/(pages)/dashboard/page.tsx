@@ -11,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 import { getAuthToken } from "@/lib/utils"
 import StartChatButton from "@/components/chat/StartChatButton"
-import { type BookingStatus, getBookingStatusMeta } from "@/lib/dashboardBookingHelpers"
+import { type BookingStatus, getBookingStatusMeta, getBookingTitle } from "@/lib/dashboardBookingHelpers"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface LoyaltyStats {
   tierDistribution: Array<{
@@ -226,10 +227,47 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-pink-50 p-4">
+        <div className="max-w-6xl mx-auto pt-20 space-y-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+            <div className="flex gap-3">
+              <Skeleton className="h-10 w-32 rounded-lg" />
+              <Skeleton className="h-10 w-32 rounded-lg" />
+            </div>
+          </div>
+          {/* Stats Cards Skeleton */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="rounded-xl border border-gray-100 bg-white p-5 space-y-3">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-3 w-full" />
+              </div>
+            ))}
+          </div>
+          {/* Content Cards Skeleton */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {[1, 2].map(i => (
+              <div key={i} className="rounded-xl border border-gray-100 bg-white p-6 space-y-4">
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-4 w-60" />
+                {[1, 2, 3].map(j => (
+                  <div key={j} className="flex items-center gap-3 py-2">
+                    <Skeleton className="h-8 w-8 rounded-lg" />
+                    <div className="flex-1 space-y-1">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     )
@@ -361,11 +399,18 @@ export default function DashboardPage() {
               </h2>
 
               {bookingsLoading && (
-                <Card className="bg-white/70 backdrop-blur border border-indigo-100">
-                  <CardContent className="py-8 text-center text-gray-500">
-                    Loading your bookings...
-                  </CardContent>
-                </Card>
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="rounded-xl border border-gray-100 bg-white p-5 flex items-center gap-4">
+                      <Skeleton className="h-10 w-10 rounded-lg" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                    </div>
+                  ))}
+                </div>
               )}
 
               {!bookingsLoading && bookingsError && (
@@ -826,7 +871,15 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     {isLoadingStats ? (
-                      <div className="text-center py-8">Loading...</div>
+                      <div className="space-y-3 py-4">
+                        {[1, 2, 3, 4].map(i => (
+                          <div key={i} className="flex items-center gap-3">
+                            <Skeleton className="h-4 w-20" />
+                            <Skeleton className="h-3 flex-1 rounded-full" />
+                            <Skeleton className="h-4 w-8" />
+                          </div>
+                        ))}
+                      </div>
                     ) : (
                       <div className="space-y-3">
                         {loyaltyStats?.tierDistribution.map((tier) => (
@@ -1169,6 +1222,114 @@ export default function DashboardPage() {
                   {new Date(user?.updatedAt || '').toLocaleDateString()}
                 </span>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Bookings Section */}
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Client Bookings & Quotes
+              </CardTitle>
+              <CardDescription>Manage bookings from customers who booked your projects</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {bookingsLoading && (
+                <div className="space-y-3 py-4">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="flex items-center gap-4 py-2">
+                      <Skeleton className="h-8 w-8 rounded-lg" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!bookingsLoading && bookingsError && (
+                <div className="text-center py-4 text-red-600">
+                  {bookingsError}
+                </div>
+              )}
+
+              {!bookingsLoading && !bookingsError && bookings.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  No bookings yet. When customers book your projects, they&apos;ll appear here.
+                </div>
+              )}
+
+              {!bookingsLoading && !bookingsError && bookings.length > 0 && (
+                <div className="space-y-3">
+                  {bookings.slice(0, 5).map((booking) => {
+                    const isProject = booking.bookingType === "project"
+                    const title = getBookingTitle(booking)
+                    const { label: statusLabel, className: statusClasses } = getBookingStatusMeta(booking.status)
+
+                    return (
+                      <div
+                        key={booking._id}
+                        className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              {isProject ? (
+                                <Package className="h-4 w-4 text-indigo-500" />
+                              ) : (
+                                <Briefcase className="h-4 w-4 text-indigo-500" />
+                              )}
+                              <h3 className="font-semibold text-sm">{title}</h3>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-gray-600 mb-2">
+                              <span>Customer: {booking.customer?.name}</span>
+                              {booking.createdAt && (
+                                <span>• {new Date(booking.createdAt).toLocaleDateString()}</span>
+                              )}
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs capitalize ${statusClasses}`}
+                            >
+                              {statusLabel}
+                            </Badge>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/bookings/${booking._id}`)}
+                              className="text-xs"
+                            >
+                              View
+                            </Button>
+                            {booking.status === 'rfq' && (
+                              <Button
+                                size="sm"
+                                onClick={() => router.push(`/bookings/${booking._id}?action=quote`)}
+                                className="text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                              >
+                                <FileText className="h-3 w-3 mr-1" />
+                                Quote
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {bookings.length > 5 && (
+                    <div className="text-center pt-2">
+                      <p className="text-xs text-gray-500">
+                        Showing 5 of {bookings.length} bookings
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
