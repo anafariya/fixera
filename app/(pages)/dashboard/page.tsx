@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 import { getAuthToken } from "@/lib/utils"
 import StartChatButton from "@/components/chat/StartChatButton"
+import { type BookingStatus, getBookingStatusMeta } from "@/lib/dashboardBookingHelpers"
 
 interface LoyaltyStats {
   tierDistribution: Array<{
@@ -38,19 +39,6 @@ interface ProjectStats {
   pendingProjects: number;
 }
 
-type BookingStatus =
-  | "rfq"
-  | "quoted"
-  | "quote_accepted"
-  | "quote_rejected"
-  | "payment_pending"
-  | "booked"
-  | "in_progress"
-  | "completed"
-  | "cancelled"
-  | "dispute"
-  | "refunded"
-  | string
 
 interface Booking {
   _id: string
@@ -91,20 +79,6 @@ interface Booking {
   }
 }
 
-const BOOKING_STATUS_STYLES: Record<string, string> = {
-  rfq: "bg-indigo-50 text-indigo-700 border border-indigo-100",
-  quoted: "bg-blue-50 text-blue-700 border border-blue-100",
-  quote_accepted: "bg-emerald-50 text-emerald-700 border border-emerald-100",
-  quote_rejected: "bg-rose-50 text-rose-700 border border-rose-100",
-  payment_pending: "bg-amber-50 text-amber-700 border border-amber-100",
-  booked: "bg-emerald-50 text-emerald-700 border border-emerald-100",
-  in_progress: "bg-sky-50 text-sky-700 border border-sky-100",
-  completed: "bg-teal-50 text-teal-700 border border-teal-100",
-  cancelled: "bg-rose-50 text-rose-700 border border-rose-100",
-  refunded: "bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-100",
-  dispute: "bg-red-50 text-red-700 border border-red-100",
-  unknown: "bg-slate-50 text-slate-700 border border-slate-100",
-}
 
 const STATUS_FILTERS: { id: string; label: string }[] = [
   { id: "all", label: "All" },
@@ -132,16 +106,7 @@ const isPastBooking = (booking: Booking): boolean => {
   return pastStatuses.has(booking.status)
 }
 
-const getBookingStatusMeta = (status?: BookingStatus) => {
-  const rawStatus = status || "unknown"
-  return {
-    rawStatus,
-    label: rawStatus.replace(/_/g, " "),
-    className:
-      BOOKING_STATUS_STYLES[rawStatus] ||
-      "bg-slate-50 text-slate-700 border border-slate-100"
-  }
-}
+
 const formatBudget = (booking: Booking): string | null => {
   const budget = booking.rfqData?.budget
   if (!budget || (budget.min == null && budget.max == null)) return null

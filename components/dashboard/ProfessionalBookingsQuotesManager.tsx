@@ -8,22 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Briefcase, Calendar, Clock, FileText, Package, RefreshCw } from "lucide-react"
+import {
+  type BookingStatus,
+  QUOTE_STATUSES,
+  QUOTE_FINISHED_STATUSES,
+  BOOKING_FINISHED_STATUSES,
+  getBookingStatusMeta,
+  getBookingTitle,
+} from "@/lib/dashboardBookingHelpers"
 
 type ManagerMode = "bookings" | "quotes"
-
-type BookingStatus =
-  | "rfq"
-  | "quoted"
-  | "quote_accepted"
-  | "quote_rejected"
-  | "payment_pending"
-  | "booked"
-  | "in_progress"
-  | "completed"
-  | "cancelled"
-  | "dispute"
-  | "refunded"
-  | string
 
 interface Booking {
   _id: string
@@ -49,42 +43,6 @@ interface Booking {
   }
 }
 
-const BOOKING_STATUS_STYLES: Record<string, string> = {
-  rfq: "bg-indigo-50 text-indigo-700 border border-indigo-100",
-  quoted: "bg-blue-50 text-blue-700 border border-blue-100",
-  quote_accepted: "bg-emerald-50 text-emerald-700 border border-emerald-100",
-  quote_rejected: "bg-rose-50 text-rose-700 border border-rose-100",
-  payment_pending: "bg-amber-50 text-amber-700 border border-amber-100",
-  booked: "bg-emerald-50 text-emerald-700 border border-emerald-100",
-  in_progress: "bg-sky-50 text-sky-700 border border-sky-100",
-  completed: "bg-teal-50 text-teal-700 border border-teal-100",
-  cancelled: "bg-rose-50 text-rose-700 border border-rose-100",
-  refunded: "bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-100",
-  dispute: "bg-red-50 text-red-700 border border-red-100",
-  unknown: "bg-slate-50 text-slate-700 border border-slate-100",
-}
-
-const QUOTE_STATUSES = new Set<BookingStatus>(["rfq", "quoted", "quote_accepted", "quote_rejected"])
-const QUOTE_FINISHED_STATUSES = new Set<BookingStatus>(["quote_accepted", "quote_rejected"])
-const BOOKING_FINISHED_STATUSES = new Set<BookingStatus>(["completed", "cancelled", "refunded"])
-
-const getBookingStatusMeta = (status?: BookingStatus) => {
-  const rawStatus = status || "unknown"
-  return {
-    label: rawStatus.replace(/_/g, " "),
-    className: BOOKING_STATUS_STYLES[rawStatus] || BOOKING_STATUS_STYLES.unknown,
-  }
-}
-
-const getBookingTitle = (booking: Booking) => {
-  const isProject = booking.bookingType === "project"
-  return (
-    (isProject ? booking.project?.title : booking.professional?.businessInfo?.companyName) ||
-    booking.rfqData?.serviceType ||
-    "Booking"
-  )
-}
-
 interface ProfessionalBookingsQuotesManagerProps {
   mode: ManagerMode
 }
@@ -98,6 +56,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalBookings, setTotalBookings] = useState(0)
   const [hasMore, setHasMore] = useState(false)
@@ -136,6 +95,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
 
     if (append) {
       setIsLoadingMore(true)
+      setLoadMoreError(null)
     } else {
       setIsLoading(true)
       setError(null)
@@ -190,11 +150,20 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
           return merged
         })
       } else {
-        setError(data.msg || "Failed to load bookings.")
+        const msg = data.msg || "Failed to load bookings."
+        if (append) {
+          setLoadMoreError(msg)
+        } else {
+          setError(msg)
+        }
       }
     } catch (fetchError) {
       console.error("Failed to fetch bookings:", fetchError)
-      setError("Failed to load bookings.")
+      if (append) {
+        setLoadMoreError("Failed to load bookings.")
+      } else {
+        setError("Failed to load bookings.")
+      }
     } finally {
       if (append) {
         setIsLoadingMore(false)
@@ -403,7 +372,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
           </div>
         )}
 
-        {!isLoading && !error && relevantBookings.length === 0 && (
+        {!isLoading && !error && relevantBookings.length === 0 && !hasMore && (
           <Card className="border-dashed">
             <CardContent className="py-8 text-center text-gray-500">
               {pageCopy.empty}
@@ -412,7 +381,10 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
         )}
 
         {!isLoading && !error && hasMore && (
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center gap-2">
+            {loadMoreError && (
+              <p className="text-sm text-rose-600">{loadMoreError}</p>
+            )}
             <Button
               variant="outline"
               onClick={() => fetchBookings(currentPage + 1, true)}
