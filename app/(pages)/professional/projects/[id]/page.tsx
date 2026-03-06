@@ -779,7 +779,7 @@ export default function ProjectDetailPage() {
               </Card>
             )}
 
-            {/* Subprojects/Pricing */}
+            {/* Subprojects/Pricing - Side by Side Card Grid */}
             <Card>
               <CardHeader className="px-4 md:px-6">
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -788,34 +788,34 @@ export default function ProjectDetailPage() {
                 </CardTitle>
                 <CardDescription>Your project pricing variations</CardDescription>
               </CardHeader>
-              <CardContent className="px-4 md:px-6 space-y-4">
-                {project.subprojects.map((subproject, index) => (
-                  <Card key={index} className="border border-gray-200">
-                    <CardHeader className="px-4 py-3">
-                      <CardTitle className="text-base">{subproject.name}</CardTitle>
-                      <CardDescription className="text-sm break-words">{subproject.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="px-4 py-3 space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+              <CardContent className="px-4 md:px-6">
+                <div className={`grid gap-4 ${project.subprojects.length === 1 ? 'grid-cols-1' : project.subprojects.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+                  {project.subprojects.map((subproject, index) => (
+                    <Card key={index} className="border border-gray-200 flex flex-col">
+                      <CardHeader className="px-4 py-3">
+                        <CardTitle className="text-base">{subproject.name}</CardTitle>
+                        <CardDescription className="text-sm break-words">{subproject.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="px-4 py-3 space-y-3 flex-1">
+                        {/* Pricing */}
                         <div>
-                          <span className="font-medium text-gray-600">Pricing:</span>
+                          <span className="font-medium text-gray-600 text-sm">Pricing:</span>
                           <p className="font-semibold text-green-600">{formatPricing(subproject.pricing)}</p>
+                          {subproject.pricing.type === 'unit' && subproject.pricing.minProjectValue != null && (
+                            <p className="text-xs text-gray-500 mt-0.5">Min. order: €{subproject.pricing.minProjectValue.toLocaleString()}</p>
+                          )}
                         </div>
+
+                        {/* Duration */}
                         <div>
-                          <span className="font-medium text-gray-600">Duration:</span>
-                          <p>{formatDuration(subproject.executionDuration)}</p>
+                          <span className="font-medium text-gray-600 text-sm">Duration:</span>
+                          <p className="text-sm">{formatDuration(subproject.executionDuration)}</p>
                         </div>
+
+                        {/* Preparation */}
                         <div>
-                          <span className="font-medium text-gray-600">Warranty:</span>
-                          <p>{subproject.warrantyPeriod.value === 0 ? 'No warranty' : `${subproject.warrantyPeriod.value} ${subproject.warrantyPeriod.unit}`}</p>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-600">Materials:</span>
-                          <p>{subproject.materialsIncluded ? 'Included' : 'Not included'}</p>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-600">Preparation:</span>
-                          <p>
+                          <span className="font-medium text-gray-600 text-sm">Preparation:</span>
+                          <p className="text-sm">
                             {(() => {
                               const preparationValue = subproject.preparationDuration?.value;
                               if (preparationValue == null) return 'Not set';
@@ -827,32 +827,74 @@ export default function ProjectDetailPage() {
                             })()}
                           </p>
                         </div>
-                        {subproject.intakeDuration && (
+
+                        {/* Buffer */}
+                        {subproject.buffer && subproject.buffer.value > 0 && (
                           <div>
-                            <span className="font-medium text-gray-600">Intake:</span>
-                            <p>{subproject.intakeDuration.value} {subproject.intakeDuration.unit}</p>
+                            <span className="font-medium text-gray-600 text-sm">Buffer:</span>
+                            <p className="text-sm">{subproject.buffer.value} {subproject.buffer.unit}</p>
                           </div>
                         )}
-                      </div>
 
-                      {subproject.included.length > 0 && (
-                        <div>
-                          <span className="font-medium text-gray-600 text-sm">Included Items:</span>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                            {subproject.included.map((item, itemIndex) => (
-                              <div key={itemIndex} className="bg-gray-50 rounded-md p-2">
-                                <p className="font-medium text-sm">{item.name}</p>
-                                {item.description && (
-                                  <p className="text-xs text-gray-600 mt-1">{item.description}</p>
-                                )}
-                              </div>
-                            ))}
+                        {/* Intake */}
+                        {subproject.intakeDuration && (
+                          <div>
+                            <span className="font-medium text-gray-600 text-sm">Intake:</span>
+                            <p className="text-sm">{subproject.intakeDuration.value} {subproject.intakeDuration.unit}</p>
                           </div>
+                        )}
+
+                        {/* Warranty */}
+                        <div>
+                          <span className="font-medium text-gray-600 text-sm">Warranty:</span>
+                          <p className="text-sm">{subproject.warrantyPeriod.value === 0 ? 'No warranty' : `${subproject.warrantyPeriod.value} ${subproject.warrantyPeriod.unit}`}</p>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+
+                        {/* Materials */}
+                        <div>
+                          <span className="font-medium text-gray-600 text-sm">Materials:</span>
+                          <p className="text-sm">{subproject.materialsIncluded ? 'Included' : 'Not included'}</p>
+                        </div>
+
+                        {/* Service Parameters */}
+                        {subproject.professionalInputs && subproject.professionalInputs.length > 0 && (
+                          <div>
+                            <span className="font-medium text-gray-600 text-sm">Service Parameters:</span>
+                            <div className="mt-1 space-y-1">
+                              {subproject.professionalInputs.map((input, i) => (
+                                <div key={i} className="flex justify-between text-xs bg-gray-50 px-2 py-1 rounded">
+                                  <span className="font-medium">{input.fieldName}</span>
+                                  <span>
+                                    {typeof input.value === 'object' && input.value !== null && 'min' in input.value && 'max' in input.value
+                                      ? `${(input.value as { min: number; max: number }).min} - ${(input.value as { min: number; max: number }).max}`
+                                      : String(input.value ?? '')}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Included Items */}
+                        {subproject.included.length > 0 && (
+                          <div>
+                            <span className="font-medium text-gray-600 text-sm">Included Items:</span>
+                            <div className="mt-1 space-y-1">
+                              {subproject.included.map((item, itemIndex) => (
+                                <div key={itemIndex} className="bg-gray-50 rounded-md px-2 py-1">
+                                  <p className="font-medium text-xs">{item.name}</p>
+                                  {item.description && (
+                                    <p className="text-xs text-gray-600">{item.description}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 

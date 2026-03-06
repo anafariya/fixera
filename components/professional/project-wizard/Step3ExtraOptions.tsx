@@ -216,7 +216,8 @@ export default function Step3ExtraOptions({ data, onChange, onValidate }: Step3P
     }
     setValidationErrors(errors)
     onValidate(errors.length === 0)
-  }, [extraOptions, termsConditions, customerPresence, onValidate])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extraOptions, termsConditions, customerPresence])
 
   const validateForm = () => {
     const errors: string[] = []
@@ -417,7 +418,7 @@ export default function Step3ExtraOptions({ data, onChange, onValidate }: Step3P
                 <span>Please select a customer presence option</span>
               </div>
             )}
-            <Select value={customerPresence} onValueChange={setCustomerPresence}>
+            <Select value={customerPresence || undefined} onValueChange={setCustomerPresence}>
               <SelectTrigger className={`w-full ${!customerPresence && validationErrors.length > 0 ? 'border-red-500' : ''}`}>
                 <SelectValue placeholder="Select customer presence requirement..." />
               </SelectTrigger>
