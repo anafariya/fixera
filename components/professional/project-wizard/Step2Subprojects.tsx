@@ -216,7 +216,21 @@ const getValidPricingTypes = (
   const isRenovation = category?.toLowerCase() === 'renovation';
   if (isRenovation) return ['rfq'];
 
-  // When we have structured config pricing options, derive valid types from ALL of them
+  // When the user made a Step 1 selection, map that single choice to pricing types
+  if (selectedOption) {
+    if (selectedOption.pricingType === 'fixed_price') return ['fixed', 'rfq'];
+    if (selectedOption.pricingType === 'price_per_unit') return ['unit', 'rfq'];
+  }
+
+  // Legacy string fallback when no structured selection
+  if (priceModel) {
+    const normalized = priceModel.toLowerCase().trim();
+    if (normalized === 'rfq only' || normalized === 'rfq') return ['rfq'];
+    if (isFixedPriceOption(undefined, priceModel)) return ['fixed', 'rfq'];
+    return ['unit', 'rfq'];
+  }
+
+  // No user selection yet — derive from all config options so the dropdown isn't empty
   if (configPricingOptions && configPricingOptions.length > 0) {
     const types = new Set<PricingType>();
     for (const opt of configPricingOptions) {
@@ -227,13 +241,7 @@ const getValidPricingTypes = (
     return Array.from(types);
   }
 
-  // RFQ-only detection (legacy string)
-  if (!selectedOption && priceModel) {
-    const normalized = priceModel.toLowerCase().trim();
-    if (normalized === 'rfq only' || normalized === 'rfq') return ['rfq'];
-  }
-  if (isFixedPriceOption(selectedOption, priceModel)) return ['fixed', 'rfq'];
-  return ['unit', 'rfq'];
+  return ['fixed', 'rfq'];
 };
 
 const getDefaultPricingType = (

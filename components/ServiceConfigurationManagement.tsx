@@ -928,9 +928,19 @@ export default function ServiceConfigurationManagement() {
                 <p className="text-xs text-muted-foreground">Comma-separated ISO country codes</p>
               </div>
 
-              {/* Required Certifications */}
+              {/* Certification Required Toggle */}
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="certificationRequired"
+                  checked={formData.certificationRequired}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, certificationRequired: checked }))}
+                />
+                <Label htmlFor="certificationRequired">Certification Required</Label>
+              </div>
+
+              {/* Required Certification Types */}
               <div className="space-y-2">
-                <Label>Required Certifications</Label>
+                <Label>Required Certification Types</Label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {CERTIFICATION_TYPES.map((type) => {
                     const checked = (formData.requiredCertifications || []).includes(type)
@@ -940,16 +950,12 @@ export default function ServiceConfigurationManagement() {
                           checked={checked}
                           onCheckedChange={(v) => {
                             const isChecked = Boolean(v)
-                            setFormData(prev => {
-                              const updated = isChecked
+                            setFormData(prev => ({
+                              ...prev,
+                              requiredCertifications: isChecked
                                 ? [...(prev.requiredCertifications || []), type]
                                 : (prev.requiredCertifications || []).filter(t => t !== type)
-                              return {
-                                ...prev,
-                                requiredCertifications: updated,
-                                certificationRequired: updated.length > 0,
-                              }
-                            })
+                            }))
                           }}
                         />
                         <Label className="cursor-pointer text-sm">{type}</Label>
