@@ -106,7 +106,7 @@ export default function ReferralCard() {
 
   const copyLink = () => {
     if (!data?.referralCode) return;
-    const link = `${window.location.origin}/join?ref=${data.referralCode}`;
+    const link = `${window.location.origin}/join?ref=${encodeURIComponent(data.referralCode)}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
     toast.success('Referral link copied!');
@@ -123,7 +123,7 @@ export default function ReferralCard() {
 
   const shareVia = (platform: string) => {
     if (!data?.referralCode) return;
-    const link = `${window.location.origin}/join?ref=${data.referralCode}`;
+    const link = `${window.location.origin}/join?ref=${encodeURIComponent(data.referralCode)}`;
     const text = `Join Fixera and get a discount on your first booking! Use my referral link:`;
 
     const urls: Record<string, string> = {
@@ -146,11 +146,7 @@ export default function ReferralCard() {
     );
   }
 
-  if (fetchError) {
-    return null; // Hide on transient errors — will retry on next mount
-  }
-
-  if (!data?.programEnabled) {
+  if (!data?.programEnabled && !fetchError) {
     return null; // Don't show card if referral program is disabled
   }
 
@@ -164,6 +160,14 @@ export default function ReferralCard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {fetchError && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-sm text-amber-800">Couldn&apos;t load your referral stats.</p>
+              <Button variant="outline" size="sm" className="mt-2" onClick={fetchReferralStats}>
+                Retry
+              </Button>
+            </div>
+          )}
           <p className="text-sm text-gray-600 mb-4">
             Refer friends to Fixera and earn credits when they complete their first booking!
           </p>
@@ -194,6 +198,14 @@ export default function ReferralCard() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {fetchError && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-sm text-amber-800">Couldn&apos;t refresh your latest referral stats.</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={fetchReferralStats}>
+              Retry
+            </Button>
+          </div>
+        )}
         {/* Referral Code Display */}
         <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
           <p className="text-xs text-gray-500 mb-1">Your Referral Code</p>
@@ -293,3 +305,4 @@ export default function ReferralCard() {
     </Card>
   );
 }
+

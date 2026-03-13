@@ -53,7 +53,11 @@ interface ReferralConfig {
   minBookingAmountForTrigger: number | undefined;
 }
 
-const numVal = (v: string): number | undefined => v === '' ? undefined : Number(v);
+const numVal = (v: string): number | undefined => {
+  const n = Number(v);
+  if (v === '' || Number.isNaN(n) || !Number.isFinite(n)) return undefined;
+  return n;
+};
 
 interface ReferralAnalytics {
   totalReferrals: number;

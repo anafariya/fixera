@@ -67,10 +67,14 @@ function RegisterForm() {
       setReferralReferrer('')
       return
     }
+    const controller = new AbortController()
     const timer = setTimeout(() => {
-      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/public/referral/validate/${encodeURIComponent(code)}`)
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/public/referral/validate/${encodeURIComponent(code)}`, {
+        signal: controller.signal,
+      })
         .then(res => res.json())
         .then(data => {
+          if (controller.signal.aborted) return
           if (data.success) {
             setReferralValid(true)
             setReferralReferrer(data.data?.referrerName || '')
@@ -79,12 +83,18 @@ function RegisterForm() {
             setReferralReferrer('')
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            return
+          }
           setReferralValid(false)
           setReferralReferrer('')
         })
     }, 500)
-    return () => clearTimeout(timer)
+    return () => {
+      controller.abort()
+      clearTimeout(timer)
+    }
   }, [formData.referralCode])
 
   const validateForm = (): boolean => {
@@ -123,14 +133,15 @@ function RegisterForm() {
 
     setLoading(true)
     try {
+      const trimmedReferralCode = formData.referralCode.trim()
       const success = await signup({
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         phone: formData.countryCode + formData.phone.trim(),
         password: formData.password,
         role: 'professional',
-        ...(formData.referralCode.trim() && {
-          referralCode: formData.referralCode.trim(),
+        ...(trimmedReferralCode && referralValid === true && {
+          referralCode: trimmedReferralCode,
         }),
       })
 
