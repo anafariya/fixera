@@ -227,6 +227,62 @@ const sanitizeHref = (url: string | undefined | null): string | undefined => {
   return undefined
 }
 
+function QuestionCard({ question, index, variant = 'default' }: {
+  question: RFQQuestion | PostBookingQuestion
+  index: number
+  variant?: 'default' | 'blue'
+}) {
+  const bgClass = variant === 'blue' ? 'bg-blue-50' : ''
+  return (
+    <div className={`p-4 border rounded-lg ${bgClass}`}>
+      <div className="mb-2 flex items-center flex-wrap gap-1">
+        <Label className="text-sm font-medium">Q{index + 1}: {question.question}</Label>
+        <Badge variant="outline" className="text-xs">
+          {question.type || question.answerType}
+        </Badge>
+        {question.isRequired && <Badge className="text-[10px] bg-red-100 text-red-800">Required</Badge>}
+      </div>
+      {question.options && question.options.length > 0 && (
+        <div className="mb-2 text-xs text-gray-600">
+          Options: {question.options.join(', ')}
+        </div>
+      )}
+      {question.professionalAnswer && (
+        <p className="text-sm text-gray-700 mb-2">
+          <strong>Answer:</strong> {question.professionalAnswer}
+        </p>
+      )}
+      {question.professionalAttachments && question.professionalAttachments.length > 0 && (
+        <div className="mt-3">
+          <Label className="text-xs font-medium text-gray-500 flex items-center space-x-1">
+            <Paperclip className="w-3 h-3" />
+            <span>Attachments ({question.professionalAttachments.length})</span>
+          </Label>
+          <div className="mt-2 space-y-2">
+            {question.professionalAttachments.map((attachment, attIndex) => {
+              const href = sanitizeHref(getUrl(attachment));
+              if (!href) return null;
+              return (
+                <a
+                  key={attIndex}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  <Paperclip className="w-3 h-3" />
+                  <span>Attachment {attIndex + 1}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ProjectApprovalPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [approvedProjects, setApprovedProjects] = useState<Project[]>([])
@@ -1072,10 +1128,10 @@ export default function ProjectApprovalPage() {
                                 {sp.description && (
                                   <p className="text-sm text-gray-700 mt-1">{sp.description}</p>
                                 )}
-                                {Array.isArray(sp.projectType) && sp.projectType.length > 0 && (
+                                {(Array.isArray(sp.projectType) && sp.projectType.length > 0 || sp.customProjectType) && (
                                   <div className="mt-2 text-xs text-gray-700">
-                                    Types: {sp.projectType.join(', ')}
-                                    {sp.customProjectType && ` (Custom: ${sp.customProjectType})`}
+                                    {Array.isArray(sp.projectType) && sp.projectType.length > 0 && <>Types: {sp.projectType.join(', ')}</>}
+                                    {sp.customProjectType && <>{Array.isArray(sp.projectType) && sp.projectType.length > 0 ? ' ' : ''}(Custom: {sp.customProjectType})</>}
                                   </div>
                                 )}
 
@@ -1228,52 +1284,7 @@ export default function ProjectApprovalPage() {
                         </h4>
                         <div className="space-y-3">
                           {selectedProject.rfqQuestions.map((rfq, index) => (
-                            <div key={index} className="p-4 border rounded-lg">
-                              <div className="mb-2 flex items-center flex-wrap gap-1">
-                                <Label className="text-sm font-medium">Q{index + 1}: {rfq.question}</Label>
-                                <Badge variant="outline" className="text-xs">
-                                  {rfq.type || rfq.answerType}
-                                </Badge>
-                                {rfq.isRequired && <Badge className="text-[10px] bg-red-100 text-red-800">Required</Badge>}
-                              </div>
-                              {rfq.options && rfq.options.length > 0 && (
-                                <div className="mb-2 text-xs text-gray-600">
-                                  Options: {rfq.options.join(', ')}
-                                </div>
-                              )}
-                              {rfq.professionalAnswer && (
-                                <p className="text-sm text-gray-700 mb-2">
-                                  <strong>Answer:</strong> {rfq.professionalAnswer}
-                                </p>
-                              )}
-                              {rfq.professionalAttachments && rfq.professionalAttachments.length > 0 && (
-                                <div className="mt-3">
-                                  <Label className="text-xs font-medium text-gray-500 flex items-center space-x-1">
-                                    <Paperclip className="w-3 h-3" />
-                                    <span>Attachments ({rfq.professionalAttachments.length})</span>
-                                  </Label>
-                                  <div className="mt-2 space-y-2">
-                                    {rfq.professionalAttachments.map((attachment, attIndex) => {
-                                      const href = sanitizeHref(getUrl(attachment));
-                                      if (!href) return null;
-                                      return (
-                                        <a
-                                          key={attIndex}
-                                          href={href}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                                        >
-                                          <Paperclip className="w-3 h-3" />
-                                          <span>Attachment {attIndex + 1}</span>
-                                          <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
+                            <QuestionCard key={index} question={rfq} index={index} />
                           ))}
                         </div>
                       </div>
@@ -1288,52 +1299,7 @@ export default function ProjectApprovalPage() {
                         </h4>
                         <div className="space-y-3">
                           {selectedProject.postBookingQuestions.map((pbq, index) => (
-                            <div key={index} className="p-4 border rounded-lg bg-blue-50">
-                              <div className="mb-2 flex items-center flex-wrap gap-1">
-                                <Label className="text-sm font-medium">Q{index + 1}: {pbq.question}</Label>
-                                <Badge variant="outline" className="text-xs">
-                                  {pbq.type || pbq.answerType}
-                                </Badge>
-                                {pbq.isRequired && <Badge className="text-[10px] bg-red-100 text-red-800">Required</Badge>}
-                              </div>
-                              {pbq.options && pbq.options.length > 0 && (
-                                <div className="mb-2 text-xs text-gray-600">
-                                  Options: {pbq.options.join(', ')}
-                                </div>
-                              )}
-                              {pbq.professionalAnswer && (
-                                <p className="text-sm text-gray-700 mb-2">
-                                  <strong>Answer:</strong> {pbq.professionalAnswer}
-                                </p>
-                              )}
-                              {pbq.professionalAttachments && pbq.professionalAttachments.length > 0 && (
-                                <div className="mt-3">
-                                  <Label className="text-xs font-medium text-gray-500 flex items-center space-x-1">
-                                    <Paperclip className="w-3 h-3" />
-                                    <span>Attachments ({pbq.professionalAttachments.length})</span>
-                                  </Label>
-                                  <div className="mt-2 space-y-2">
-                                    {pbq.professionalAttachments.map((attachment, attIndex) => {
-                                      const href = sanitizeHref(getUrl(attachment));
-                                      if (!href) return null;
-                                      return (
-                                        <a
-                                          key={attIndex}
-                                          href={href}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                                        >
-                                          <Paperclip className="w-3 h-3" />
-                                          <span>Attachment {attIndex + 1}</span>
-                                          <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
+                            <QuestionCard key={index} question={pbq} index={index} variant="blue" />
                           ))}
                         </div>
                       </div>

@@ -108,10 +108,10 @@ export default function DashboardPage() {
     }
   }, [user])
 
-  // Fetch bookings for customer and professional dashboards
+  // Fetch bookings for professional dashboard only (CustomerDashboard fetches its own)
   useEffect(() => {
     if (!user || !isAuthenticated) return
-    if (user.role !== "customer" && user.role !== "professional") return
+    if (user.role !== "professional") return
 
     const fetchBookings = async () => {
       setBookingsLoading(true)

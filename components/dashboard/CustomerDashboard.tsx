@@ -88,9 +88,9 @@ export default function CustomerDashboard() {
     return () => clearTimeout(t)
   }, [bookingSearch])
 
-  // Fetch bookings
+  // Fetch all bookings via pagination
   useEffect(() => {
-    const fetchBookings = async () => {
+    const fetchAllBookings = async () => {
       setBookingsLoading(true)
       setBookingsError(null)
       try {
@@ -98,23 +98,38 @@ export default function CustomerDashboard() {
         const headers: Record<string, string> = {}
         if (token) headers['Authorization'] = `Bearer ${token}`
 
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/my-bookings?limit=50`,
-          { credentials: "include", headers }
-        )
-        const data = await response.json()
-        if (response.ok && data.success) {
-          setBookings(data.bookings || [])
-        } else {
-          setBookingsError(data.msg || "Failed to load your bookings.")
+        const allBookings: typeof bookings = []
+        let page = 1
+        const limit = 50
+
+        while (true) {
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/my-bookings?page=${page}&limit=${limit}`,
+            { credentials: "include", headers }
+          )
+          const data = await response.json()
+          if (!response.ok || !data.success) {
+            if (allBookings.length === 0) {
+              setBookingsError(data.msg || "Failed to load your bookings.")
+              return
+            }
+            break
+          }
+          const incoming = data.bookings || []
+          allBookings.push(...incoming)
+          const totalPages = data.pagination?.totalPages ?? 1
+          if (page >= totalPages || incoming.length < limit) break
+          page++
         }
+
+        setBookings(allBookings)
       } catch {
         setBookingsError("Failed to load your bookings.")
       } finally {
         setBookingsLoading(false)
       }
     }
-    fetchBookings()
+    fetchAllBookings()
   }, [])
 
   // Split into quotes and bookings

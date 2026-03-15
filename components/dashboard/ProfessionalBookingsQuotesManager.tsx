@@ -66,6 +66,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [serviceFilter, setServiceFilter] = useState("all")
+  const [allServices, setAllServices] = useState<string[]>([])
 
   // Debounce search
   useEffect(() => {
@@ -139,13 +140,24 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
         headers.Authorization = `Bearer ${token}`
       }
 
+      const params = new URLSearchParams({
+        page: String(pageToLoad),
+        limit: String(PAGE_SIZE),
+      })
+      if (statusFilter !== "all") params.append("status", statusFilter)
+      if (serviceFilter !== "all") params.append("service", serviceFilter)
+      if (debouncedSearch) params.append("search", debouncedSearch)
+
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/my-bookings?page=${pageToLoad}&limit=${PAGE_SIZE}`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/my-bookings?${params}`,
         { credentials: "include", headers }
       )
       const data = await response.json()
 
       if (response.ok && data.success) {
+        if (Array.isArray(data.distinctServices)) {
+          setAllServices(data.distinctServices)
+        }
         const incomingBookings = Array.isArray(data.bookings) ? data.bookings : []
         const pagination = data.pagination || {}
         const totalFromApi = typeof pagination.total === "number" ? pagination.total : null
@@ -202,7 +214,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
         setIsLoading(false)
       }
     }
-  }, [isAuthenticated, user?.role])
+  }, [isAuthenticated, user?.role, statusFilter, serviceFilter, debouncedSearch])
 
   useEffect(() => {
     fetchBookings(1, false)
@@ -215,26 +227,13 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
     })
   }, [bookings, mode])
 
-  // Unique services for the filter dropdown
-  const uniqueServices = useMemo(() => {
-    return Array.from(new Set(relevantBookings.map(b => b.rfqData?.serviceType).filter(Boolean))) as string[]
-  }, [relevantBookings])
+  // Unique services for the filter dropdown (prefer server-provided list)
+  const uniqueServices = allServices.length > 0
+    ? allServices
+    : Array.from(new Set(relevantBookings.map(b => b.rfqData?.serviceType).filter(Boolean))) as string[]
 
-  // Apply search, status and service filters
-  const filteredBookings = useMemo(() => {
-    return relevantBookings.filter((booking) => {
-      if (statusFilter !== "all" && booking.status !== statusFilter) return false
-      if (serviceFilter !== "all" && booking.rfqData?.serviceType !== serviceFilter) return false
-      if (debouncedSearch) {
-        const term = debouncedSearch.toLowerCase()
-        const title = getBookingTitle(booking).toLowerCase()
-        const service = (booking.rfqData?.serviceType || "").toLowerCase()
-        const customer = (booking.customer?.name || "").toLowerCase()
-        if (!title.includes(term) && !service.includes(term) && !customer.includes(term)) return false
-      }
-      return true
-    })
-  }, [relevantBookings, statusFilter, serviceFilter, debouncedSearch])
+  // Filters are now applied server-side; relevantBookings just splits quotes vs bookings
+  const filteredBookings = relevantBookings
 
   const pendingBookings = useMemo(() => {
     return filteredBookings.filter((booking) => {

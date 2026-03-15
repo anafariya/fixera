@@ -10,6 +10,7 @@ export interface ActionNeededBooking {
   project?: { _id: string; title?: string }
   scheduledStartDate?: string
   scheduledExecutionEndDate?: string
+  scheduledEndDate?: string
   createdAt?: string
 }
 
@@ -59,7 +60,8 @@ export function getProfessionalActionItems(bookings: ActionNeededBooking[]): Act
     }
 
     // Completion date passed, still in progress
-    if (booking.status === "in_progress" && isPastDate(booking.scheduledExecutionEndDate)) {
+    const endDate = booking.scheduledExecutionEndDate ?? booking.scheduledEndDate
+    if (booking.status === "in_progress" && isPastDate(endDate)) {
       items.push({ booking, label: "Confirm completion or extend", severity: "warning" })
     }
 

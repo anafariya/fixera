@@ -175,6 +175,7 @@ export default function ManageProjectsPage() {
   const [totalProjects, setTotalProjects] = useState(0)
   const [projectCounts, setProjectCounts] = useState(() => ({ ...DEFAULT_PROJECT_COUNTS }))
   const [activeTab, setActiveTab] = useState<TabValue>('all')
+  const [allServices, setAllServices] = useState<string[]>([])
 
   const mapTabToStatus = (tab: TabValue): string => {
     switch (tab) {
@@ -294,6 +295,9 @@ export default function ManageProjectsPage() {
             itemCount: responseData.items.length,
             counts: responseData.counts
           })
+          if (Array.isArray(responseData.distinctServices)) {
+            setAllServices(responseData.distinctServices)
+          }
           fetchedProjects = responseData.items
           responseCounts = responseData.counts
           setTotalPages(responseData.meta.pages || 1)
@@ -591,8 +595,8 @@ export default function ManageProjectsPage() {
     rejected: projectCounts.rejected
   }
 
-  // Get unique services for filter dropdown
-  const uniqueServices = Array.from(new Set(projects.map(p => p.service))).filter(Boolean)
+  // Get unique services for filter dropdown (from API, falls back to current page)
+  const uniqueServices = allServices.length > 0 ? allServices : Array.from(new Set(projects.map(p => p.service))).filter(Boolean)
 
   const selectedProjectStatus = selectedProject ? normalizeProjectStatus(selectedProject.status) : null
 
