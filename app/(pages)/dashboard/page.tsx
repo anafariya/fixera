@@ -4,13 +4,14 @@ import { useAuth } from "@/contexts/AuthContext"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { User, Mail, Phone, Shield, Calendar, Crown, Settings, TrendingUp, Users, Award, CheckCircle, XCircle, Clock, AlertTriangle, Plus, Briefcase, Package, CreditCard, FileText, Star } from "lucide-react"
+import { User, Mail, Phone, Shield, Calendar, Crown, Settings, TrendingUp, Users, Award, CheckCircle, XCircle, Clock, AlertTriangle, Plus, Briefcase, Package, CreditCard, FileText, Star, Gift } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 import { getAuthToken } from "@/lib/utils"
 import StartChatButton from "@/components/chat/StartChatButton"
+import ReferralCard from "@/components/dashboard/ReferralCard"
 import { type BookingStatus, getBookingStatusMeta, getBookingTitle } from "@/lib/dashboardBookingHelpers"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -366,6 +367,9 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Referral Card */}
+          <ReferralCard />
 
           {/* Status filter chips */}
           <div className="flex flex-wrap gap-2">
@@ -795,6 +799,25 @@ export default function DashboardPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
+                    <Gift className="h-5 w-5 text-purple-500" />
+                    Referral Program
+                  </CardTitle>
+                  <CardDescription>Configure rewards, view analytics, and manage referrals</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={() => window.open('/admin/referral', '_blank')}
+                    className="w-full bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900"
+                  >
+                    <Gift className="h-4 w-4 mr-2" />
+                    Manage Referral Program
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
                     <Settings className="h-5 w-5 text-gray-500" />
                     Platform Settings
                   </CardTitle>
@@ -1207,6 +1230,9 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Referral Card */}
+          <ReferralCard />
 
           {/* Account Stats */}
           <Card>

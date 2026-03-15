@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, User, Mail, Phone, Lock, Briefcase } from "lucide-react"
+import { ArrowLeft, User, Mail, Phone, Lock, Briefcase, Gift, CheckCircle2, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
@@ -22,9 +22,18 @@ interface FormData {
   countryCode: string
   password: string
   confirmPassword: string
+  referralCode: string
 }
 
 export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
+  )
+}
+
+function RegisterForm() {
   const [currentStep, setCurrentStep] = useState<'form' | 'verification'>('form')
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -33,10 +42,60 @@ export default function RegisterPage() {
     countryCode: '+32',
     password: '',
     confirmPassword: '',
+    referralCode: '',
   })
   const [loading, setLoading] = useState(false)
+  const [referralValid, setReferralValid] = useState<boolean | null>(null)
+  const [referralReferrer, setReferralReferrer] = useState<string>('')
   const { signup } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Pre-fill referral code from URL query param
+  useEffect(() => {
+    const ref = searchParams.get('ref')
+    if (ref) {
+      setFormData(prev => ({ ...prev, referralCode: ref }))
+    }
+  }, [searchParams])
+
+  // Validate referral code whenever it changes (debounced)
+  useEffect(() => {
+    const code = formData.referralCode.trim()
+    if (!code) {
+      setReferralValid(null)
+      setReferralReferrer('')
+      return
+    }
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/public/referral/validate/${encodeURIComponent(code)}`, {
+        signal: controller.signal,
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (controller.signal.aborted) return
+          if (data.success) {
+            setReferralValid(true)
+            setReferralReferrer(data.data?.referrerName || '')
+          } else {
+            setReferralValid(false)
+            setReferralReferrer('')
+          }
+        })
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            return
+          }
+          setReferralValid(false)
+          setReferralReferrer('')
+        })
+    }, 500)
+    return () => {
+      controller.abort()
+      clearTimeout(timer)
+    }
+  }, [formData.referralCode])
 
   const validateForm = (): boolean => {
     if (!formData.name.trim()) {
@@ -74,12 +133,16 @@ export default function RegisterPage() {
 
     setLoading(true)
     try {
+      const trimmedReferralCode = formData.referralCode.trim()
       const success = await signup({
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         phone: formData.countryCode + formData.phone.trim(),
         password: formData.password,
-        role: 'professional'
+        role: 'professional',
+        ...(trimmedReferralCode && referralValid === true && {
+          referralCode: trimmedReferralCode,
+        }),
       })
 
       if (success) {
@@ -243,6 +306,34 @@ export default function RegisterPage() {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Referral Code */}
+              <div className="space-y-2">
+                <Label htmlFor="referralCode">Referral Code (Optional)</Label>
+                <div className="relative">
+                  <Gift className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="referralCode"
+                    type="text"
+                    placeholder="e.g. FIXERA-AHMED-7K2X"
+                    value={formData.referralCode}
+                    onChange={(e) => handleInputChange('referralCode', e.target.value.toUpperCase())}
+                    className="pl-10"
+                  />
+                </div>
+                {referralValid === true && referralReferrer && (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Referred by {referralReferrer}
+                  </p>
+                )}
+                {referralValid === false && formData.referralCode && (
+                  <p className="text-xs text-amber-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Invalid referral code. You can still sign up without one.
+                  </p>
+                )}
               </div>
 
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">

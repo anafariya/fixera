@@ -1,14 +1,24 @@
 'use client'
 
-import React from 'react'
-import { useRouter } from 'next/navigation'
+import React, { Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Briefcase, UserCircle, CheckCircle2, Sparkles } from 'lucide-react'
+import { ArrowRight, Briefcase, UserCircle, CheckCircle2, Sparkles, Gift } from 'lucide-react'
 import Link from 'next/link'
 
 export default function JoinPage() {
+  return (
+    <Suspense>
+      <JoinContent />
+    </Suspense>
+  )
+}
+
+function JoinContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const refCode = searchParams.get('ref')
 
   const features = {
     customer: [
@@ -60,6 +70,13 @@ export default function JoinPage() {
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Choose your path and start your journey with Europe&apos;s leading property services platform
           </p>
+
+          {refCode && (
+            <div className="mt-6 inline-flex items-center gap-2 px-5 py-3 bg-green-50 border border-green-200 rounded-full text-green-700 font-medium">
+              <Gift className="h-4 w-4" />
+              You&apos;ve been referred! Complete your first booking to unlock your welcome discount.
+            </div>
+          )}
         </div>
 
         {/* Role selection cards */}
@@ -93,7 +110,7 @@ export default function JoinPage() {
               </div>
 
               <Button
-                onClick={() => router.push('/signup/customer')}
+                onClick={() => router.push(`/signup/customer${refCode ? `?ref=${encodeURIComponent(refCode)}` : ''}`)}
                 className="w-full h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-lg group/btn"
                 size="lg"
               >
@@ -136,7 +153,7 @@ export default function JoinPage() {
               </div>
 
               <Button
-                onClick={() => router.push('/register')}
+                onClick={() => router.push(`/register${refCode ? `?ref=${encodeURIComponent(refCode)}` : ''}`)}
                 className="w-full h-12 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-lg group/btn"
                 size="lg"
               >

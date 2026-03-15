@@ -100,6 +100,13 @@ interface User {
   }
   profileCompletedAt?: string
   professionalOnboardingCompletedAt?: string
+  // Referral fields
+  referralCode?: string
+  referredBy?: string
+  referralCredits?: number
+  referralCreditsExpiry?: string
+  totalReferrals?: number
+  completedReferrals?: number
   createdAt: string
   updatedAt: string
 }
@@ -130,6 +137,7 @@ interface SignupData {
   companyName?: string
   vatNumber?: string
   isVatValidated?: boolean
+  referralCode?: string
 }
 
 // Route Configuration

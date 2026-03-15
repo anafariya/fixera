@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
+  Gift,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -70,6 +71,8 @@ interface FormData {
   // Coordinates (auto-populated from geocoding)
   latitude?: number;
   longitude?: number;
+  // Referral
+  referralCode: string;
 }
 
 interface VatValidationState {
@@ -86,6 +89,14 @@ interface VatValidationState {
 }
 
 export default function CustomerSignupPage() {
+  return (
+    <Suspense>
+      <CustomerSignupForm />
+    </Suspense>
+  );
+}
+
+function CustomerSignupForm() {
   const [currentStep, setCurrentStep] = useState<'form' | 'verification'>(
     'form'
   );
@@ -103,14 +114,64 @@ export default function CustomerSignupPage() {
     city: '',
     country: '',
     postalCode: '',
+    referralCode: '',
   });
   const [loading, setLoading] = useState(false);
   const [vatValidating, setVatValidating] = useState(false);
   const [vatValidation, setVatValidation] = useState<VatValidationState>({});
   const [addressValidating, setAddressValidating] = useState(false);
   const [isAddressValid, setIsAddressValid] = useState(false);
+  const [referralValid, setReferralValid] = useState<boolean | null>(null);
+  const [referralReferrer, setReferralReferrer] = useState<string>('');
   const { signup } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Pre-fill referral code from URL query param
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      setFormData(prev => ({ ...prev, referralCode: ref }));
+    }
+  }, [searchParams]);
+
+  // Validate referral code whenever it changes (debounced)
+  useEffect(() => {
+    const code = formData.referralCode.trim();
+    if (!code) {
+      setReferralValid(null);
+      setReferralReferrer('');
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/public/referral/validate/${encodeURIComponent(code)}`, {
+        signal: controller.signal,
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (controller.signal.aborted) return;
+          if (data.success) {
+            setReferralValid(true);
+            setReferralReferrer(data.data?.referrerName || '');
+          } else {
+            setReferralValid(false);
+            setReferralReferrer('');
+          }
+        })
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            return;
+          }
+          setReferralValid(false);
+          setReferralReferrer('');
+        });
+    }, 500);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [formData.referralCode]);
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({
@@ -397,6 +458,7 @@ export default function CustomerSignupPage() {
 
     setLoading(true);
     try {
+      const trimmedReferralCode = formData.referralCode.trim();
       const submitData = {
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
@@ -418,6 +480,9 @@ export default function CustomerSignupPage() {
             ? formatVATNumber(formData.vatNumber)
             : undefined,
           isVatValidated: vatValidation.valid || false,
+        }),
+        ...(trimmedReferralCode && referralValid === true && {
+          referralCode: trimmedReferralCode,
         }),
       };
 
@@ -845,6 +910,36 @@ export default function CustomerSignupPage() {
                     and projects. Your exact address is never shared publicly.
                   </p>
                 </div>
+              </div>
+
+              {/* Referral Code */}
+              <div className='space-y-2'>
+                <Label htmlFor='referralCode'>Referral Code (Optional)</Label>
+                <div className='relative'>
+                  <Gift className='absolute left-3 top-3 h-4 w-4 text-gray-400' />
+                  <Input
+                    id='referralCode'
+                    type='text'
+                    placeholder='e.g. FIXERA-AHMED-7K2X'
+                    value={formData.referralCode}
+                    onChange={(e) =>
+                      handleInputChange('referralCode', e.target.value.toUpperCase())
+                    }
+                    className='pl-10'
+                  />
+                </div>
+                {referralValid === true && referralReferrer && (
+                  <p className='text-xs text-green-600 flex items-center gap-1'>
+                    <CheckCircle2 className='h-3 w-3' />
+                    Referred by {referralReferrer} — complete your first booking to unlock your welcome discount!
+                  </p>
+                )}
+                {referralValid === false && formData.referralCode && (
+                  <p className='text-xs text-amber-600 flex items-center gap-1'>
+                    <AlertCircle className='h-3 w-3' />
+                    Invalid referral code. You can still sign up without one.
+                  </p>
+                )}
               </div>
 
               {/* Submit Button */}
