@@ -104,6 +104,13 @@ interface User {
   loyaltyLevel?: 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond'
   totalSpent?: number
   totalBookings?: number
+  // Referral fields
+  referralCode?: string
+  referredBy?: string
+  referralCredits?: number
+  referralCreditsExpiry?: string
+  totalReferrals?: number
+  completedReferrals?: number
   createdAt: string
   updatedAt: string
 }
@@ -134,6 +141,7 @@ interface SignupData {
   companyName?: string
   vatNumber?: string
   isVatValidated?: boolean
+  referralCode?: string
 }
 
 // Route Configuration

@@ -158,6 +158,12 @@ interface ProjectData {
   subprojects?: ISubproject[]
   extraOptions?: IExtraOption[]
   termsConditions?: ITermCondition[]
+  repeatBuyerDiscount?: {
+    enabled: boolean
+    percentage: number
+    minPreviousBookings: number
+    maxDiscountAmount?: number | null
+  }
   faq?: IFAQ[]
   rfqQuestions?: IRFQQuestion[]
   postBookingQuestions?: IPostBookingQuestion[]
@@ -304,6 +310,7 @@ export default function ProjectCreatePage() {
             subprojects: project.subprojects || [],
             extraOptions: project.extraOptions || [],
             termsConditions: project.termsConditions || [],
+            repeatBuyerDiscount: project.repeatBuyerDiscount || { enabled: false, percentage: 5, minPreviousBookings: 1 },
             faq: project.faq || [],
             rfqQuestions: project.rfqQuestions || [],
             postBookingQuestions: project.postBookingQuestions || [],
@@ -363,30 +370,17 @@ export default function ProjectCreatePage() {
 
       console.log('Saving project data:', dataToSave)
 
-      let response;
       const token = getAuthToken()
-      // If projectData.id exists, it's an existing project, so use PUT. Otherwise, POST for a new project.
-      if (projectData.id) {
-        response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/projects/${projectData.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify(dataToSave),
-          credentials: 'include'
-        })
-      } else {
-        response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/projects/draft`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify(dataToSave),
-          credentials: 'include'
-        })
-      }
+      // Always use POST /draft - the handler checks projectData.id to create or update
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/projects/draft`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(dataToSave),
+        credentials: 'include'
+      })
 
       if (response.ok) {
         const savedProject = await response.json()

@@ -436,7 +436,8 @@ export default function LoyaltyConfigPage() {
                     </div>
                   </div>
 
-                  <div className="grid md:grid-cols-3 gap-4">
+                  {/* Discount Settings */}
+                  <div className="grid md:grid-cols-3 gap-4 pt-2 border-t border-dashed border-gray-200">
                     <div className="space-y-2">
                       <Label htmlFor={`tier-discount-${tierIndex}`}>Auto-Discount (%)</Label>
                       <Input
@@ -452,7 +453,7 @@ export default function LoyaltyConfigPage() {
                       <p className="text-xs text-gray-500">Automatic discount applied to bookings for this tier</p>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`tier-max-discount-${tierIndex}`}>Max Discount Cap ($)</Label>
+                      <Label htmlFor={`tier-max-discount-${tierIndex}`}>Max Discount Cap (EUR)</Label>
                       <Input
                         id={`tier-max-discount-${tierIndex}`}
                         type="number"
@@ -479,7 +480,7 @@ export default function LoyaltyConfigPage() {
                         step="1"
                         placeholder="No cap"
                       />
-                      <p className="text-xs text-gray-500">Leave empty for no cap</p>
+                      <p className="text-xs text-gray-500">Maximum discount amount per booking (leave empty for no cap)</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor={`tier-color-${tierIndex}`}>Tier Color</Label>
