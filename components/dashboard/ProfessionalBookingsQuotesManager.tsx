@@ -72,10 +72,13 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
   const [showCreateQuoteModal, setShowCreateQuoteModal] = useState(false)
   const [activeCustomers, setActiveCustomers] = useState<Array<{ _id: string; name?: string; email?: string }>>([])
   const [loadingCustomers, setLoadingCustomers] = useState(false)
+  const [loadingCustomersError, setLoadingCustomersError] = useState<string | null>(null)
   const [creatingQuote, setCreatingQuote] = useState(false)
 
   const fetchActiveCustomers = async () => {
     setLoadingCustomers(true)
+    setLoadingCustomersError(null)
+    setActiveCustomers([])
     try {
       const token = getAuthToken()
       const headers: Record<string, string> = {}
@@ -88,9 +91,12 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
       const data = await response.json()
       if (response.ok && data?.success) {
         setActiveCustomers(data.data?.customers || [])
+      } else {
+        setLoadingCustomersError("Failed to load customers")
       }
     } catch (err) {
       console.error("Error fetching active customers:", err)
+      setLoadingCustomersError("Failed to load customers")
     } finally {
       setLoadingCustomers(false)
     }
@@ -579,6 +585,10 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading customers...
               </div>
+            ) : loadingCustomersError ? (
+              <p className="text-sm text-red-500 text-center py-4">
+                {loadingCustomersError}
+              </p>
             ) : activeCustomers.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-4">
                 No active conversations found. Start a conversation with a customer first.

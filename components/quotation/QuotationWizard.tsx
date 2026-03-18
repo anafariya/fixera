@@ -43,13 +43,24 @@ const getDefaultFormData = (existing?: QuoteVersion): QuotationWizardFormData =>
       currency: existing.currency || 'EUR',
       useMilestones: (existing.milestones?.length || 0) > 0,
       milestones: existing.milestones?.length
-        ? existing.milestones.map(m => ({ ...m }))
+        ? existing.milestones.map(m => ({
+            title: m.title,
+            amount: m.amount,
+            description: m.description || '',
+            dueCondition: m.dueCondition,
+            customDueDate: m.customDueDate,
+            order: m.order,
+            status: 'pending' as const,
+          }))
         : [{ ...EMPTY_MILESTONE }],
       preparationDuration: { ...existing.preparationDuration },
       executionDuration: { ...existing.executionDuration },
       bufferDuration: existing.bufferDuration ? { ...existing.bufferDuration } : { value: 0, unit: 'days' },
       useBuffer: !!existing.bufferDuration?.value,
-      validUntil: existing.validUntil ? new Date(existing.validUntil).toISOString().split('T')[0] : '',
+      validUntil: existing.validUntil ? (() => {
+        const d = new Date(existing.validUntil)
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      })() : '',
       changeNote: '',
     }
   }
@@ -71,7 +82,7 @@ const getDefaultFormData = (existing?: QuoteVersion): QuotationWizardFormData =>
     executionDuration: { value: 1, unit: 'days' },
     bufferDuration: { value: 0, unit: 'days' },
     useBuffer: false,
-    validUntil: defaultValid.toISOString().split('T')[0],
+    validUntil: `${defaultValid.getFullYear()}-${String(defaultValid.getMonth() + 1).padStart(2, '0')}-${String(defaultValid.getDate()).padStart(2, '0')}`,
     changeNote: '',
   }
 }
@@ -126,9 +137,18 @@ export default function QuotationWizard({ bookingId, existingVersion, isEditing,
       toast.error('Validity date is required')
       return
     }
-    if (form.useMilestones && !milestoneSumMatches) {
-      toast.error('Sum of milestone amounts must equal the total amount')
-      return
+    if (form.useMilestones) {
+      const validMilestones = form.milestones.filter(m => m.title.trim())
+      const validSum = validMilestones.reduce((sum, m) => sum + (m.amount || 0), 0)
+      if (Math.abs(validSum - form.totalAmount) >= 0.01) {
+        toast.error('Sum of milestone amounts must equal the total amount')
+        return
+      }
+      const missingDate = validMilestones.find(m => m.dueCondition === 'custom_date' && !m.customDueDate)
+      if (missingDate) {
+        toast.error('Please set a date for all milestones with custom date condition')
+        return
+      }
     }
     if (isEditing && !form.changeNote) {
       toast.error('Please provide a reason for the changes')

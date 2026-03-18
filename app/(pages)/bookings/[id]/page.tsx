@@ -531,7 +531,7 @@ export default function BookingDetailPage() {
           body: JSON.stringify({ action, rejectionReason: action === 'rejected' ? rejectionReason : undefined }),
         }
       )
-      const data = await response.json()
+      const { data } = await parseResponseBody<{ success?: boolean; error?: { message?: string }; data?: Record<string, unknown> }>(response)
 
       if (response.ok && data?.success) {
         if (action === 'accepted') {
@@ -539,6 +539,7 @@ export default function BookingDetailPage() {
           setShowQuotationWizard(true)
         } else {
           toast.success("RFQ rejected.")
+          setRejectionReason('')
           setShowRejectionModal(false)
         }
         await refreshBooking()
@@ -578,7 +579,7 @@ export default function BookingDetailPage() {
           }),
         }
       )
-      const data = await response.json()
+      const { data } = await parseResponseBody<{ success?: boolean; error?: { message?: string }; data?: { clientSecret?: string } }>(response)
 
       if (response.ok && data?.success) {
         if (action === 'accepted') {
@@ -590,6 +591,7 @@ export default function BookingDetailPage() {
           }
         } else {
           toast.success("Quotation rejected. The professional will be notified.")
+          setQuoteRejectionReason('')
           setShowQuoteRejectionModal(false)
           await refreshBooking()
         }
@@ -616,7 +618,7 @@ export default function BookingDetailPage() {
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/quotations/${bookingId}/milestones/${index}/payment-intent`,
         { method: "POST", headers, credentials: "include" }
       )
-      const data = await response.json()
+      const { data } = await parseResponseBody<{ success?: boolean; error?: { message?: string }; data?: { clientSecret?: string } }>(response)
 
       if (response.ok && data?.success) {
         router.push(`/bookings/${bookingId}/payment`)
