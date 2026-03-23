@@ -21,7 +21,6 @@ import {
   Search,
   X,
   EyeOff,
-  Eye,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -203,8 +202,8 @@ export default function ProfessionalProfilePage() {
       setRatingsSummary(data.data.ratingsSummary)
       setTotalPages(data.data.pagination.totalPages)
       if (data.data.projects) setProjectOptions(data.data.projects)
-    } catch (err: any) {
-      if (err?.name === "AbortError") return
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") return
       toast.error("Failed to load professional profile")
     } finally {
       setLoading(false)

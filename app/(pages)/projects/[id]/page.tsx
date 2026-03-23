@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
-  Loader2,
   MapPin,
   Calendar,
   Users,
@@ -280,8 +279,8 @@ export default function ProjectDetailPage() {
           setOrdersInQueue(data.data.ordersInQueue || 0);
           setReviewTotalPages(data.data.pagination.totalPages);
         }
-      } catch (err: any) {
-        if (err?.name === 'AbortError') return;
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         // non-critical
       } finally {
         setReviewsLoading(false);
