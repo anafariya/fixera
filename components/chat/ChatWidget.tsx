@@ -590,6 +590,7 @@ export default function ChatWidget() {
                     currentUserId={user?._id}
                     filter="all"
                     userLabels={[]}
+                    compact
                     onSelect={(conversationId) => {
                       setManualNewChatPanel(false);
                       setSelectedConversationId(conversationId);

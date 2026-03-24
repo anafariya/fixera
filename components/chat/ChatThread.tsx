@@ -6,6 +6,7 @@ import { cn, getAuthToken } from "@/lib/utils";
 import { FileText, Download, Star, MessageSquare, Loader2, Reply, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { reportChatMessage } from "@/lib/chatApi";
 
@@ -55,10 +56,12 @@ const REPORT_REASONS = [
 
 function ReportDialog({
   messageId,
-  onClose,
+  open,
+  onOpenChange,
 }: {
   messageId: string;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const [reason, setReason] = useState("");
   const [description, setDescription] = useState("");
@@ -73,7 +76,7 @@ function ReportDialog({
     try {
       await reportChatMessage(messageId, reason, description.trim() || undefined);
       toast.success("Report submitted");
-      onClose();
+      onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to submit report");
     } finally {
@@ -82,12 +85,11 @@ function ReportDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <div
-        className="bg-white rounded-xl p-5 shadow-xl w-[90%] max-w-sm space-y-3"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-sm font-semibold text-gray-900">Report Message</h3>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <DialogHeader>
+          <DialogTitle className="text-sm">Report Message</DialogTitle>
+        </DialogHeader>
         <div className="space-y-1.5">
           {REPORT_REASONS.map((r) => (
             <label
@@ -121,12 +123,12 @@ function ReportDialog({
             {submitting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
             Submit Report
           </Button>
-          <Button size="sm" variant="ghost" className="text-xs" onClick={onClose} disabled={submitting}>
+          <Button size="sm" variant="ghost" className="text-xs" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancel
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -303,7 +305,6 @@ function ReplyToPreview({ replyTo, isMine }: { replyTo: ChatMessage["replyTo"]; 
 }
 
 export default function ChatThread({ messages, currentUserId, currentUserRole, loading, onReviewReplySubmitted, onReplyTo }: ChatThreadProps) {
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [reportingId, setReportingId] = useState<string | null>(null);
 
   if (loading) {
@@ -339,8 +340,6 @@ export default function ChatThread({ messages, currentUserId, currentUserRole, l
         const isMine = getSenderId(message) === currentUserId;
         const senderName = getSenderName(message);
         const senderImage = getSenderImage(message);
-        const isHovered = hoveredId === message._id;
-
         // Group consecutive messages from same sender — only show avatar on first
         const prevMessage = index > 0 ? messages[index - 1] : null;
         const showAvatar = !isMine && (!prevMessage || getSenderId(prevMessage) !== getSenderId(message) || prevMessage.messageType === "review_notification");
@@ -349,9 +348,7 @@ export default function ChatThread({ messages, currentUserId, currentUserRole, l
           <div
             key={message._id}
             id={`msg-${message._id}`}
-            className={cn("flex gap-2", isMine ? "justify-end" : "justify-start")}
-            onMouseEnter={() => setHoveredId(message._id)}
-            onMouseLeave={() => setHoveredId(null)}
+            className={cn("flex gap-2 group/msg", isMine ? "justify-end" : "justify-start")}
           >
             {/* Avatar */}
             {!isMine && (
@@ -465,48 +462,47 @@ export default function ChatThread({ messages, currentUserId, currentUserRole, l
                 </p>
               </div>
 
-              {/* Hover actions: Reply + Report */}
-              {isHovered && (
-                <div
-                  className={cn(
-                    "absolute top-0 flex gap-0.5 bg-white border border-slate-200 rounded-md shadow-sm p-0.5 z-10",
-                    isMine ? "left-0 -translate-x-full -ml-1" : "right-0 translate-x-full ml-1"
-                  )}
-                >
-                  {onReplyTo && (
-                    <button
-                      type="button"
-                      className="p-1 rounded hover:bg-slate-100"
-                      onClick={() => onReplyTo(message)}
-                      title="Reply"
-                    >
-                      <Reply className="h-3.5 w-3.5 text-gray-500" />
-                    </button>
-                  )}
-                  {!isMine && (
-                    <button
-                      type="button"
-                      className="p-1 rounded hover:bg-slate-100"
-                      onClick={() => setReportingId(message._id)}
-                      title="Report"
-                    >
-                      <Flag className="h-3.5 w-3.5 text-gray-500" />
-                    </button>
-                  )}
-                </div>
-              )}
+              {/* Hover actions: Reply + Report — always in DOM, shown via CSS */}
+              <div
+                className={cn(
+                  "absolute top-0 flex gap-0.5 bg-white border border-slate-200 rounded-md shadow-sm p-0.5 z-10 transition-opacity",
+                  "opacity-0 group-hover/msg:opacity-100 focus-within:opacity-100",
+                  "[@media(hover:none)]:opacity-70",
+                  isMine ? "left-0 -translate-x-full -ml-1" : "right-0 translate-x-full ml-1"
+                )}
+              >
+                {onReplyTo && (
+                  <button
+                    type="button"
+                    className="p-1 rounded hover:bg-slate-100"
+                    onClick={() => onReplyTo(message)}
+                    title="Reply"
+                  >
+                    <Reply className="h-3.5 w-3.5 text-gray-500" />
+                  </button>
+                )}
+                {!isMine && (
+                  <button
+                    type="button"
+                    className="p-1 rounded hover:bg-slate-100"
+                    onClick={() => setReportingId(message._id)}
+                    title="Report"
+                  >
+                    <Flag className="h-3.5 w-3.5 text-gray-500" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         );
       })}
 
       {/* Report dialog */}
-      {reportingId && (
-        <ReportDialog
-          messageId={reportingId}
-          onClose={() => setReportingId(null)}
-        />
-      )}
+      <ReportDialog
+        messageId={reportingId || ""}
+        open={!!reportingId}
+        onOpenChange={(open) => { if (!open) setReportingId(null); }}
+      />
     </div>
   );
 }

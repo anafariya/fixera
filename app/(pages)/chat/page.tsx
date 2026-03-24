@@ -92,18 +92,26 @@ export default function ChatPage() {
     });
   }, [conversations, searchQuery, userRole]);
 
-  // Collect all unique user labels across conversations
+  // Collect all unique user labels — use a ref to preserve labels discovered from unfiltered list
+  const allLabelsRef = useRef<string[]>([]);
   const userLabels = useMemo(() => {
     const labels = new Set<string>();
     const uid = user?._id;
-    if (!uid) return [];
+    if (!uid) return allLabelsRef.current;
     for (const c of conversations) {
       for (const l of c.labels || []) {
         if (l.userId === uid) labels.add(l.label);
       }
     }
-    return Array.from(labels);
-  }, [conversations, user?._id]);
+    const current = Array.from(labels);
+    // When viewing all conversations, this is the authoritative label list
+    if (chatFilter === "all") {
+      allLabelsRef.current = current;
+      return current;
+    }
+    // When filtered, preserve previously known labels
+    return allLabelsRef.current;
+  }, [conversations, user?._id, chatFilter]);
 
   const otherParticipant = selectedConversation
     ? getOtherParticipant(selectedConversation, userRole)
@@ -183,21 +191,23 @@ export default function ChatPage() {
     [loadConversationList]
   );
 
-  // Load absence info when conversation changes
+  // Load absence info when conversation changes (with stale guard)
   useEffect(() => {
     if (!selectedConversationId) {
       setAbsence(null);
       return;
     }
+    let stale = false;
     const loadAbsence = async () => {
       try {
         const data = await fetchConversationInfo(selectedConversationId);
-        setAbsence(data.stats.absence);
+        if (!stale) setAbsence(data.stats.absence);
       } catch {
         // non-critical
       }
     };
     void loadAbsence();
+    return () => { stale = true; };
   }, [selectedConversationId]);
 
   useEffect(() => {
@@ -666,14 +676,22 @@ export default function ChatPage() {
                     <button
                       type="button"
                       className="p-0.5 rounded hover:bg-gray-200"
-                      onClick={() => setChatSearchIndex((i) => (i > 0 ? i - 1 : chatSearchResults.length - 1))}
+                      onClick={() => {
+                        const newIdx = chatSearchIndex > 0 ? chatSearchIndex - 1 : chatSearchResults.length - 1;
+                        setChatSearchIndex(newIdx);
+                        document.getElementById(`msg-${chatSearchResults[newIdx]?._id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }}
                     >
                       &uarr;
                     </button>
                     <button
                       type="button"
                       className="p-0.5 rounded hover:bg-gray-200"
-                      onClick={() => setChatSearchIndex((i) => (i < chatSearchResults.length - 1 ? i + 1 : 0))}
+                      onClick={() => {
+                        const newIdx = chatSearchIndex < chatSearchResults.length - 1 ? chatSearchIndex + 1 : 0;
+                        setChatSearchIndex(newIdx);
+                        document.getElementById(`msg-${chatSearchResults[newIdx]?._id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }}
                     >
                       &darr;
                     </button>

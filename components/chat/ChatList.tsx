@@ -13,6 +13,7 @@ interface ChatListProps {
   currentUserId: string | undefined;
   filter: ChatFilter;
   userLabels: string[];
+  compact?: boolean;
   onSelect: (conversationId: string) => void;
   onFilterChange: (filter: ChatFilter) => void;
   onToggleStar: (conversationId: string) => void;
@@ -78,6 +79,7 @@ export default function ChatList({
   currentUserId,
   filter,
   userLabels,
+  compact,
   onSelect,
   onFilterChange,
   onToggleStar,
@@ -102,39 +104,41 @@ export default function ChatList({
   return (
     <div className="h-full flex flex-col">
       {/* Filter tabs */}
-      <div className="px-3 py-2 border-b border-slate-100 flex gap-1 flex-wrap">
-        {FILTER_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onFilterChange(opt.value)}
-            className={cn(
-              "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors",
-              filter === opt.value
-                ? "bg-indigo-100 text-indigo-700"
-                : "text-gray-500 hover:bg-gray-100"
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
-        {userLabels.map((label) => (
-          <button
-            key={`label:${label}`}
-            type="button"
-            onClick={() => onFilterChange(`label:${label}`)}
-            className={cn(
-              "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors",
-              filter === `label:${label}`
-                ? "bg-indigo-100 text-indigo-700"
-                : "text-gray-500 hover:bg-gray-100"
-            )}
-          >
-            <Tag className="h-2.5 w-2.5 inline mr-0.5" />
-            {label}
-          </button>
-        ))}
-      </div>
+      {!compact && (
+        <div className="px-3 py-2 border-b border-slate-100 flex gap-1 flex-wrap">
+          {FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onFilterChange(opt.value)}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors",
+                filter === opt.value
+                  ? "bg-indigo-100 text-indigo-700"
+                  : "text-gray-500 hover:bg-gray-100"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+          {userLabels.map((label) => (
+            <button
+              key={`label:${label}`}
+              type="button"
+              onClick={() => onFilterChange(`label:${label}`)}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors",
+                filter === `label:${label}`
+                  ? "bg-indigo-100 text-indigo-700"
+                  : "text-gray-500 hover:bg-gray-100"
+              )}
+            >
+              <Tag className="h-2.5 w-2.5 inline mr-0.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto">
@@ -221,24 +225,29 @@ export default function ChatList({
                 </button>
 
                 {/* Context menu trigger */}
-                <button
-                  type="button"
-                  className={cn(
-                    "absolute top-3 right-3 p-1.5 rounded-md bg-white border border-slate-200 shadow-sm transition-opacity",
-                    "hover:bg-slate-100 hover:border-slate-300",
-                    isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuOpenId(isMenuOpen ? null : conversation._id);
-                    setLabelInputId(null);
-                  }}
-                >
-                  <MoreVertical className="h-4 w-4 text-gray-600" />
-                </button>
+                {!compact && (
+                  <button
+                    type="button"
+                    className={cn(
+                      "absolute top-3 right-3 p-1.5 rounded-md bg-white border border-slate-200 shadow-sm transition-opacity",
+                      "hover:bg-slate-100 hover:border-slate-300",
+                      "focus:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-indigo-500",
+                      "[@media(hover:none)]:opacity-70",
+                      isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpenId(isMenuOpen ? null : conversation._id);
+                      setLabelInputId(null);
+                    }}
+                    aria-label="Conversation options"
+                  >
+                    <MoreVertical className="h-4 w-4 text-gray-600" />
+                  </button>
+                )}
 
                 {/* Dropdown menu */}
-                {isMenuOpen && (
+                {!compact && isMenuOpen && (
                   <div
                     ref={menuRef}
                     className="absolute right-2 top-8 z-50 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[160px]"
