@@ -46,6 +46,10 @@ const PopularProjectsCarousel = () => {
       if (response.ok) {
         const data = (await response.json()) as { projects: PopularProject[] };
         setProjects(data.projects || []);
+      } else {
+        const errorText = await response.text().catch(() => '');
+        console.error(`Failed to fetch popular projects: ${response.status}`, errorText);
+        setProjects([]);
       }
     } catch (error) {
       console.error('Failed to fetch popular projects:', error);
