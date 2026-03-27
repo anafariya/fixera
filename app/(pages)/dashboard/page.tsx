@@ -42,6 +42,25 @@ interface ProjectStats {
   pendingProjects: number;
 }
 
+interface WarrantyAnalytics {
+  window?: {
+    lastDays?: number
+  }
+  summary?: {
+    totalClaims?: number
+    totalEscalated?: number
+    totalClosed?: number
+    avgResolutionHours?: number
+  }
+  flaggedProfessionals?: Array<{
+    professionalId: string
+    claimsCount: number
+    escalatedCount: number
+    completedBookings: number
+    claimRate: number
+  }>
+}
+
 
 interface Booking {
   _id: string
@@ -90,6 +109,7 @@ export default function DashboardPage() {
   const [loyaltyStats, setLoyaltyStats] = useState<LoyaltyStats | null>(null)
   const [approvalStats, setApprovalStats] = useState<ApprovalStats | null>(null)
   const [projectStats, setProjectStats] = useState<ProjectStats | null>(null)
+  const [warrantyAnalytics, setWarrantyAnalytics] = useState<WarrantyAnalytics | null>(null)
   const [isLoadingStats, setIsLoadingStats] = useState(false)
   const [bookings, setBookings] = useState<Booking[]>([])
   const [bookingsLoading, setBookingsLoading] = useState(false)
@@ -177,10 +197,11 @@ export default function DashboardPage() {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       }
 
-      const [loyaltyResponse, approvalResponse, projectsResponse] = await Promise.all([
+      const [loyaltyResponse, approvalResponse, projectsResponse, warrantyResponse] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/loyalty/analytics`, fetchOptions),
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/stats/approvals`, fetchOptions),
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/projects/admin/pending`, fetchOptions),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/warranty-claims/admin/analytics`, fetchOptions),
       ])
 
       if (loyaltyResponse.ok) {
@@ -196,6 +217,11 @@ export default function DashboardPage() {
       if (projectsResponse.ok) {
         const projectsData = await projectsResponse.json()
         setProjectStats({ pendingProjects: projectsData.length })
+      }
+
+      if (warrantyResponse.ok) {
+        const warrantyData = await warrantyResponse.json()
+        setWarrantyAnalytics(warrantyData.data || null)
       }
 
     } catch (error) {
@@ -297,7 +323,7 @@ export default function DashboardPage() {
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
                 {/* Quick Stats */}
                 <Card
                   className="cursor-pointer hover:shadow-lg transition-shadow"
@@ -358,6 +384,26 @@ export default function DashboardPage() {
                     </div>
                   </CardContent>
                 </Card>
+
+                <Card
+                  className="cursor-pointer hover:shadow-lg transition-shadow"
+                  onClick={() => window.open('/admin/warranty-claims', '_blank')}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <AlertTriangle className="h-4 w-4 text-rose-500" />
+                      Warranty Claims
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-rose-600">
+                      {isLoadingStats ? '...' : warrantyAnalytics?.summary?.totalClaims || 0}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Escalated: {isLoadingStats ? '...' : warrantyAnalytics?.summary?.totalEscalated || 0}
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
 
               <Card>
@@ -394,6 +440,40 @@ export default function DashboardPage() {
                   >
                     <Settings className="h-4 w-4 mr-2" />
                     Manage Platform Settings
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-rose-500" />
+                    Warranty Claims Oversight
+                  </CardTitle>
+                  <CardDescription>Track claim volume, escalations, and flagged professionals</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-3 gap-3">
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <p className="text-xs text-slate-500">Claims (window)</p>
+                      <p className="text-lg font-semibold">{warrantyAnalytics?.summary?.totalClaims || 0}</p>
+                    </div>
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <p className="text-xs text-slate-500">Avg resolution</p>
+                      <p className="text-lg font-semibold">
+                        {Number(warrantyAnalytics?.summary?.avgResolutionHours || 0).toFixed(1)}h
+                      </p>
+                    </div>
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <p className="text-xs text-slate-500">Flagged professionals</p>
+                      <p className="text-lg font-semibold">{warrantyAnalytics?.flaggedProfessionals?.length || 0}</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => window.open('/admin/warranty-claims', '_blank')}
+                    className="w-full bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-700 hover:to-orange-700"
+                  >
+                    Open Warranty Claims Dashboard
                   </Button>
                 </CardContent>
               </Card>
@@ -790,6 +870,14 @@ export default function DashboardPage() {
                 >
                   <Star className="h-4 w-4" />
                   My Reviews
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/dashboard/warranty-claims')}
+                  className="flex items-center gap-2"
+                >
+                  <Shield className="h-4 w-4" />
+                  Warranty Claims
                 </Button>
               </div>
             </CardContent>
