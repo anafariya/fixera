@@ -13,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { ArrowLeft, Calendar, Clock, Package, Briefcase, User, Mail, Phone, Shield, CheckCircle, XCircle, Play, CheckCheck, CreditCard, FileText, Loader2, Upload, Star, Gift, ChevronDown, ChevronUp, MessageSquare, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
-import { type WarrantyClaimStatus, REASON_LABELS as warrantyReasonLabels } from "@/lib/warrantyClaim"
+import { type WarrantyClaimStatus, REASON_LABELS as warrantyReasonLabels, STATUS_LABELS as warrantyStatusLabels } from "@/lib/warrantyClaim"
 import { getAuthToken } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import StartChatButton from "@/components/chat/StartChatButton"
@@ -261,15 +261,6 @@ const parseResponseBody = async <T,>(response: Response): Promise<{ data: T | nu
 }
 
 
-const warrantyStatusLabels: Record<WarrantyClaimStatus, string> = {
-  open: "Open",
-  proposal_sent: "Proposal Sent",
-  proposal_accepted: "Proposal Accepted",
-  resolved: "Resolved",
-  escalated: "Escalated",
-  closed: "Closed",
-}
-
 export default function BookingDetailPage() {
   const { user, isAuthenticated, loading } = useAuth()
   const router = useRouter()
@@ -319,6 +310,8 @@ export default function BookingDetailPage() {
   const [warrantyProposalSchedule, setWarrantyProposalSchedule] = useState("")
   const [warrantyResolutionSummary, setWarrantyResolutionSummary] = useState("")
   const [warrantyDialogAutoOpened, setWarrantyDialogAutoOpened] = useState(false)
+  const [showDeclineReasonDialog, setShowDeclineReasonDialog] = useState(false)
+  const [declineReason, setDeclineReason] = useState("")
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -727,13 +720,18 @@ export default function BookingDetailPage() {
 
   const handleDeclineWarrantyClaim = async () => {
     if (!warrantyClaim?._id) return
-    const reason = prompt("Reason for declining this claim (required):")
-    if (!reason || !reason.trim()) return
+    const trimmed = declineReason.trim()
+    if (!trimmed) {
+      toast.error("Please provide a reason for declining.")
+      return
+    }
 
     setWarrantyActionLoading(true)
     try {
-      const data = await callWarrantyAction(`${warrantyClaim._id}/decline`, { reason: reason.trim() })
+      const data = await callWarrantyAction(`${warrantyClaim._id}/decline`, { reason: trimmed })
       setWarrantyClaim(data.claim || null)
+      setShowDeclineReasonDialog(false)
+      setDeclineReason("")
       toast.success("Claim declined and escalated.")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to decline claim")
@@ -2403,7 +2401,7 @@ export default function BookingDetailPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={handleDeclineWarrantyClaim}
+                                onClick={() => setShowDeclineReasonDialog(true)}
                                 disabled={warrantyActionLoading}
                                 className="border-rose-300 text-rose-700"
                               >
@@ -2515,12 +2513,9 @@ export default function BookingDetailPage() {
                           value={warrantyClaimReason}
                           onChange={(e) => setWarrantyClaimReason(e.target.value)}
                         >
-                          <option value="defect">Defect</option>
-                          <option value="incomplete_work">Incomplete Work</option>
-                          <option value="material_issue">Material Issue</option>
-                          <option value="functionality_issue">Functionality Issue</option>
-                          <option value="safety_issue">Safety Issue</option>
-                          <option value="other">Other</option>
+                          {Object.entries(warrantyReasonLabels).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
                         </select>
                       </div>
 
@@ -2541,9 +2536,31 @@ export default function BookingDetailPage() {
                           id="warranty-files"
                           type="file"
                           multiple
-                          onChange={(e) =>
-                            setWarrantyEvidenceFiles(Array.from(e.target.files || []))
-                          }
+                          accept="image/*,video/*,.pdf"
+                          onChange={(e) => {
+                            const allowedTypes = ['image/', 'video/', 'application/pdf']
+                            const maxFileSize = 50 * 1024 * 1024 // 50 MB
+                            const maxFiles = 10
+                            const raw = Array.from(e.target.files || [])
+                            const valid: File[] = []
+                            const rejected: string[] = []
+                            for (const file of raw.slice(0, maxFiles)) {
+                              if (!allowedTypes.some((t) => file.type.startsWith(t))) {
+                                rejected.push(`${file.name}: unsupported type`)
+                              } else if (file.size > maxFileSize) {
+                                rejected.push(`${file.name}: exceeds 50 MB`)
+                              } else {
+                                valid.push(file)
+                              }
+                            }
+                            if (raw.length > maxFiles) {
+                              rejected.push(`Only ${maxFiles} files allowed`)
+                            }
+                            setWarrantyEvidenceFiles(valid)
+                            if (rejected.length > 0) {
+                              toast.error(rejected.join('; '))
+                            }
+                          }}
                         />
                         {warrantyEvidenceFiles.length > 0 && (
                           <p className="text-xs text-gray-500">
@@ -2567,6 +2584,48 @@ export default function BookingDetailPage() {
                         >
                           {openingWarrantyClaim ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                           Submit Claim
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={showDeclineReasonDialog} onOpenChange={(open) => { setShowDeclineReasonDialog(open); if (!open) setDeclineReason("") }}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Decline Warranty Claim</DialogTitle>
+                      <DialogDescription>
+                        Please provide a reason for declining this claim. The claim will be escalated for admin review.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="decline-reason">Reason</Label>
+                        <Textarea
+                          id="decline-reason"
+                          value={declineReason}
+                          onChange={(e) => setDeclineReason(e.target.value)}
+                          placeholder="Explain why you are declining this claim..."
+                          className="min-h-[100px]"
+                          aria-required="true"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => { setShowDeclineReasonDialog(false); setDeclineReason("") }}
+                          disabled={warrantyActionLoading}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleDeclineWarrantyClaim}
+                          disabled={warrantyActionLoading || !declineReason.trim()}
+                          className="bg-rose-600 hover:bg-rose-700 text-white"
+                        >
+                          {warrantyActionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          Decline Claim
                         </Button>
                       </div>
                     </div>

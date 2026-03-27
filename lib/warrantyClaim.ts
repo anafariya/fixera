@@ -25,6 +25,15 @@ export const STATUS_STYLES: Record<WarrantyClaimStatus, string> = {
   closed: "bg-slate-100 text-slate-700 border border-slate-200",
 }
 
+export const STATUS_LABELS: Record<WarrantyClaimStatus, string> = {
+  open: "Open",
+  proposal_sent: "Proposal Sent",
+  proposal_accepted: "Proposal Accepted",
+  resolved: "Resolved",
+  escalated: "Escalated",
+  closed: "Closed",
+}
+
 export const REASON_LABELS: Record<string, string> = {
   defect: "Defect",
   incomplete_work: "Incomplete Work",
