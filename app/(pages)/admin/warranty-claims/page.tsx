@@ -541,7 +541,7 @@ export default function AdminWarrantyClaimsPage() {
                       {item.professional?.name || item.professional?.businessInfo?.companyName || item.professional?.email || item.professionalId}
                     </p>
                     <p className="text-xs text-slate-600">
-                      Claim rate: {(item.claimRate * 100).toFixed(1)}% · Claims: {item.claimsCount} · Escalated: {item.escalatedCount} · Completed bookings: {item.completedBookings}
+                      Claim rate: {Number.isFinite(item.claimRate) ? `${(item.claimRate * 100).toFixed(1)}%` : "-"} · Claims: {item.claimsCount} · Escalated: {item.escalatedCount} · Completed bookings: {item.completedBookings}
                     </p>
                   </div>
                 ))}
