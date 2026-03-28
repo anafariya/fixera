@@ -34,11 +34,15 @@ export const STATUS_LABELS: Record<WarrantyClaimStatus, string> = {
   closed: "Closed",
 }
 
-export const REASON_LABELS: Record<string, string> = {
+const REASON_LABELS_MAP = {
   defect: "Defect",
   incomplete_work: "Incomplete Work",
   material_issue: "Material Issue",
   functionality_issue: "Functionality Issue",
   safety_issue: "Safety Issue",
   other: "Other",
-}
+} as const
+
+export type WarrantyClaimReason = keyof typeof REASON_LABELS_MAP
+
+export const REASON_LABELS: Record<string, string> = REASON_LABELS_MAP

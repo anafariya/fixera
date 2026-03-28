@@ -277,6 +277,7 @@ export default function DashboardPage() {
         if (d.errors?.length) parts.push(`${d.errors.length} error(s)`)
         toast.success(parts.length ? `RFQ: ${parts.join(', ')}` : 'No overdue RFQ deadlines found')
       }
+      await fetchAdminData()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : `Failed to run ${type} checks`)
     } finally {

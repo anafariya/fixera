@@ -170,6 +170,9 @@ export default function AdminWarrantyClaimsPage() {
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return
       console.error("[ADMIN][WARRANTY] claims fetch failed", err)
+      setClaims([])
+      setTotalPages(1)
+      setTotalClaims(0)
       setError(err instanceof Error ? err.message : "Failed to load warranty claims")
     } finally {
       setIsLoadingClaims(false)
