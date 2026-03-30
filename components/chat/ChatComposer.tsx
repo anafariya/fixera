@@ -142,7 +142,7 @@ export default function ChatComposer({ disabled, sending, replyTo, onCancelReply
           disabled={disabled || sending}
           className="resize-none flex-1 min-h-[36px] max-h-[80px]"
         />
-        <Button type="button" size="icon" className="h-9 w-9 shrink-0" onClick={handleSubmit} disabled={!canSend}>
+        <Button type="button" size="icon" className="h-9 w-9 shrink-0" onClick={handleSubmit} disabled={!canSend} aria-label="Send message">
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CornerUpRight className="h-4 w-4" />}
         </Button>
       </div>

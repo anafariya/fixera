@@ -330,8 +330,8 @@ export default function BookingDetailPage() {
   const [quoteRejectionReason, setQuoteRejectionReason] = useState("")
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
   const [payingMilestone, setPayingMilestone] = useState<number | null>(null)
-  const [uploadingPostBookingQuestionIndex, setUploadingPostBookingQuestionIndex] = useState<number | null>(null)
-  const [updatingMilestoneIndex, setUpdatingMilestoneIndex] = useState<number | null>(null)
+  const [uploadingPostBookingQuestionIndexes, setUploadingPostBookingQuestionIndexes] = useState<Set<number>>(new Set())
+  const [updatingMilestoneIndexes, setUpdatingMilestoneIndexes] = useState<Set<number>>(new Set())
   const [warrantyClaim, setWarrantyClaim] = useState<WarrantyClaimDetail | null | undefined>(undefined)
   const [loadingWarrantyClaim, setLoadingWarrantyClaim] = useState(false)
   const [showWarrantyClaimDialog, setShowWarrantyClaimDialog] = useState(false)
@@ -540,7 +540,7 @@ export default function BookingDetailPage() {
   const handlePostBookingAttachmentUpload = async (index: number, file: File | null) => {
     if (!file || !booking?.project?._id) return
 
-    setUploadingPostBookingQuestionIndex(index)
+    setUploadingPostBookingQuestionIndexes(prev => new Set(prev).add(index))
     try {
       const token = getAuthToken()
       const headers: Record<string, string> = {}
@@ -573,7 +573,7 @@ export default function BookingDetailPage() {
       console.error("Failed to upload post-booking attachment:", err)
       toast.error("Failed to upload attachment. Please try again.")
     } finally {
-      setUploadingPostBookingQuestionIndex(null)
+      setUploadingPostBookingQuestionIndexes(prev => { const next = new Set(prev); next.delete(index); return next })
     }
   }
 
@@ -878,6 +878,10 @@ export default function BookingDetailPage() {
 
   const handleSubmitPostBookingAnswers = async () => {
     if (!booking || !bookingId) return
+    if (uploadingPostBookingQuestionIndexes.size > 0) {
+      toast.error("Please wait for all uploads to finish before submitting.")
+      return
+    }
 
     // Validate required answers
     const missingRequired = postBookingQuestions
@@ -1092,7 +1096,7 @@ export default function BookingDetailPage() {
   const handleMilestoneWorkStatus = async (index: number, action: "start" | "complete") => {
     if (!bookingId) return
 
-    setUpdatingMilestoneIndex(index)
+    setUpdatingMilestoneIndexes(prev => new Set(prev).add(index))
     try {
       const token = getAuthToken()
       const headers: Record<string, string> = { "Content-Type": "application/json" }
@@ -1120,7 +1124,7 @@ export default function BookingDetailPage() {
       console.error("Error updating milestone:", err)
       toast.error("Failed to update milestone. Please try again.")
     } finally {
-      setUpdatingMilestoneIndex(null)
+      setUpdatingMilestoneIndexes(prev => { const next = new Set(prev); next.delete(index); return next })
     }
   }
 
@@ -1459,7 +1463,7 @@ export default function BookingDetailPage() {
                         id={`q${index}-field`}
                         type="file"
                         accept=".pdf,image/*"
-                        disabled={uploadingPostBookingQuestionIndex === index}
+                        disabled={uploadingPostBookingQuestionIndexes.has(index)}
                         onChange={(e) => {
                           const file = e.target.files?.[0] || null
                           void handlePostBookingAttachmentUpload(index, file)
@@ -1470,13 +1474,13 @@ export default function BookingDetailPage() {
                         aria-describedby={errorId}
                         aria-required={question.isRequired}
                       />
-                      {uploadingPostBookingQuestionIndex === index && (
+                      {uploadingPostBookingQuestionIndexes.has(index) && (
                         <div className="mt-2 inline-flex items-center text-xs text-indigo-600">
                           <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
                           Uploading...
                         </div>
                       )}
-                      {postBookingAnswers[index] && (
+                      {postBookingAnswers[index] && isHttpUrl(postBookingAnswers[index]) ? (
                         <a
                           href={postBookingAnswers[index]}
                           target="_blank"
@@ -1485,7 +1489,11 @@ export default function BookingDetailPage() {
                         >
                           {getFileLabel(postBookingAnswers[index])}
                         </a>
-                      )}
+                      ) : postBookingAnswers[index] ? (
+                        <span className="mt-2 inline-flex text-sm text-gray-700">
+                          {getFileLabel(postBookingAnswers[index])}
+                        </span>
+                      ) : null}
                     </div>
                   )}
                   {hasError && (
@@ -2053,22 +2061,22 @@ export default function BookingDetailPage() {
                               {canStart && (
                                 <Button
                                   onClick={() => handleMilestoneWorkStatus(i, 'start')}
-                                  disabled={updatingMilestoneIndex === i}
+                                  disabled={updatingMilestoneIndexes.has(i)}
                                   size="sm"
                                   variant="outline"
                                 >
-                                  {updatingMilestoneIndex === i ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Play className="h-4 w-4 mr-1" />}
+                                  {updatingMilestoneIndexes.has(i) ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Play className="h-4 w-4 mr-1" />}
                                   Start
                                 </Button>
                               )}
                               {canComplete && (
                                 <Button
                                   onClick={() => handleMilestoneWorkStatus(i, 'complete')}
-                                  disabled={updatingMilestoneIndex === i}
+                                  disabled={updatingMilestoneIndexes.has(i)}
                                   size="sm"
                                   className="bg-emerald-600 hover:bg-emerald-700 text-white"
                                 >
-                                  {updatingMilestoneIndex === i ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCheck className="h-4 w-4 mr-1" />}
+                                  {updatingMilestoneIndexes.has(i) ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCheck className="h-4 w-4 mr-1" />}
                                   Mark Complete
                                 </Button>
                               )}

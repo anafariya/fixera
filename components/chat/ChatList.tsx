@@ -229,11 +229,11 @@ export default function ChatList({
                   <button
                     type="button"
                     className={cn(
-                      "absolute top-8 right-3 p-1.5 rounded-md bg-white border border-slate-200 shadow-sm transition-opacity",
+                      "absolute top-2 right-3 p-1.5 rounded-md bg-white border border-slate-200 shadow-sm transition-opacity",
                       "hover:bg-slate-100 hover:border-slate-300",
                       "focus:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-indigo-500",
-                      "[@media(hover:none)]:opacity-70",
-                      isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                      "[@media(hover:none)]:opacity-0 [@media(hover:none)]:pointer-events-none",
+                      isMenuOpen ? "opacity-100 [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto" : "opacity-0 group-hover:opacity-100"
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -250,7 +250,7 @@ export default function ChatList({
                 {!compact && isMenuOpen && (
                   <div
                     ref={menuRef}
-                    className="absolute right-2 top-8 z-50 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[160px]"
+                    className="absolute right-2 top-10 z-50 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[160px]"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button

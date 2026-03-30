@@ -122,6 +122,56 @@ export default function ProfilePage() {
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileImageUploading, setProfileImageUploading] = useState(false)
   const profileImageInputRef = useRef<HTMLInputElement>(null)
+  const renderAvatarEditor = () => (
+    <div className="flex items-center gap-4 pb-3 border-b">
+      <div className="relative group">
+        <div className="h-16 w-16 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden">
+          {user?.profileImage ? (
+            <img src={user.profileImage} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-lg font-semibold text-indigo-600">
+              {user?.name?.charAt(0).toUpperCase()}
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => profileImageInputRef.current?.click()}
+          disabled={profileImageUploading}
+          aria-label="Edit profile photo"
+          className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 transition-opacity cursor-pointer"
+        >
+          {profileImageUploading ? (
+            <Loader2 className="h-5 w-5 text-white animate-spin" />
+          ) : (
+            <Camera className="h-5 w-5 text-white" />
+          )}
+        </button>
+        <input
+          ref={profileImageInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={handleProfileImageUpload}
+        />
+      </div>
+      <div>
+        <p className="text-sm font-medium">{user?.name}</p>
+        <p className="text-xs text-gray-500">Click photo to change</p>
+        {user?.profileImage && (
+          <button
+            type="button"
+            onClick={handleDeleteProfileImage}
+            disabled={profileImageUploading}
+            className="text-xs text-red-500 hover:text-red-700 mt-0.5 flex items-center gap-1"
+          >
+            <Trash2 className="h-3 w-3" /> Remove
+          </button>
+        )}
+      </div>
+    </div>
+  )
+
   const [showAutoPopulateDialog, setShowAutoPopulateDialog] = useState(false)
   const [pendingVatData, setPendingVatData] = useState<{
     vatNumber: string;
@@ -1506,52 +1556,7 @@ export default function ProfilePage() {
                     <CardDescription>Your account details</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="flex items-center gap-4 pb-3 border-b">
-                      <div className="relative group">
-                        <div className="h-16 w-16 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden">
-                          {user?.profileImage ? (
-                            <img src={user.profileImage} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <span className="text-lg font-semibold text-indigo-600">
-                              {user?.name?.charAt(0).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => profileImageInputRef.current?.click()}
-                          disabled={profileImageUploading}
-                          className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                        >
-                          {profileImageUploading ? (
-                            <Loader2 className="h-5 w-5 text-white animate-spin" />
-                          ) : (
-                            <Camera className="h-5 w-5 text-white" />
-                          )}
-                        </button>
-                        <input
-                          ref={profileImageInputRef}
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          className="hidden"
-                          onChange={handleProfileImageUpload}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{user?.name}</p>
-                        <p className="text-xs text-gray-500">Click photo to change</p>
-                        {user?.profileImage && (
-                          <button
-                            type="button"
-                            onClick={handleDeleteProfileImage}
-                            disabled={profileImageUploading}
-                            className="text-xs text-red-500 hover:text-red-700 mt-0.5 flex items-center gap-1"
-                          >
-                            <Trash2 className="h-3 w-3" /> Remove
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                    {renderAvatarEditor()}
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 text-gray-500" />
                       <span className="text-sm">{user?.email}</span>
@@ -2536,52 +2541,7 @@ export default function ProfilePage() {
                     <CardDescription>Your account details</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="flex items-center gap-4 pb-3 border-b">
-                      <div className="relative group">
-                        <div className="h-16 w-16 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden">
-                          {user?.profileImage ? (
-                            <img src={user.profileImage} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <span className="text-lg font-semibold text-indigo-600">
-                              {user?.name?.charAt(0).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => profileImageInputRef.current?.click()}
-                          disabled={profileImageUploading}
-                          className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                        >
-                          {profileImageUploading ? (
-                            <Loader2 className="h-5 w-5 text-white animate-spin" />
-                          ) : (
-                            <Camera className="h-5 w-5 text-white" />
-                          )}
-                        </button>
-                        <input
-                          ref={profileImageInputRef}
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          className="hidden"
-                          onChange={handleProfileImageUpload}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{user?.name}</p>
-                        <p className="text-xs text-gray-500">Click photo to change</p>
-                        {user?.profileImage && (
-                          <button
-                            type="button"
-                            onClick={handleDeleteProfileImage}
-                            disabled={profileImageUploading}
-                            className="text-xs text-red-500 hover:text-red-700 mt-0.5 flex items-center gap-1"
-                          >
-                            <Trash2 className="h-3 w-3" /> Remove
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                    {renderAvatarEditor()}
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 text-gray-500" />
                       <span className="text-sm">{user?.email}</span>
