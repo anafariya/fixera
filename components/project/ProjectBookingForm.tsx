@@ -358,7 +358,7 @@ export default function ProjectBookingForm({
   } | null>(null);
   const [loadingScheduleWindow, setLoadingScheduleWindow] = useState(false);
   const [rfqAnswers, setRFQAnswers] = useState<RFQAnswer[]>([]);
-  const [uploadingQuestionIndex, setUploadingQuestionIndex] = useState<number | null>(null);
+  const [uploadingQuestionIndexes, setUploadingQuestionIndexes] = useState<Set<number>>(new Set());
   const [selectedExtraOptions, setSelectedExtraOptions] = useState<number[]>(
     []
   );
@@ -1789,7 +1789,7 @@ export default function ProjectBookingForm({
   const handleRFQAttachmentUpload = async (index: number, file: File | null) => {
     if (!file) return;
 
-    setUploadingQuestionIndex(index);
+    setUploadingQuestionIndexes(prev => new Set(prev).add(index));
     try {
       const token = getAuthToken();
       const headers: Record<string, string> = {};
@@ -1822,7 +1822,7 @@ export default function ProjectBookingForm({
       console.error('Failed to upload RFQ attachment:', error);
       toast.error('Failed to upload attachment');
     } finally {
-      setUploadingQuestionIndex(null);
+      setUploadingQuestionIndexes(prev => { const next = new Set(prev); next.delete(index); return next });
     }
   };
 
@@ -1930,6 +1930,10 @@ export default function ProjectBookingForm({
   };
 
   const handleNext = () => {
+    if (uploadingQuestionIndexes.size > 0) {
+      toast.error('Please wait for all uploads to finish before continuing.');
+      return;
+    }
     if (!guardOutsideServiceArea()) return;
     if (!validateStep()) return;
 
@@ -1947,6 +1951,11 @@ export default function ProjectBookingForm({
   };
 
   const handleSubmit = async () => {
+    if (uploadingQuestionIndexes.size > 0) {
+      toast.error('Please wait for all uploads to finish before submitting.');
+      return;
+    }
+
     debugLog?.('[BOOKING] Submit initiated');
     debugLog?.('[BOOKING] Current step:', currentStep);
     debugLog?.('[BOOKING] Selected package index:', selectedPackageIndex);
@@ -3416,20 +3425,20 @@ export default function ProjectBookingForm({
                           type='file'
                           accept='.pdf,image/*'
                           className='mt-3'
-                          disabled={uploadingQuestionIndex === idx}
+                          disabled={uploadingQuestionIndexes.has(idx)}
                           onChange={(e) => {
                             const file = e.target.files?.[0] || null;
                             void handleRFQAttachmentUpload(idx, file);
                             e.currentTarget.value = '';
                           }}
                         />
-                        {uploadingQuestionIndex === idx && (
+                        {uploadingQuestionIndexes.has(idx) && (
                           <div className='mt-3 inline-flex items-center text-xs text-indigo-600'>
                             <Loader2 className='h-3.5 w-3.5 mr-1 animate-spin' />
                             Uploading...
                           </div>
                         )}
-                        {rfqAnswers[idx]?.answer && (
+                        {rfqAnswers[idx]?.answer && /^https?:\/\//i.test(rfqAnswers[idx].answer) && (
                           <a
                             href={rfqAnswers[idx].answer}
                             target='_blank'
@@ -3797,13 +3806,13 @@ export default function ProjectBookingForm({
           </Button>
 
           {currentStep < 4 ? (
-            <Button onClick={handleNext} disabled={isOutsideServiceArea}>
+            <Button onClick={handleNext} disabled={isOutsideServiceArea || uploadingQuestionIndexes.size > 0}>
               Next Step
             </Button>
           ) : (
             <Button
               onClick={handleSubmit}
-              disabled={loading || isOutsideServiceArea}
+              disabled={loading || isOutsideServiceArea || uploadingQuestionIndexes.size > 0}
               className='bg-blue-600 hover:bg-blue-700'
             >
               {loading ? (

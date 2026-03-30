@@ -6,6 +6,9 @@ export interface QuotationMilestone {
   customDueDate?: string
   order: number
   status: 'pending' | 'invoiced' | 'paid' | 'overdue'
+}
+
+export interface BookingMilestone extends QuotationMilestone {
   workStatus?: 'pending' | 'in_progress' | 'completed'
   stripePaymentIntentId?: string
   stripeClientSecret?: string

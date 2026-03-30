@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import StartChatButton from "@/components/chat/StartChatButton"
 import ReviewModal from "@/components/booking/ReviewModal"
 import QuotationWizard from "@/components/quotation/QuotationWizard"
-import type { QuoteVersion, QuotationMilestone } from "@/types/quotation"
+import type { QuoteVersion, BookingMilestone } from "@/types/quotation"
 
 type BookingStatus =
   | "rfq"
@@ -92,7 +92,7 @@ interface BookingDetail {
   rfqResponse?: { action: 'accepted' | 'rejected'; respondedAt: string; rejectionReason?: string }
   rfqDeadline?: string
   customerRejectionReason?: string
-  milestonePayments?: QuotationMilestone[]
+  milestonePayments?: BookingMilestone[]
   scheduledStartDate?: string
   scheduledExecutionEndDate?: string
   scheduledEndDate?: string
