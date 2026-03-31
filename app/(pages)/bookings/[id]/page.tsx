@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import StartChatButton from "@/components/chat/StartChatButton"
 import ReviewModal from "@/components/booking/ReviewModal"
 import QuotationWizard from "@/components/quotation/QuotationWizard"
-import type { QuoteVersion, QuotationMilestone } from "@/types/quotation"
+import type { QuoteVersion, BookingMilestone } from "@/types/quotation"
 
 type BookingStatus =
   | "rfq"
@@ -51,6 +51,13 @@ interface PostBookingAnswer {
   answer: string
 }
 
+interface RFQAnswer {
+  questionId?: string
+  question: string
+  answer: string
+  fieldType?: string
+}
+
 interface BookingDetail {
   _id: string
   bookingType: "professional" | "project"
@@ -58,6 +65,8 @@ interface BookingDetail {
   rfqData?: {
     serviceType?: string
     description?: string
+    answers?: RFQAnswer[]
+    attachments?: string[]
     preferredStartDate?: string
     urgency?: "low" | "medium" | "high" | "urgent"
     budget?: {
@@ -83,8 +92,9 @@ interface BookingDetail {
   rfqResponse?: { action: 'accepted' | 'rejected'; respondedAt: string; rejectionReason?: string }
   rfqDeadline?: string
   customerRejectionReason?: string
-  milestonePayments?: QuotationMilestone[]
+  milestonePayments?: BookingMilestone[]
   scheduledStartDate?: string
+  scheduledExecutionEndDate?: string
   scheduledEndDate?: string
   createdAt?: string
   updatedAt?: string
@@ -101,6 +111,7 @@ interface BookingDetail {
     category?: string
     service?: string
     description?: string
+    rfqQuestions?: PostBookingQuestion[]
     postBookingQuestions?: PostBookingQuestion[]
   }
   professional?: {
@@ -244,6 +255,27 @@ const formatMoney = (amount: number, currencyCode = "EUR"): string =>
     maximumFractionDigits: 2,
   })}`
 
+const isHttpUrl = (value?: string | null) => {
+  if (!value) return false
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
+const getFileLabel = (value?: string | null, fallback = "Open attachment") => {
+  if (!value) return fallback
+  try {
+    const parsed = new URL(value)
+    const segments = parsed.pathname.split("/").filter(Boolean)
+    return decodeURIComponent(segments[segments.length - 1] || fallback)
+  } catch {
+    return fallback
+  }
+}
+
 const parseResponseBody = async <T,>(response: Response): Promise<{ data: T | null; rawText: string | null }> => {
   const contentType = response.headers.get("content-type") || ""
   if (contentType.includes("application/json")) {
@@ -298,6 +330,8 @@ export default function BookingDetailPage() {
   const [quoteRejectionReason, setQuoteRejectionReason] = useState("")
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
   const [payingMilestone, setPayingMilestone] = useState<number | null>(null)
+  const [uploadingPostBookingQuestionIndexes, setUploadingPostBookingQuestionIndexes] = useState<Set<number>>(new Set())
+  const [updatingMilestoneIndexes, setUpdatingMilestoneIndexes] = useState<Set<number>>(new Set())
   const [warrantyClaim, setWarrantyClaim] = useState<WarrantyClaimDetail | null | undefined>(undefined)
   const [loadingWarrantyClaim, setLoadingWarrantyClaim] = useState(false)
   const [showWarrantyClaimDialog, setShowWarrantyClaimDialog] = useState(false)
@@ -503,6 +537,46 @@ export default function BookingDetailPage() {
     setValidationErrors(prev => prev.filter((item) => item !== index))
   }
 
+  const handlePostBookingAttachmentUpload = async (index: number, file: File | null) => {
+    if (!file || !booking?.project?._id) return
+
+    setUploadingPostBookingQuestionIndexes(prev => new Set(prev).add(index))
+    try {
+      const token = getAuthToken()
+      const headers: Record<string, string> = {}
+      if (token) headers.Authorization = `Bearer ${token}`
+
+      const formData = new FormData()
+      formData.append("attachment", file)
+      formData.append("projectId", booking.project._id)
+      formData.append("questionId", postBookingQuestions[index]?._id || postBookingQuestions[index]?.id || `post-booking-${index}`)
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/projects/upload/attachment`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers,
+          body: formData,
+        }
+      )
+
+      const { data, rawText } = await parseResponseBody<{ success?: boolean; data?: { url?: string }; message?: string }>(response)
+
+      if (response.ok && data?.success && data.data?.url) {
+        handleAnswerChange(index, data.data.url)
+        toast.success("Attachment uploaded")
+      } else {
+        toast.error(data?.message || rawText || `Failed to upload attachment (${response.status}).`)
+      }
+    } catch (err) {
+      console.error("Failed to upload post-booking attachment:", err)
+      toast.error("Failed to upload attachment. Please try again.")
+    } finally {
+      setUploadingPostBookingQuestionIndexes(prev => { const next = new Set(prev); next.delete(index); return next })
+    }
+  }
+
   const fetchWarrantyClaim = async () => {
     if (!bookingId || !isAuthenticated || !booking || booking.status !== "completed") {
       setWarrantyClaim(null)
@@ -632,16 +706,13 @@ export default function BookingDetailPage() {
 
       createdClaimId = data.claim._id
 
-      // Step 2: Upload and attach evidence to the created claim
       try {
         await uploadWarrantyEvidence(createdClaimId)
       } catch (evidenceErr) {
-        // Evidence upload failed — delete the draft claim to avoid orphaned claim
         await deleteDraftClaim(createdClaimId)
         throw evidenceErr
       }
 
-      // Step 3: Re-fetch the claim to get the updated evidence URLs
       const refreshRes = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/warranty-claims/${createdClaimId}`,
         {
@@ -807,6 +878,10 @@ export default function BookingDetailPage() {
 
   const handleSubmitPostBookingAnswers = async () => {
     if (!booking || !bookingId) return
+    if (uploadingPostBookingQuestionIndexes.size > 0) {
+      toast.error("Please wait for all uploads to finish before submitting.")
+      return
+    }
 
     // Validate required answers
     const missingRequired = postBookingQuestions
@@ -1015,6 +1090,41 @@ export default function BookingDetailPage() {
       toast.error("Failed to initiate payment. Please try again.")
     } finally {
       setPayingMilestone(null)
+    }
+  }
+
+  const handleMilestoneWorkStatus = async (index: number, action: "start" | "complete") => {
+    if (!bookingId) return
+
+    setUpdatingMilestoneIndexes(prev => new Set(prev).add(index))
+    try {
+      const token = getAuthToken()
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) headers.Authorization = `Bearer ${token}`
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/quotations/${bookingId}/milestones/${index}/work-status`,
+        {
+          method: "PATCH",
+          headers,
+          credentials: "include",
+          body: JSON.stringify({ action }),
+        }
+      )
+
+      const { data } = await parseResponseBody<{ success?: boolean; error?: { message?: string } }>(response)
+
+      if (response.ok && data?.success) {
+        toast.success(action === "start" ? "Milestone started." : "Milestone completed.")
+        await refreshBooking()
+      } else {
+        toast.error(data?.error?.message || "Failed to update milestone.")
+      }
+    } catch (err) {
+      console.error("Error updating milestone:", err)
+      toast.error("Failed to update milestone. Please try again.")
+    } finally {
+      setUpdatingMilestoneIndexes(prev => { const next = new Set(prev); next.delete(index); return next })
     }
   }
 
@@ -1348,18 +1458,42 @@ export default function BookingDetailPage() {
                   {question.type === "attachment" && (
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center bg-white">
                       <Upload className="h-6 w-6 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">File upload coming soon</p>
+                      <p className="text-sm text-gray-600">Upload a file for this question</p>
                       <Input
                         id={`q${index}-field`}
-                        type="text"
-                        placeholder="For now, please describe or provide a link"
-                        value={postBookingAnswers[index] || ""}
-                        onChange={(e) => handleAnswerChange(index, e.target.value)}
+                        type="file"
+                        accept=".pdf,image/*"
+                        disabled={uploadingPostBookingQuestionIndexes.has(index)}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null
+                          void handlePostBookingAttachmentUpload(index, file)
+                          e.currentTarget.value = ""
+                        }}
                         className="mt-2"
                         aria-invalid={hasError}
                         aria-describedby={errorId}
                         aria-required={question.isRequired}
                       />
+                      {uploadingPostBookingQuestionIndexes.has(index) && (
+                        <div className="mt-2 inline-flex items-center text-xs text-indigo-600">
+                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                          Uploading...
+                        </div>
+                      )}
+                      {postBookingAnswers[index] && isHttpUrl(postBookingAnswers[index]) ? (
+                        <a
+                          href={postBookingAnswers[index]}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="mt-2 inline-flex text-sm text-indigo-600 hover:underline"
+                        >
+                          {getFileLabel(postBookingAnswers[index])}
+                        </a>
+                      ) : postBookingAnswers[index] ? (
+                        <span className="mt-2 inline-flex text-sm text-gray-700">
+                          {getFileLabel(postBookingAnswers[index])}
+                        </span>
+                      ) : null}
                     </div>
                   )}
                   {hasError && (
@@ -1842,20 +1976,36 @@ export default function BookingDetailPage() {
                 {/* Milestone Tracker (when booking has milestonePayments and is booked/in_progress) */}
                 {booking.milestonePayments && booking.milestonePayments.length > 0 && ['booked', 'in_progress', 'completed'].includes(booking.status) && (
                   <div className="bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-200 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-sky-900 mb-3">Milestone Payments</h3>
-                    {/* Progress bar */}
+                    <h3 className="text-sm font-semibold text-sky-900 mb-3">Milestones</h3>
                     {(() => {
                       const total = booking.milestonePayments!.reduce((s, m) => s + m.amount, 0)
                       const paid = booking.milestonePayments!.filter(m => m.status === 'paid').reduce((s, m) => s + m.amount, 0)
-                      const pct = total > 0 ? Math.round((paid / total) * 100) : 0
+                      const completed = booking.milestonePayments!.filter(m => (m.workStatus || 'pending') === 'completed').reduce((s, m) => s + m.amount, 0)
+                      const paymentPct = total > 0 ? Math.round((paid / total) * 100) : 0
+                      const workPct = total > 0 ? Math.round((completed / total) * 100) : 0
                       return (
-                        <div className="mb-3">
-                          <div className="flex justify-between text-xs text-gray-600 mb-1">
-                            <span>EUR {paid.toFixed(2)} paid</span>
-                            <span>{pct}%</span>
+                        <div className="mb-4 space-y-3">
+                          <div>
+                            <div className="flex justify-between text-xs text-gray-600 mb-1">
+                              <span>Work progress</span>
+                              <span>{workPct}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div className="bg-emerald-500 h-2 rounded-full transition-all" style={{ width: `${workPct}%` }} />
+                            </div>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div className="bg-sky-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          <div>
+                            <div className="flex justify-between text-xs text-gray-600 mb-1">
+                              <span>Payment progress</span>
+                              <span>{paymentPct}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div className="bg-sky-500 h-2 rounded-full transition-all" style={{ width: `${paymentPct}%` }} />
+                            </div>
+                          </div>
+                          <div className="flex justify-between text-xs text-gray-600">
+                            <span>EUR {completed.toFixed(2)} completed</span>
+                            <span>EUR {paid.toFixed(2)} paid</span>
                           </div>
                         </div>
                       )
@@ -1863,31 +2013,85 @@ export default function BookingDetailPage() {
                     <div className="space-y-2">
                       {booking.milestonePayments.map((ms, i) => {
                         const isPaid = ms.status === 'paid'
+                        const workStatus = ms.workStatus || 'pending'
                         const prevPaid = booking.milestonePayments!.slice(0, i).every(m => m.status === 'paid')
+                        const prevCompleted = booking.milestonePayments!.slice(0, i).every(m => (m.workStatus || 'pending') === 'completed')
                         const canPay = !isPaid && prevPaid && user?.role === 'customer'
+                        const canStart = user?.role === 'professional' && workStatus === 'pending' && prevCompleted && booking.status !== 'completed'
+                        const canComplete = user?.role === 'professional' && workStatus === 'in_progress' && booking.status !== 'completed'
 
                         return (
-                          <div key={i} className={`flex items-center justify-between p-2 rounded ${isPaid ? 'bg-green-50 border border-green-200' : 'bg-white border'}`}>
-                            <div className="flex items-center gap-2">
-                              {isPaid ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Clock className="h-4 w-4 text-gray-400" />}
-                              <div>
-                                <p className="text-sm font-medium">{ms.title}</p>
-                                <p className="text-xs text-gray-500">EUR {ms.amount.toFixed(2)}</p>
+                          <div key={i} className={`rounded border p-3 ${isPaid ? 'bg-green-50 border-green-200' : 'bg-white border-slate-200'}`}>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-2">
+                                {workStatus === 'completed' ? (
+                                  <CheckCircle className="h-4 w-4 mt-0.5 text-emerald-500" />
+                                ) : workStatus === 'in_progress' ? (
+                                  <Play className="h-4 w-4 mt-0.5 text-amber-500" />
+                                ) : (
+                                  <Clock className="h-4 w-4 mt-0.5 text-gray-400" />
+                                )}
+                                <div>
+                                  <p className="text-sm font-medium">{ms.title}</p>
+                                  <p className="text-xs text-gray-500">EUR {ms.amount.toFixed(2)}</p>
+                                  {ms.startedAt && (
+                                    <p className="text-[11px] text-gray-500">Started: {new Date(ms.startedAt).toLocaleDateString()}</p>
+                                  )}
+                                  {ms.completedAt && (
+                                    <p className="text-[11px] text-gray-500">Completed: {new Date(ms.completedAt).toLocaleDateString()}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap items-center justify-end gap-2">
+                                <Badge className={
+                                  workStatus === 'completed'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : workStatus === 'in_progress'
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-slate-100 text-slate-700'
+                                }>
+                                  {workStatus === 'completed' ? 'Completed' : workStatus === 'in_progress' ? 'In Progress' : 'Not Started'}
+                                </Badge>
+                                <Badge className={isPaid ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'}>
+                                  {isPaid ? 'Paid' : 'Unpaid'}
+                                </Badge>
                               </div>
                             </div>
-                            {isPaid && <Badge className="bg-green-100 text-green-700">Paid</Badge>}
-                            {canPay && (
-                              <Button
-                                onClick={() => handlePayMilestone(i)}
-                                disabled={payingMilestone === i}
-                                size="sm"
-                                className="bg-sky-600 hover:bg-sky-700 text-white"
-                              >
-                                {payingMilestone === i ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4 mr-1" />}
-                                Pay
-                              </Button>
-                            )}
-                            {!isPaid && !canPay && <Badge variant="outline">Pending</Badge>}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {canStart && (
+                                <Button
+                                  onClick={() => handleMilestoneWorkStatus(i, 'start')}
+                                  disabled={updatingMilestoneIndexes.has(i)}
+                                  size="sm"
+                                  variant="outline"
+                                >
+                                  {updatingMilestoneIndexes.has(i) ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Play className="h-4 w-4 mr-1" />}
+                                  Start
+                                </Button>
+                              )}
+                              {canComplete && (
+                                <Button
+                                  onClick={() => handleMilestoneWorkStatus(i, 'complete')}
+                                  disabled={updatingMilestoneIndexes.has(i)}
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                >
+                                  {updatingMilestoneIndexes.has(i) ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCheck className="h-4 w-4 mr-1" />}
+                                  Mark Complete
+                                </Button>
+                              )}
+                              {canPay && (
+                                <Button
+                                  onClick={() => handlePayMilestone(i)}
+                                  disabled={payingMilestone === i}
+                                  size="sm"
+                                  className="bg-sky-600 hover:bg-sky-700 text-white"
+                                >
+                                  {payingMilestone === i ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4 mr-1" />}
+                                  Pay
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         )
                       })}
@@ -2667,13 +2871,13 @@ export default function BookingDetailPage() {
                       </span>
                     </div>
                   )}
-                  {booking.scheduledEndDate && (
+                  {(booking.scheduledExecutionEndDate || booking.scheduledEndDate) && (
                     <div className="flex items-center gap-2">
                       <Calendar className="h-3 w-3 text-blue-500" />
                       <span>
                         Completion Date:{" "}
                         <span className="font-medium">
-                          {new Date(booking.scheduledEndDate).toLocaleDateString()}
+                          {new Date(booking.scheduledExecutionEndDate || booking.scheduledEndDate || "").toLocaleDateString()}
                         </span>
                       </span>
                     </div>
@@ -2713,6 +2917,82 @@ export default function BookingDetailPage() {
                     <p className="text-xs leading-relaxed text-gray-700 whitespace-pre-line">
                       {booking.rfqData.description}
                     </p>
+                  </section>
+                )}
+
+                {Array.isArray(booking.rfqData?.attachments) && booking.rfqData.attachments.length > 0 && (
+                  <section className="space-y-2">
+                    <h2 className="text-sm font-semibold text-gray-900">
+                      Request attachments
+                    </h2>
+                    <div className="space-y-2">
+                      {booking.rfqData.attachments.map((attachment, index) => (
+                        <a
+                          key={`${attachment}-${index}`}
+                          href={attachment}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-indigo-700 hover:bg-slate-100"
+                        >
+                          <span className="truncate pr-3">{getFileLabel(attachment, `Attachment ${index + 1}`)}</span>
+                          <span className="font-medium">Open</span>
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {Array.isArray(booking.rfqData?.answers) && booking.rfqData.answers.length > 0 && (
+                  <section className="space-y-2">
+                    <h2 className="text-sm font-semibold text-gray-900">
+                      RFQ answers
+                    </h2>
+                    <div className="space-y-2">
+                      {booking.rfqData.answers.map((answer, index) => (
+                        <div key={`${answer.question}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                          <p className="text-xs font-medium text-gray-900">{answer.question}</p>
+                          {isHttpUrl(answer.answer) ? (
+                            <a
+                              href={answer.answer}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="mt-1 inline-flex text-xs text-indigo-700 hover:underline"
+                            >
+                              {getFileLabel(answer.answer)}
+                            </a>
+                          ) : (
+                            <p className="mt-1 text-xs text-gray-700 whitespace-pre-wrap">{answer.answer}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {Array.isArray(booking.postBookingData) && booking.postBookingData.length > 0 && (
+                  <section className="space-y-2">
+                    <h2 className="text-sm font-semibold text-gray-900">
+                      Post-booking answers
+                    </h2>
+                    <div className="space-y-2">
+                      {booking.postBookingData.map((answer, index) => (
+                        <div key={`${answer.questionId}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                          <p className="text-xs font-medium text-gray-900">{answer.question}</p>
+                          {isHttpUrl(answer.answer) ? (
+                            <a
+                              href={answer.answer}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="mt-1 inline-flex text-xs text-indigo-700 hover:underline"
+                            >
+                              {getFileLabel(answer.answer)}
+                            </a>
+                          ) : (
+                            <p className="mt-1 text-xs text-gray-700 whitespace-pre-wrap">{answer.answer}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </section>
                 )}
 

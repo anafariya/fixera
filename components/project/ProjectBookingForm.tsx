@@ -32,6 +32,7 @@ import 'react-day-picker/dist/style.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { getViewerTimezone, normalizeTimezone } from '@/lib/timezoneDisplay';
 import { formatCurrency } from '@/lib/formatters';
+import { getAuthToken } from '@/lib/utils';
 
 // Get unit label from priceModel (e.g., "m² of floor surface" ? "m²")
 const getUnitLabel = (priceModel?: string): string => {
@@ -357,6 +358,7 @@ export default function ProjectBookingForm({
   } | null>(null);
   const [loadingScheduleWindow, setLoadingScheduleWindow] = useState(false);
   const [rfqAnswers, setRFQAnswers] = useState<RFQAnswer[]>([]);
+  const [uploadingQuestionIndexes, setUploadingQuestionIndexes] = useState<Set<number>>(new Set());
   const [selectedExtraOptions, setSelectedExtraOptions] = useState<number[]>(
     []
   );
@@ -1784,6 +1786,46 @@ export default function ProjectBookingForm({
     });
   };
 
+  const handleRFQAttachmentUpload = async (index: number, file: File | null) => {
+    if (!file) return;
+
+    setUploadingQuestionIndexes(prev => new Set(prev).add(index));
+    try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const formData = new FormData();
+      formData.append('attachment', file);
+      formData.append('projectId', project._id);
+      formData.append('questionId', project.rfqQuestions[index]?.question || `rfq-${index}`);
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/projects/upload/attachment`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers,
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok || !data?.success || !data?.data?.url) {
+        toast.error(data?.message || 'Failed to upload attachment');
+        return;
+      }
+
+      handleRFQAnswerChange(index, data.data.url);
+      toast.success('Attachment uploaded');
+    } catch (error) {
+      console.error('Failed to upload RFQ attachment:', error);
+      toast.error('Failed to upload attachment');
+    } finally {
+      setUploadingQuestionIndexes(prev => { const next = new Set(prev); next.delete(index); return next });
+    }
+  };
+
   const handleExtraOptionToggle = (index: number) => {
     setSelectedExtraOptions((prev) =>
       prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
@@ -1888,6 +1930,10 @@ export default function ProjectBookingForm({
   };
 
   const handleNext = () => {
+    if (uploadingQuestionIndexes.size > 0) {
+      toast.error('Please wait for all uploads to finish before continuing.');
+      return;
+    }
     if (!guardOutsideServiceArea()) return;
     if (!validateStep()) return;
 
@@ -1905,6 +1951,11 @@ export default function ProjectBookingForm({
   };
 
   const handleSubmit = async () => {
+    if (uploadingQuestionIndexes.size > 0) {
+      toast.error('Please wait for all uploads to finish before submitting.');
+      return;
+    }
+
     debugLog?.('[BOOKING] Submit initiated');
     debugLog?.('[BOOKING] Current step:', currentStep);
     debugLog?.('[BOOKING] Selected package index:', selectedPackageIndex);
@@ -3368,17 +3419,35 @@ export default function ProjectBookingForm({
                       <div className='border-2 border-dashed border-gray-300 rounded-lg p-6 text-center'>
                         <Upload className='h-8 w-8 text-gray-400 mx-auto mb-2' />
                         <p className='text-sm text-gray-600'>
-                          File upload coming soon
+                          Upload a file for this question
                         </p>
                         <Input
-                          type='text'
-                          placeholder='For now, please describe or provide a link'
-                          value={rfqAnswers[idx]?.answer || ''}
-                          onChange={(e) =>
-                            handleRFQAnswerChange(idx, e.target.value)
-                          }
+                          type='file'
+                          accept='.pdf,image/*'
                           className='mt-3'
+                          disabled={uploadingQuestionIndexes.has(idx)}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            void handleRFQAttachmentUpload(idx, file);
+                            e.currentTarget.value = '';
+                          }}
                         />
+                        {uploadingQuestionIndexes.has(idx) && (
+                          <div className='mt-3 inline-flex items-center text-xs text-indigo-600'>
+                            <Loader2 className='h-3.5 w-3.5 mr-1 animate-spin' />
+                            Uploading...
+                          </div>
+                        )}
+                        {rfqAnswers[idx]?.answer && /^https?:\/\//i.test(rfqAnswers[idx].answer) && (
+                          <a
+                            href={rfqAnswers[idx].answer}
+                            target='_blank'
+                            rel='noreferrer noopener'
+                            className='mt-3 inline-flex text-sm text-indigo-600 hover:underline'
+                          >
+                            Open uploaded attachment
+                          </a>
+                        )}
                       </div>
                     )}
                   </div>
@@ -3737,13 +3806,13 @@ export default function ProjectBookingForm({
           </Button>
 
           {currentStep < 4 ? (
-            <Button onClick={handleNext} disabled={isOutsideServiceArea}>
+            <Button onClick={handleNext} disabled={isOutsideServiceArea || uploadingQuestionIndexes.size > 0}>
               Next Step
             </Button>
           ) : (
             <Button
               onClick={handleSubmit}
-              disabled={loading || isOutsideServiceArea}
+              disabled={loading || isOutsideServiceArea || uploadingQuestionIndexes.size > 0}
               className='bg-blue-600 hover:bg-blue-700'
             >
               {loading ? (
