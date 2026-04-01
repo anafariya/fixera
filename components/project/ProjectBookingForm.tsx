@@ -1867,9 +1867,7 @@ export default function ProjectBookingForm({
         return false;
       }
 
-      const isRfqPricing = selectedPackage?.pricing?.type === 'rfq';
       if (
-        !isRfqPricing &&
         projectMode === 'days' &&
         (loadingScheduleWindow || !scheduleWindowCompletionDate)
       ) {
@@ -2167,17 +2165,20 @@ export default function ProjectBookingForm({
   };
 
   const getEffectivePackagePrice = (): number | null => {
+    const currentPackage = selectedPackage;
+    const amount = currentPackage?.pricing.amount;
     if (
-      !selectedPackage?.pricing.amount ||
-      selectedPackage.pricing.type === 'rfq'
+      !currentPackage ||
+      amount == null ||
+      currentPackage?.pricing.type === 'rfq'
     ) {
       return null;
     }
 
-    const multiplier = shouldCollectUsage(selectedPackage.pricing.type)
+    const multiplier = shouldCollectUsage(currentPackage.pricing.type)
       ? estimatedUsage
       : 1;
-    return multiplier * selectedPackage.pricing.amount;
+    return multiplier * amount;
   };
 
   const calculateTotal = (): number => {

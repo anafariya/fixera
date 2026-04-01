@@ -67,6 +67,31 @@ const formatBudget = (booking: Booking): string | null => {
   return `${currency}${value.toLocaleString()}`
 }
 
+const ACCENT_CLASSES = {
+  indigo: {
+    icon: "text-indigo-500",
+    border: "border-indigo-200",
+    hoverBorder: "hover:border-indigo-300",
+  },
+  blue: {
+    icon: "text-blue-500",
+    border: "border-blue-200",
+    hoverBorder: "hover:border-blue-300",
+  },
+  emerald: {
+    icon: "text-emerald-500",
+    border: "border-emerald-200",
+    hoverBorder: "hover:border-emerald-300",
+  },
+  teal: {
+    icon: "text-teal-500",
+    border: "border-teal-200",
+    hoverBorder: "hover:border-teal-300",
+  },
+} as const
+
+type AccentKey = keyof typeof ACCENT_CLASSES
+
 export default function CustomerDashboard() {
   const { user } = useAuth()
   const router = useRouter()
@@ -204,6 +229,7 @@ export default function CustomerDashboard() {
     () => filteredQuotes.filter(b => selectedQuoteIds.has(b._id)),
     [filteredQuotes, selectedQuoteIds]
   )
+  const visibleSelectedCount = comparisonBookings.length
 
   // Summary stats
   const totalBookings = bookings.length
@@ -261,6 +287,7 @@ export default function CustomerDashboard() {
   )
 
   const renderBookingCard = (booking: Booking, colorAccent: string, opts?: { selectable?: boolean; selected?: boolean; onToggle?: () => void }) => {
+    const accent = ACCENT_CLASSES[(colorAccent as AccentKey)] ?? ACCENT_CLASSES.indigo
     const isProject = booking.bookingType === "project"
     const title = getBookingTitle(booking)
     const { label: statusLabel, className: statusClasses } = getBookingStatusMeta(booking.status)
@@ -303,9 +330,9 @@ export default function CustomerDashboard() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   {isProject ? (
-                    <Package className={`h-4 w-4 text-${colorAccent}-500`} />
+                    <Package className={`h-4 w-4 ${accent.icon}`} />
                   ) : (
-                    <Briefcase className={`h-4 w-4 text-${colorAccent}-500`} />
+                    <Briefcase className={`h-4 w-4 ${accent.icon}`} />
                   )}
                   <CardTitle className="text-base font-semibold text-gray-900">
                     {title}
@@ -328,7 +355,7 @@ export default function CustomerDashboard() {
         <CardContent className="pt-0 space-y-2 text-xs text-gray-700">
           {preferredStart && (
             <div className="flex items-center gap-2">
-              <Calendar className={`h-3 w-3 text-${colorAccent}-500`} />
+              <Calendar className={`h-3 w-3 ${accent.icon}`} />
               <span>
                 Start: <span className="font-medium">{preferredStart.toLocaleDateString()}</span>
               </span>
@@ -362,7 +389,7 @@ export default function CustomerDashboard() {
               variant="outline"
               size="sm"
               onClick={() => router.push(`/bookings/${booking._id}`)}
-              className={`text-xs bg-white/80 border-${colorAccent}-200 hover:border-${colorAccent}-300`}
+              className={`text-xs bg-white/80 ${accent.border} ${accent.hoverBorder}`}
             >
               View details
             </Button>
@@ -371,7 +398,7 @@ export default function CustomerDashboard() {
                 professionalId={booking.professional._id}
                 label="Chat"
                 size="sm"
-                className={`text-xs bg-white/80 border-${colorAccent}-200 hover:border-${colorAccent}-300`}
+                className={`text-xs bg-white/80 ${accent.border} ${accent.hoverBorder}`}
               />
             )}
             {(booking.status === 'quote_accepted' || booking.status === 'payment_pending') && (
@@ -604,19 +631,19 @@ export default function CustomerDashboard() {
             {filteredQuotes.length > 1 && (
               <div className="flex items-center justify-between">
                 <p className="text-xs text-gray-500">
-                  {selectedQuoteIds.size > 0
-                    ? `${selectedQuoteIds.size} selected`
+                  {visibleSelectedCount > 0
+                    ? `${visibleSelectedCount} selected`
                     : "Select quotes to compare"}
                 </p>
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={selectedQuoteIds.size < 2}
+                  disabled={visibleSelectedCount < 2}
                   onClick={() => setShowComparison(true)}
                   className="text-xs"
                 >
                   <GitCompareArrows className="h-3.5 w-3.5 mr-1.5" />
-                  Compare ({selectedQuoteIds.size})
+                  Compare ({visibleSelectedCount})
                 </Button>
               </div>
             )}

@@ -446,14 +446,14 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
             Back to Dashboard
           </Button>
           <div className="flex gap-2">
-            {mode === "quotes" && selectedQuoteIds.size >= 2 && (
+            {mode === "quotes" && comparisonBookings.length >= 2 && (
               <Button
                 variant="outline"
                 onClick={() => setShowComparison(true)}
                 className="text-xs"
               >
                 <GitCompareArrows className="h-4 w-4 mr-2" />
-                Compare ({selectedQuoteIds.size})
+                Compare ({comparisonBookings.length})
               </Button>
             )}
             {mode === "quotes" && (

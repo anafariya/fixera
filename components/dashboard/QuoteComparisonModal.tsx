@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, ArrowDown, ArrowUp, Minus, Clock, Shield, Package, CreditCard, Calendar } from 'lucide-react'
@@ -44,9 +44,17 @@ const formatDate = (dateStr?: string) => {
 
 export default function QuoteComparisonModal({ open, onOpenChange, bookings }: QuoteComparisonModalProps) {
   const [quotes, setQuotes] = useState<FetchedQuote[]>([])
+  const requestSeqRef = useRef(0)
 
   useEffect(() => {
-    if (!open || bookings.length === 0) return
+    if (!open || bookings.length === 0) {
+      setQuotes([])
+      return
+    }
+
+    const runSeq = requestSeqRef.current + 1
+    requestSeqRef.current = runSeq
+    const controller = new AbortController()
 
     const initial = bookings.map(b => ({
       booking: b,
@@ -56,7 +64,7 @@ export default function QuoteComparisonModal({ open, onOpenChange, bookings }: Q
     }))
     setQuotes(initial)
 
-    bookings.forEach((booking, idx) => {
+    bookings.forEach((booking) => {
       const fetchVersion = async () => {
         try {
           const token = getAuthToken()
@@ -65,23 +73,33 @@ export default function QuoteComparisonModal({ open, onOpenChange, bookings }: Q
 
           const res = await fetch(
             `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/quotations/${booking._id}/versions`,
-            { credentials: 'include', headers }
+            { credentials: 'include', headers, signal: controller.signal }
           )
+          if (controller.signal.aborted || requestSeqRef.current !== runSeq) return
           const data = await res.json()
+          if (controller.signal.aborted || requestSeqRef.current !== runSeq) return
 
           if (res.ok && data?.success && data.data?.versions?.length > 0) {
             const versions: QuoteVersion[] = data.data.versions
             const current = versions[versions.length - 1]
-            setQuotes(prev => prev.map((q, i) => i === idx ? { ...q, version: current, loading: false } : q))
+            setQuotes(prev => prev.map((q) => q.booking._id === booking._id ? { ...q, version: current, loading: false } : q))
           } else {
-            setQuotes(prev => prev.map((q, i) => i === idx ? { ...q, loading: false, error: 'No quotation data' } : q))
+            setQuotes(prev => prev.map((q) => q.booking._id === booking._id ? { ...q, loading: false, error: 'No quotation data' } : q))
           }
         } catch {
-          setQuotes(prev => prev.map((q, i) => i === idx ? { ...q, loading: false, error: 'Failed to load' } : q))
+          if (controller.signal.aborted || requestSeqRef.current !== runSeq) return
+          setQuotes(prev => prev.map((q) => q.booking._id === booking._id ? { ...q, loading: false, error: 'Failed to load' } : q))
         }
       }
       fetchVersion()
     })
+
+    return () => {
+      controller.abort()
+      if (!open || bookings.length === 0) {
+        setQuotes([])
+      }
+    }
   }, [open, bookings])
 
   const allLoaded = quotes.length > 0 && quotes.every(q => !q.loading)
