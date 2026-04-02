@@ -50,6 +50,7 @@ export default function ReferralCard() {
   const [fetchError, setFetchError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const isProfessional = user?.role === 'professional';
 
   const fetchReferralStats = async () => {
     try {
@@ -126,7 +127,9 @@ export default function ReferralCard() {
   const shareVia = (platform: string) => {
     if (!data?.referralCode) return;
     const link = `${window.location.origin}/join?ref=${encodeURIComponent(data.referralCode)}`;
-    const text = `Join Fixera and get a discount on your first booking! Use my referral link:`;
+    const text = isProfessional
+      ? 'Join Fixera as a professional and start earning points while building trust faster. Use my referral link:'
+      : 'Join Fixera and get a discount on your first booking! Use my referral link:';
 
     const urls: Record<string, string> = {
       whatsapp: `https://wa.me/?text=${encodeURIComponent(`${text} ${link}`)}`,
@@ -137,8 +140,6 @@ export default function ReferralCard() {
       window.open(urls[platform], '_blank');
     }
   };
-
-  const isProfessional = user?.role === 'professional';
 
   if (loading) {
     return (

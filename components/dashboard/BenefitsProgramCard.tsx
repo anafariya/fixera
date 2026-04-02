@@ -49,7 +49,11 @@ export default function BenefitsProgramCard() {
   const [professionalData, setProfessionalData] = useState<ProfessionalBenefitsResponse | null>(null)
 
   useEffect(() => {
+    const controller = new AbortController()
     const load = async () => {
+      const role = user?.role
+      setCustomerData(null)
+      setProfessionalData(null)
       if (!user || (user.role !== "customer" && user.role !== "professional")) {
         setLoading(false)
         return
@@ -66,19 +70,26 @@ export default function BenefitsProgramCard() {
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}${endpoint}`, {
           credentials: "include",
           headers,
+          signal: controller.signal,
         })
         const payload = await response.json()
-        if (!response.ok || !payload.success) return
-        if (user.role === "customer") {
+        if (controller.signal.aborted || user.role !== role || !response.ok || !payload.success) return
+        if (role === "customer") {
           setCustomerData(payload.data || null)
         } else {
           setProfessionalData(payload.data || null)
         }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return
+        console.error("Failed to load benefits program data:", error)
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
     void load()
+    return () => controller.abort()
   }, [user])
 
   if (!user || (user.role !== "customer" && user.role !== "professional")) return null

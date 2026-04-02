@@ -294,6 +294,32 @@ const parseResponseBody = async <T,>(response: Response): Promise<{ data: T | nu
   }
 }
 
+const WARRANTY_ALLOWED_FILE_TYPES = ['image/', 'video/', 'application/pdf']
+const WARRANTY_MAX_FILE_SIZE = 50 * 1024 * 1024
+const WARRANTY_MAX_FILES = 10
+
+const validateWarrantyFiles = (fileList: FileList | File[] | null | undefined) => {
+  const raw = Array.from(fileList || [])
+  const valid: File[] = []
+  const rejected: string[] = []
+
+  for (const file of raw.slice(0, WARRANTY_MAX_FILES)) {
+    if (!WARRANTY_ALLOWED_FILE_TYPES.some((type) => file.type.startsWith(type))) {
+      rejected.push(`${file.name}: unsupported type`)
+    } else if (file.size > WARRANTY_MAX_FILE_SIZE) {
+      rejected.push(`${file.name}: exceeds 50 MB`)
+    } else {
+      valid.push(file)
+    }
+  }
+
+  if (raw.length > WARRANTY_MAX_FILES) {
+    rejected.push(`Only ${WARRANTY_MAX_FILES} files allowed`)
+  }
+
+  return { valid, rejected }
+}
+
 
 export default function BookingDetailPage() {
   const { user, isAuthenticated, loading } = useAuth()
@@ -840,9 +866,10 @@ export default function BookingDetailPage() {
     }
     setWarrantyActionLoading(true)
     try {
+      const token = getAuthToken()
       let attachmentUrls: string[] = []
+      let uploadedFiles: Array<{ url?: string; key?: string }> = []
       if (warrantyResolutionFiles.length > 0) {
-        const token = getAuthToken()
         const formData = new FormData()
         warrantyResolutionFiles.forEach((file) => formData.append("files", file))
         const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/warranty-claims/upload-evidence`, {
@@ -855,14 +882,38 @@ export default function BookingDetailPage() {
         if (!uploadResponse.ok || !uploadPayload.success) {
           throw new Error(uploadPayload.msg || "Failed to upload resolution attachments")
         }
-        attachmentUrls = Array.isArray(uploadPayload.data?.files)
-          ? uploadPayload.data.files.map((file: { url: string }) => file.url).filter(Boolean)
-          : []
+        uploadedFiles = Array.isArray(uploadPayload.data?.files) ? uploadPayload.data.files : []
+        attachmentUrls = uploadedFiles
+          .map((file: { url?: string }) => file.url)
+          .filter((url): url is string => Boolean(url))
       }
-      const data = await callWarrantyAction(`${warrantyClaim._id}/resolve`, {
-        summary: warrantyResolutionSummary.trim(),
-        attachments: attachmentUrls,
-      })
+      let data
+      try {
+        data = await callWarrantyAction(`${warrantyClaim._id}/resolve`, {
+          summary: warrantyResolutionSummary.trim(),
+          attachments: attachmentUrls,
+        })
+      } catch (error) {
+        if (uploadedFiles.length > 0) {
+          try {
+            await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/warranty-claims/upload-evidence`, {
+              method: "DELETE",
+              credentials: "include",
+              headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              body: JSON.stringify({
+                urls: uploadedFiles.map((file) => file.url).filter(Boolean),
+                keys: uploadedFiles.map((file) => file.key).filter(Boolean),
+              }),
+            })
+          } catch (cleanupError) {
+            console.error("Failed to clean up warranty resolution attachments:", cleanupError)
+          }
+        }
+        throw error
+      }
       setWarrantyClaim(data.claim || null)
       setWarrantyResolutionSummary("")
       setWarrantyResolutionFiles([])
@@ -2699,7 +2750,14 @@ export default function BookingDetailPage() {
                               <Input
                                 type="file"
                                 multiple
-                                onChange={(e) => setWarrantyResolutionFiles(Array.from(e.target.files || []))}
+                                accept="image/*,video/*,.pdf"
+                                onChange={(e) => {
+                                  const { valid, rejected } = validateWarrantyFiles(e.target.files)
+                                  setWarrantyResolutionFiles(valid)
+                                  if (rejected.length > 0) {
+                                    toast.error(rejected.join('; '))
+                                  }
+                                }}
                                 className="text-xs"
                               />
                               {warrantyResolutionFiles.length > 0 && (
@@ -2813,24 +2871,7 @@ export default function BookingDetailPage() {
                           multiple
                           accept="image/*,video/*,.pdf"
                           onChange={(e) => {
-                            const allowedTypes = ['image/', 'video/', 'application/pdf']
-                            const maxFileSize = 50 * 1024 * 1024 // 50 MB
-                            const maxFiles = 10
-                            const raw = Array.from(e.target.files || [])
-                            const valid: File[] = []
-                            const rejected: string[] = []
-                            for (const file of raw.slice(0, maxFiles)) {
-                              if (!allowedTypes.some((t) => file.type.startsWith(t))) {
-                                rejected.push(`${file.name}: unsupported type`)
-                              } else if (file.size > maxFileSize) {
-                                rejected.push(`${file.name}: exceeds 50 MB`)
-                              } else {
-                                valid.push(file)
-                              }
-                            }
-                            if (raw.length > maxFiles) {
-                              rejected.push(`Only ${maxFiles} files allowed`)
-                            }
+                            const { valid, rejected } = validateWarrantyFiles(e.target.files)
                             setWarrantyEvidenceFiles(valid)
                             if (rejected.length > 0) {
                               toast.error(rejected.join('; '))

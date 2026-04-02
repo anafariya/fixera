@@ -140,9 +140,12 @@ export default function DashboardPage() {
   const [bookingsLoading, setBookingsLoading] = useState(false)
   const [bookingsError, setBookingsError] = useState<string | null>(null)
   const [warrantyClaims, setWarrantyClaims] = useState<WarrantyClaimAction[]>([])
+  const [warrantyClaimsLoading, setWarrantyClaimsLoading] = useState(false)
+  const [warrantyClaimsError, setWarrantyClaimsError] = useState<string | null>(null)
 
   const actionItems = useMemo(() => getProfessionalActionItems(bookings), [bookings])
   const warrantyActionItems = useMemo<WarrantyDashboardAction[]>(() => {
+    if (warrantyClaimsLoading || warrantyClaimsError) return []
     return warrantyClaims.flatMap((claim) => {
       if (!claim.booking?._id) return []
       if (claim.status === "open") {
@@ -155,7 +158,7 @@ export default function DashboardPage() {
       }
       return []
     })
-  }, [warrantyClaims])
+  }, [warrantyClaims, warrantyClaimsError, warrantyClaimsLoading])
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -230,6 +233,8 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user || !isAuthenticated || user.role !== "professional") return
     const loadClaims = async () => {
+      setWarrantyClaimsLoading(true)
+      setWarrantyClaimsError(null)
       try {
         const token = getAuthToken()
         const headers: Record<string, string> = {}
@@ -239,9 +244,16 @@ export default function DashboardPage() {
           headers,
         })
         const payload = await response.json()
-        if (response.ok && payload.success) setWarrantyClaims(payload.data?.claims || [])
-      } catch {
-        // non-blocking
+        if (response.ok && payload.success) {
+          setWarrantyClaims(payload.data?.claims || [])
+          return
+        }
+        setWarrantyClaimsError(payload?.msg || "Failed to load warranty claims.")
+      } catch (error) {
+        console.error("Failed to load warranty claims:", error)
+        setWarrantyClaimsError("Failed to load warranty claims.")
+      } finally {
+        setWarrantyClaimsLoading(false)
       }
     }
     void loadClaims()
@@ -1131,13 +1143,25 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {!bookingsLoading && !bookingsError && actionItems.length === 0 && warrantyActionItems.length === 0 && (
+              {!bookingsLoading && !bookingsError && !warrantyClaimsLoading && !warrantyClaimsError && actionItems.length === 0 && warrantyActionItems.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   No actions needed right now. You&apos;re all caught up!
                 </div>
               )}
 
-              {!bookingsLoading && !bookingsError && (actionItems.length > 0 || warrantyActionItems.length > 0) && (
+              {!bookingsLoading && !bookingsError && warrantyClaimsLoading && (
+                <div className="text-center py-4 text-gray-500">
+                  Loading warranty actions...
+                </div>
+              )}
+
+              {!bookingsLoading && !bookingsError && !warrantyClaimsLoading && warrantyClaimsError && (
+                <div className="text-center py-4 text-amber-700">
+                  {warrantyClaimsError}
+                </div>
+              )}
+
+              {!bookingsLoading && !bookingsError && (actionItems.length > 0 || (!warrantyClaimsLoading && !warrantyClaimsError && warrantyActionItems.length > 0)) && (
                 <div className="space-y-3">
                   {actionItems.map((item) => {
                     const isProject = item.booking.bookingType === "project"
@@ -1207,7 +1231,7 @@ export default function DashboardPage() {
                       </div>
                     )
                   })}
-                  {warrantyActionItems.map((item) => (
+                  {!warrantyClaimsLoading && !warrantyClaimsError && warrantyActionItems.map((item) => (
                     <div key={item.id} className={`border rounded-lg p-4 ${item.severity === "urgent" ? "border-red-200 bg-red-50/50" : "border-amber-200 bg-amber-50/50"}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div>

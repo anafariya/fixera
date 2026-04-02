@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -30,40 +30,83 @@ export default function AdminProfessionalManagementPage() {
   const [country, setCountry] = useState("all")
   const [level, setLevel] = useState("all")
   const [tag, setTag] = useState("")
+  const abortRef = useRef<AbortController | null>(null)
+  const loadRequestIdRef = useRef(0)
 
-  const load = async () => {
-    const token = getAuthToken()
-    const params = new URLSearchParams()
-    if (search.trim()) params.set("search", search.trim())
-    if (country !== "all") params.set("country", country)
-    if (level !== "all") params.set("levels", level)
-    if (tag.trim()) params.set("tags", tag.trim())
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/professionals/manage?${params.toString()}`, {
-      credentials: "include",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-    const payload = await response.json()
-    if (response.ok && payload.success) setRows(payload.data?.professionals || [])
-  }
+  const load = useCallback(async () => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    const requestId = ++loadRequestIdRef.current
+    try {
+      const token = getAuthToken()
+      const params = new URLSearchParams()
+      if (search.trim()) params.set("search", search.trim())
+      if (country !== "all") params.set("country", country)
+      if (level !== "all") params.set("levels", level)
+      if (tag.trim()) params.set("tags", tag.trim())
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/professionals/manage?${params.toString()}`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal: controller.signal,
+      })
+      let payload: { success?: boolean; msg?: string; data?: { professionals?: ProfessionalRow[] } } | null = null
+      try {
+        payload = await response.json()
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          console.error("Failed to parse professionals response:", error)
+        }
+      }
+      const isLatestRequest = requestId === loadRequestIdRef.current
+      if (!controller.signal.aborted && isLatestRequest && response.ok && payload?.success) {
+        setRows(payload.data?.professionals || [])
+        return
+      }
+      if (!controller.signal.aborted && isLatestRequest && !response.ok) {
+        console.error("Failed to load professionals:", payload?.msg || `Request failed with status ${response.status}`)
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return
+      console.error("Failed to load professionals:", error)
+    }
+  }, [country, level, search, tag])
 
   const patchProfessional = async (professionalId: string, body: Record<string, unknown>) => {
-    const token = getAuthToken()
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/professionals/manage/${professionalId}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(body),
-    })
-    if (response.ok) await load()
+    try {
+      const token = getAuthToken()
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/professionals/manage/${professionalId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      })
+      let payload: { success?: boolean; msg?: string } | null = null
+      try {
+        payload = await response.json()
+      } catch (error) {
+        console.error("Failed to parse professional patch response:", error)
+      }
+      if (!response.ok || !payload?.success) {
+        console.error("Failed to patch professional:", payload?.msg || `Request failed with status ${response.status}`)
+        return
+      }
+      await load()
+    } catch (error) {
+      console.error("Failed to patch professional:", error)
+    }
   }
 
   useEffect(() => {
     if (user?.role !== "admin") return
     void load()
-  }, [user, search, country, level, tag])
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [load, user])
 
   if (user?.role !== "admin") return null
 
@@ -122,8 +165,18 @@ export default function AdminProfessionalManagementPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" onClick={() => void patchProfessional(row._id, { tags: ["verified"] })}>Verified</Button>
-                  <Button variant="outline" onClick={() => void patchProfessional(row._id, { tags: ["our choice"] })}>Our Choice</Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => void patchProfessional(row._id, { tags: Array.from(new Set([...(row.adminTags || []), "verified"])) })}
+                  >
+                    Verified
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => void patchProfessional(row._id, { tags: Array.from(new Set([...(row.adminTags || []), "our choice"])) })}
+                  >
+                    Our Choice
+                  </Button>
                   <Button variant="outline" onClick={() => void patchProfessional(row._id, { action: row.accountStatus === "suspended" ? "reactivate" : "suspend" })}>
                     {row.accountStatus === "suspended" ? "Reactivate" : "Suspend"}
                   </Button>

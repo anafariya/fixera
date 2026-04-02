@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -30,38 +30,84 @@ export default function AdminCustomersPage() {
   const [country, setCountry] = useState("all")
   const [level, setLevel] = useState("all")
 
-  const load = async () => {
-    const token = getAuthToken()
-    const params = new URLSearchParams()
-    if (search.trim()) params.set("search", search.trim())
-    if (country !== "all") params.set("country", country)
-    if (level !== "all") params.set("levels", level)
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/customers/manage?${params.toString()}`, {
-      credentials: "include",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-    const payload = await response.json()
-    if (response.ok && payload.success) setRows(payload.data?.customers || [])
-  }
+  const abortRef = useRef<AbortController | null>(null)
+  const loadRequestIdRef = useRef(0)
+  const [patching, setPatching] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    const requestId = ++loadRequestIdRef.current
+    try {
+      const token = getAuthToken()
+      const params = new URLSearchParams()
+      if (search.trim()) params.set("search", search.trim())
+      if (country !== "all") params.set("country", country)
+      if (level !== "all") params.set("levels", level)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/customers/manage?${params.toString()}`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal: controller.signal,
+      })
+      let payload: { success?: boolean; msg?: string; data?: { customers?: CustomerRow[] } } | null = null
+      try {
+        payload = await response.json()
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          console.error("Failed to parse customers response:", error)
+        }
+      }
+      const isLatestRequest = requestId === loadRequestIdRef.current
+      if (!controller.signal.aborted && isLatestRequest && response.ok && payload?.success) {
+        setRows(payload.data?.customers || [])
+        return
+      }
+      if (!controller.signal.aborted && isLatestRequest && !response.ok) {
+        console.error("Failed to load customers:", payload?.msg || `Request failed with status ${response.status}`)
+      }
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return
+      console.error("Failed to load customers:", e)
+    }
+  }, [country, level, search])
 
   const patchCustomer = async (customerId: string, body: Record<string, unknown>) => {
-    const token = getAuthToken()
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/customers/manage/${customerId}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(body),
-    })
-    if (response.ok) await load()
+    setPatching(customerId)
+    try {
+      const token = getAuthToken()
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/customers/manage/${customerId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      })
+      let payload: { success?: boolean; msg?: string } | null = null
+      try {
+        payload = await response.json()
+      } catch (error) {
+        console.error("Failed to parse customer patch response:", error)
+      }
+      if (!response.ok || !payload?.success) {
+        console.error("Failed to patch customer:", payload?.msg || `Request failed with status ${response.status}`)
+        return
+      }
+      await load()
+    } catch (e) {
+      console.error("Failed to patch customer:", e)
+    } finally {
+      setPatching(null)
+    }
   }
 
   useEffect(() => {
     if (user?.role !== "admin") return
     void load()
-  }, [user, search, country, level])
+    return () => { abortRef.current?.abort() }
+  }, [load, user])
 
   if (user?.role !== "admin") return null
 
@@ -118,10 +164,23 @@ export default function AdminCustomersPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" onClick={() => void patchCustomer(row._id, { action: row.accountStatus === "suspended" ? "reactivate" : "suspend" })}>
+                  <Button
+                    variant="outline"
+                    disabled={patching === row._id}
+                    onClick={() => void patchCustomer(row._id, { action: row.accountStatus === "suspended" ? "reactivate" : "suspend" })}
+                  >
                     {row.accountStatus === "suspended" ? "Reactivate" : "Suspend"}
                   </Button>
-                  <Button variant="destructive" onClick={() => void patchCustomer(row._id, { action: "delete" })}>
+                  <Button
+                    variant="destructive"
+                    disabled={patching === row._id}
+                    onClick={() => {
+                      if (!window.confirm(`Delete customer ${row.name || row.email}? This can be reversed only through admin recovery tools.`)) {
+                        return
+                      }
+                      void patchCustomer(row._id, { action: "delete" })
+                    }}
+                  >
                     Delete
                   </Button>
                 </div>
