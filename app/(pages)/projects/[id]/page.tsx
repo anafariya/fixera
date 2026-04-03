@@ -916,7 +916,7 @@ export default function ProjectDetailPage() {
                                 Number.isFinite(term.additionalCost) &&
                                 term.additionalCost > 0 && (
                                   <div className='shrink-0 text-sm font-semibold text-orange-600'>
-                                    +{formatCurrency(term.additionalCost) ?? `€${term.additionalCost.toFixed(2)}`}
+                                    +{formatCurrency(customerPrice(term.additionalCost)) ?? `€${term.additionalCost.toFixed(2)}`}
                                   </div>
                                 )}
                             </div>

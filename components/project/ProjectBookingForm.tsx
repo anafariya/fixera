@@ -2270,10 +2270,25 @@ export default function ProjectBookingForm({
     ? 'Preparing Payment...'
     : 'Submitting RFQ...';
   const repeatBuyerEligible = project.repeatBuyerEligibility?.eligible === true;
+  const displaySelectedPackageUnitPrice = toCustomerDisplayAmount(selectedPackage?.pricing.amount);
+  const discountedSelectedPackageUnitPrice = applyConfiguredRepeatBuyerDiscount(
+    displaySelectedPackageUnitPrice,
+    repeatBuyerEligible
+  );
+  const hasSelectedPackageUnitDiscount =
+    displaySelectedPackageUnitPrice != null &&
+    discountedSelectedPackageUnitPrice != null &&
+    discountedSelectedPackageUnitPrice < displaySelectedPackageUnitPrice;
   const displayPackagePrice = toCustomerDisplayAmount(getEffectivePackagePrice());
   const displayTotalPrice = toCustomerDisplayAmount(calculateTotal());
   const discountedDisplayTotalPrice =
     applyConfiguredRepeatBuyerDiscount(displayTotalPrice, repeatBuyerEligible);
+  const discountedDisplayPackagePrice =
+    applyConfiguredRepeatBuyerDiscount(displayPackagePrice, repeatBuyerEligible);
+  const hasDisplayPackageDiscount =
+    displayPackagePrice != null &&
+    discountedDisplayPackagePrice != null &&
+    discountedDisplayPackagePrice < displayPackagePrice;
   const baseDisplayTotal =
     typeof displayTotalPrice === 'number' ? displayTotalPrice : calculateTotal();
   const repeatBuyerDiscountAmount =
@@ -2743,23 +2758,37 @@ export default function ProjectBookingForm({
                           <div className='text-right'>
                             {selectedPackage.pricing.type === 'fixed' &&
                               selectedPackage.pricing.amount && (
-                                <p className='text-2xl font-bold text-blue-600'>
-                                  {formatCurrency(
-                                    selectedPackage.pricing.amount
+                                <div className='text-2xl font-bold text-blue-600'>
+                                  {hasDisplayPackageDiscount ? (
+                                    <div className='flex flex-col items-end'>
+                                      <span className='text-base font-semibold text-gray-400 line-through'>
+                                        {formatCurrency(displayPackagePrice)}
+                                      </span>
+                                      <span>{formatCurrency(discountedDisplayPackagePrice)}</span>
+                                    </div>
+                                  ) : (
+                                    formatCurrency(displayPackagePrice ?? selectedPackage.pricing.amount)
                                   )}
-                                </p>
+                                </div>
                               )}
                             {selectedPackage.pricing.type === 'unit' &&
                               selectedPackage.pricing.amount && (
                                 <div>
                                   <p className='text-2xl font-bold text-blue-600'>
-                                    {formatCurrency(
-                                      selectedPackage.pricing.amount
-                                    )}
+                                    {hasSelectedPackageUnitDiscount
+                                      ? formatCurrency(discountedSelectedPackageUnitPrice)
+                                      : formatCurrency(
+                                        displaySelectedPackageUnitPrice ?? selectedPackage.pricing.amount
+                                      )}
                                     <span className='text-sm font-normal text-gray-500 ml-1'>
                                       /{getUnitLabel(project.priceModel)}
                                     </span>
                                   </p>
+                                  {hasSelectedPackageUnitDiscount && (
+                                    <p className='text-sm font-semibold text-gray-400 line-through'>
+                                      {formatCurrency(displaySelectedPackageUnitPrice)}
+                                    </p>
+                                  )}
                                 </div>
                               )}
                             {selectedPackage.pricing.type === 'rfq' && (
@@ -2824,16 +2853,24 @@ export default function ProjectBookingForm({
                               <p className='text-sm text-gray-600'>
                                 Estimated Price:
                               </p>
-                              <p className='text-4xl font-bold text-blue-600'>
-                                {formatCurrency(
-                                  estimatedUsage *
-                                  (selectedPackage.pricing.amount || 0)
+                              <div className='text-4xl font-bold text-blue-600'>
+                                {hasDisplayPackageDiscount ? (
+                                  <div className='flex flex-col'>
+                                    <span className='text-base font-semibold text-gray-400 line-through'>
+                                      {formatCurrency(displayPackagePrice)}
+                                    </span>
+                                    <span>{formatCurrency(discountedDisplayPackagePrice)}</span>
+                                  </div>
+                                ) : (
+                                  formatCurrency(displayPackagePrice ?? getEffectivePackagePrice() ?? 0)
                                 )}
-                              </p>
+                              </div>
                               <p className='text-sm text-gray-500'>
                                 {estimatedUsage}{' '}
                                 {getUnitLabel(project.priceModel)} x{' '}
-                                {formatCurrency(selectedPackage.pricing.amount)}
+                                {formatCurrency(
+                                  displaySelectedPackageUnitPrice ?? selectedPackage.pricing.amount
+                                )}
                                 /{getUnitLabel(project.priceModel)}
                               </p>
                             </div>
@@ -3321,7 +3358,9 @@ export default function ProjectBookingForm({
                                 </div>
                                 <div className='text-right flex-shrink-0'>
                                   <p className='font-bold text-blue-600'>
-                                    +{formatCurrency(option.price)}
+                                    +{formatCurrency(
+                                      toCustomerDisplayAmount(option.price) ?? option.price
+                                    )}
                                   </p>
                                 </div>
                               </div>
@@ -3584,13 +3623,19 @@ export default function ProjectBookingForm({
                         {selectedPackage.pricing.type === 'fixed' &&
                           selectedPackage.pricing.amount && (
                             <span className='font-semibold text-blue-600'>
-                              {formatCurrency(selectedPackage.pricing.amount)}
+                              {hasDisplayPackageDiscount
+                                ? formatCurrency(discountedDisplayPackagePrice)
+                                : formatCurrency(displayPackagePrice ?? selectedPackage.pricing.amount)}
                             </span>
                           )}
                         {selectedPackage.pricing.type === 'unit' &&
                           selectedPackage.pricing.amount && (
                             <span className='font-semibold text-blue-600'>
-                              {formatCurrency(selectedPackage.pricing.amount)}
+                              {hasSelectedPackageUnitDiscount
+                                ? formatCurrency(discountedSelectedPackageUnitPrice)
+                                : formatCurrency(
+                                  displaySelectedPackageUnitPrice ?? selectedPackage.pricing.amount
+                                )}
                               <span className='text-xs font-normal text-gray-500 ml-1'>
                                 /{getUnitLabel(project.priceModel)}
                               </span>
@@ -3796,7 +3841,9 @@ export default function ProjectBookingForm({
                       {shouldShowUsageBreakdown && (
                         <p className='text-xs text-gray-600'>
                           ({estimatedUsage} {getUnitLabel(project.priceModel)} ×{' '}
-                          {formatCurrency(selectedPackage.pricing.amount)}/
+                          {formatCurrency(
+                            displaySelectedPackageUnitPrice ?? selectedPackage.pricing.amount
+                          )}/
                           {getUnitLabel(project.priceModel)})
                         </p>
                       )}

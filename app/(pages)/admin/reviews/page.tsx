@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { authFetch } from "@/lib/utils"
@@ -101,6 +101,14 @@ export default function AdminReviewsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actioningReviewId, setActioningReviewId] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     if (loading) return
@@ -118,6 +126,7 @@ export default function AdminReviewsPage() {
 
   const fetchReviews = useCallback(async (signal?: AbortSignal) => {
     if (!isAuthenticated || user?.role !== "admin") return
+    if (signal?.aborted || !isMountedRef.current) return
     setIsLoading(true)
     setError(null)
     try {
@@ -135,6 +144,7 @@ export default function AdminReviewsPage() {
       if (!response.ok || !payload.success) {
         throw new Error(payload.msg || "Failed to load reviews")
       }
+      if (signal?.aborted || !isMountedRef.current) return
 
       const data: ReviewsPayload = payload.data
       setReviews(Array.isArray(data.reviews) ? data.reviews : [])
@@ -143,6 +153,7 @@ export default function AdminReviewsPage() {
       setTotalReviews(data.pagination?.total || 0)
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return
+      if (signal?.aborted || !isMountedRef.current) return
       console.error("[ADMIN][REVIEWS] fetch failed", err)
       setReviews([])
       setStats({ total: 0, hidden: 0, visible: 0 })
@@ -150,6 +161,7 @@ export default function AdminReviewsPage() {
       setTotalReviews(0)
       setError(err instanceof Error ? err.message : "Failed to load reviews")
     } finally {
+      if (!isMountedRef.current || signal?.aborted) return
       setIsLoading(false)
     }
   }, [isAuthenticated, page, searchQuery, statusFilter, user?.role])
@@ -158,10 +170,11 @@ export default function AdminReviewsPage() {
     const controller = new AbortController()
     fetchReviews(controller.signal)
     return () => controller.abort()
-  }, [fetchReviews])
+  }, [fetchReviews, refreshKey])
 
   const mutateVisibility = async (review: ReviewRecord, nextAction: "hide" | "unhide") => {
     setActioningReviewId(review._id)
+    const controller = new AbortController()
     try {
       const response = await authFetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/reviews/${review._id}/${nextAction}`,
@@ -173,11 +186,14 @@ export default function AdminReviewsPage() {
       }
 
       toast.success(nextAction === "hide" ? "Review hidden" : "Review restored")
-      await fetchReviews()
+      await fetchReviews(controller.signal)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : `Failed to ${nextAction} review`)
     } finally {
-      setActioningReviewId(null)
+      controller.abort()
+      if (isMountedRef.current) {
+        setActioningReviewId(null)
+      }
     }
   }
 
@@ -224,6 +240,7 @@ export default function AdminReviewsPage() {
             <Button
               onClick={() => {
                 setPage(1)
+                setRefreshKey((prev) => prev + 1)
               }}
               disabled={isLoading}
               className="bg-amber-600 hover:bg-amber-700"

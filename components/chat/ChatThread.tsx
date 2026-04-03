@@ -272,7 +272,6 @@ function WarrantyNotificationCard({ message }: { message: ChatMessage }) {
   const handleOpenClaim = () => {
     const params = new URLSearchParams();
     params.set("claimId", meta.claimId);
-    if (meta.status) params.set("status", meta.status);
     router.push(`/dashboard/warranty-claims?${params.toString()}`);
   };
 

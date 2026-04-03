@@ -479,8 +479,17 @@ export default function WarrantyClaimsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-slate-700 space-y-1">
-            <p>Respond to new claims within 5 business days to avoid automatic escalation.</p>
-            <p>Use the booking detail page to send proposals, mark repairs resolved, and track confirmations.</p>
+            {isProfessional ? (
+              <>
+                <p>Respond to new claims within 5 business days to avoid automatic escalation.</p>
+                <p>Use the booking detail page to send proposals, mark repairs resolved, and track confirmations.</p>
+              </>
+            ) : (
+              <>
+                <p>Open the related booking to review claim details, proposal updates, and repair progress.</p>
+                <p>Use the booking page to accept or decline proposals, confirm resolutions, or escalate if the issue remains unresolved.</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

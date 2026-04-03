@@ -180,6 +180,37 @@ export default function SubprojectComparisonTable({
     currentCustomerAmount,
     repeatBuyerEligibility?.eligible === true
   )
+  const hasCurrentDiscount =
+    currentCustomerAmount != null &&
+    currentDiscountedAmount != null &&
+    currentDiscountedAmount < currentCustomerAmount
+  const minProjectCustomerAmount = toCustomerAmount(currentSubproject.pricing.minProjectValue)
+  const minProjectDiscountedAmount = applyConfiguredDiscount(
+    minProjectCustomerAmount,
+    repeatBuyerEligibility?.eligible === true
+  )
+  const hasMinProjectDiscount =
+    minProjectCustomerAmount != null &&
+    minProjectDiscountedAmount != null &&
+    minProjectDiscountedAmount < minProjectCustomerAmount
+  const minRangeCustomerAmount = toCustomerAmount(currentSubproject.pricing.priceRange?.min)
+  const maxRangeCustomerAmount = toCustomerAmount(currentSubproject.pricing.priceRange?.max)
+  const minRangeDiscountedAmount = applyConfiguredDiscount(
+    minRangeCustomerAmount,
+    repeatBuyerEligibility?.eligible === true
+  )
+  const maxRangeDiscountedAmount = applyConfiguredDiscount(
+    maxRangeCustomerAmount,
+    repeatBuyerEligibility?.eligible === true
+  )
+  const hasMinRangeDiscount =
+    minRangeCustomerAmount != null &&
+    minRangeDiscountedAmount != null &&
+    minRangeDiscountedAmount < minRangeCustomerAmount
+  const hasMaxRangeDiscount =
+    maxRangeCustomerAmount != null &&
+    maxRangeDiscountedAmount != null &&
+    maxRangeDiscountedAmount < maxRangeCustomerAmount
 
   return (
     <div className="w-full">
@@ -223,7 +254,7 @@ export default function SubprojectComparisonTable({
                       <span className="text-2xl">RFQ</span>
                     ) : currentSubproject.pricing.type === 'unit' ? (
                       <>
-                        {currentDiscountedAmount != null && currentCustomerAmount != null ? (
+                        {hasCurrentDiscount ? (
                           <span className="flex flex-col">
                             <span className="text-xl font-semibold text-gray-400 line-through">
                               {formatCurrency(currentCustomerAmount)}
@@ -238,7 +269,7 @@ export default function SubprojectComparisonTable({
                         </span>
                       </>
                     ) : (
-                      currentDiscountedAmount != null && currentCustomerAmount != null ? (
+                      hasCurrentDiscount ? (
                         <span className="flex flex-col">
                           <span className="text-xl font-semibold text-gray-400 line-through">
                             {formatCurrency(currentCustomerAmount)}
@@ -252,15 +283,44 @@ export default function SubprojectComparisonTable({
                   </div>
                   {currentSubproject.pricing.type === 'unit' && currentSubproject.pricing.minProjectValue && (
                     <p className="text-sm text-gray-500 mt-2">
-                      Min. order: {formatCurrency(toCustomerAmount(currentSubproject.pricing.minProjectValue) ?? currentSubproject.pricing.minProjectValue)}
+                      Min. order: {hasMinProjectDiscount ? (
+                        <>
+                          <span className="line-through text-gray-400 mr-2">
+                            {formatCurrency(minProjectCustomerAmount)}
+                          </span>
+                          <span>{formatCurrency(minProjectDiscountedAmount)}</span>
+                        </>
+                      ) : (
+                        formatCurrency(minProjectCustomerAmount ?? currentSubproject.pricing.minProjectValue)
+                      )}
                     </p>
                   )}
                   {currentSubproject.pricing.type === 'rfq' && currentSubproject.pricing.priceRange && (
                     <p className="text-sm text-gray-500 mt-2">
-                      Estimated range: {formatCurrency(toCustomerAmount(currentSubproject.pricing.priceRange.min) ?? currentSubproject.pricing.priceRange.min)} - {formatCurrency(toCustomerAmount(currentSubproject.pricing.priceRange.max) ?? currentSubproject.pricing.priceRange.max)}
+                      Estimated range: {hasMinRangeDiscount ? (
+                        <>
+                          <span className="line-through text-gray-400 mr-2">
+                            {formatCurrency(minRangeCustomerAmount)}
+                          </span>
+                          <span>{formatCurrency(minRangeDiscountedAmount)}</span>
+                        </>
+                      ) : (
+                        formatCurrency(minRangeCustomerAmount ?? currentSubproject.pricing.priceRange.min)
+                      )}{" "}
+                      -{" "}
+                      {hasMaxRangeDiscount ? (
+                        <>
+                          <span className="line-through text-gray-400 mr-2">
+                            {formatCurrency(maxRangeCustomerAmount)}
+                          </span>
+                          <span>{formatCurrency(maxRangeDiscountedAmount)}</span>
+                        </>
+                      ) : (
+                        formatCurrency(maxRangeCustomerAmount ?? currentSubproject.pricing.priceRange.max)
+                      )}
                     </p>
                   )}
-                  {repeatBuyerDiscount?.enabled && currentDiscountedAmount != null && currentCustomerAmount != null && currentDiscountedAmount < currentCustomerAmount && (
+                  {repeatBuyerDiscount?.enabled && hasCurrentDiscount && (
                     <p className="text-sm text-green-600 mt-2">
                       Returning customer price available
                     </p>
