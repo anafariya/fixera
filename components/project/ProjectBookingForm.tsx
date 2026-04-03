@@ -2176,17 +2176,20 @@ export default function ProjectBookingForm({
   };
 
   const getEffectivePackagePrice = (): number | null => {
+    const currentPackage = selectedPackage;
+    const amount = currentPackage?.pricing.amount;
     if (
-      !selectedPackage?.pricing.amount ||
-      selectedPackage.pricing.type === 'rfq'
+      !currentPackage ||
+      amount == null ||
+      currentPackage?.pricing.type === 'rfq'
     ) {
       return null;
     }
 
-    const multiplier = shouldCollectUsage(selectedPackage.pricing.type)
+    const multiplier = shouldCollectUsage(currentPackage.pricing.type)
       ? estimatedUsage
       : 1;
-    return multiplier * selectedPackage.pricing.amount;
+    return multiplier * amount;
   };
 
   const toCustomerDisplayAmount = (amount?: number | null): number | null => {
@@ -2462,7 +2465,6 @@ export default function ProjectBookingForm({
     }
   })();
 
-  const effectivePackagePrice = getEffectivePackagePrice();
   const shouldShowUsageBreakdown = Boolean(
     selectedPackage?.pricing.amount &&
     shouldCollectUsage(selectedPackage.pricing.type)
@@ -2761,7 +2763,7 @@ export default function ProjectBookingForm({
                                 </div>
                               )}
                             {selectedPackage.pricing.type === 'rfq' && (
-                              <Badge variant='outline'>Quote Required</Badge>
+                              <Badge variant='outline'>RFQ</Badge>
                             )}
                           </div>
                         </div>
@@ -3595,7 +3597,7 @@ export default function ProjectBookingForm({
                             </span>
                           )}
                         {selectedPackage.pricing.type === 'rfq' && (
-                          <Badge variant='outline'>Quote Required</Badge>
+                          <Badge variant='outline'>RFQ</Badge>
                         )}
                       </div>
                     </div>
