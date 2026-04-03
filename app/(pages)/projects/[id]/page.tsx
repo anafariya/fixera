@@ -16,12 +16,15 @@ import {
   MapPin,
   Calendar,
   Users,
+  User,
   CheckCircle,
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
   Clock,
   Shield,
+  AlertTriangle,
+  FileText,
   Award,
   Euro,
   Star,
@@ -49,6 +52,7 @@ import {
   formatDateOnlyProfessionalViewer,
   getViewerTimezone,
 } from '@/lib/timezoneDisplay';
+import { useCommissionRate } from '@/hooks/useCommissionRate';
 
 interface Project {
   _id: string;
@@ -119,6 +123,19 @@ interface Project {
     name: string;
     description?: string;
     price: number;
+  }>;
+  repeatBuyerDiscount?: {
+    enabled: boolean;
+    percentage: number;
+    minPreviousBookings: number;
+    maxDiscountAmount?: number | null;
+  };
+  customerPresence?: string;
+  termsConditions?: Array<{
+    name: string;
+    description: string;
+    type?: 'condition' | 'warning';
+    additionalCost?: number;
   }>;
   faq: Array<{
     question: string;
@@ -200,6 +217,13 @@ const filterQualityCertificates = (
   return certifications.filter((cert) => isQualityCertificate(cert.name));
 };
 
+const CUSTOMER_PRESENCE_LABELS: Record<string, string> = {
+  not_required: 'Not required',
+  available: 'Customer should be available',
+  first_hour_only: 'Customer only needs to be present for the first hour',
+  present_throughout: 'Customer must be present throughout',
+};
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -242,6 +266,7 @@ export default function ProjectDetailPage() {
   const [reviewRatingFilter, setReviewRatingFilter] = useState<number | null>(null);
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewTotalPages, setReviewTotalPages] = useState(1);
+  const { customerPrice } = useCommissionRate();
 
   const projectId = params.id as string;
 
@@ -462,6 +487,12 @@ export default function ProjectDetailPage() {
   const warrantySummaries = collectWarrantySummaries(project.subprojects);
   const hasQualityHighlights =
     qualityCertificates.length > 0 || warrantySummaries.length > 0;
+  const customerPresenceLabel = project.customerPresence
+    ? CUSTOMER_PRESENCE_LABELS[project.customerPresence] || project.customerPresence
+    : null;
+  const projectTermsConditions = project.termsConditions || [];
+  const hasPresenceConditionsSection =
+    Boolean(customerPresenceLabel) || projectTermsConditions.length > 0;
 
   const getComparisonTableDateLabels = () => {
     // We strictly use viewerTimeZone
@@ -814,6 +845,87 @@ export default function ProjectDetailPage() {
 
 
 
+            {/* Customer Presence, Conditions & Warnings */}
+            {hasPresenceConditionsSection && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className='flex items-center gap-2'>
+                    <FileText className='h-5 w-5 text-blue-600' />
+                    Customer Presence, Conditions & Warnings
+                  </CardTitle>
+                  <CardDescription>
+                    Requirements the customer should review before booking
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-5'>
+                  {customerPresenceLabel && (
+                    <div className='rounded-lg border border-blue-100 bg-blue-50 px-4 py-3'>
+                      <div className='flex items-center gap-2 text-sm font-semibold text-blue-900'>
+                        <User className='h-4 w-4' />
+                        Customer Presence
+                      </div>
+                      <p className='mt-1 text-sm text-blue-800'>
+                        {customerPresenceLabel}
+                      </p>
+                    </div>
+                  )}
+
+                  {projectTermsConditions.length > 0 && (
+                    <div className='space-y-3'>
+                      {projectTermsConditions.map((term, idx) => {
+                        const isWarning = term.type === 'warning';
+                        return (
+                          <div
+                            key={`${term.name}-${idx}`}
+                            className={`rounded-lg border px-4 py-3 ${
+                              isWarning
+                                ? 'border-yellow-200 bg-yellow-50'
+                                : 'border-gray-200 bg-white'
+                            }`}
+                          >
+                            <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>
+                              <div className='min-w-0'>
+                                <div className='flex items-center gap-2'>
+                                  {isWarning ? (
+                                    <AlertTriangle className='h-4 w-4 text-yellow-600' />
+                                  ) : (
+                                    <Shield className='h-4 w-4 text-blue-600' />
+                                  )}
+                                  <h4 className='font-semibold text-gray-900'>
+                                    {term.name}
+                                  </h4>
+                                  {isWarning && (
+                                    <Badge
+                                      variant='outline'
+                                      className='border-yellow-300 bg-yellow-100 text-yellow-800'
+                                    >
+                                      Warning
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className='mt-2 text-sm text-gray-600'>
+                                  {term.description}
+                                </p>
+                              </div>
+
+                              {!isWarning &&
+                                term.additionalCost != null &&
+                                Number.isFinite(term.additionalCost) &&
+                                term.additionalCost > 0 && (
+                                  <div className='shrink-0 text-sm font-semibold text-orange-600'>
+                                    +{formatCurrency(term.additionalCost) ?? `€${term.additionalCost.toFixed(2)}`}
+                                  </div>
+                                )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* FAQ */}
             {(project.faq?.length || 0) > 0 && (
               <Card>
@@ -994,6 +1106,7 @@ export default function ProjectDetailPage() {
                   subprojects={project.subprojects}
                   onSelectPackage={handleSelectPackage}
                   priceModel={project.priceModel}
+                  repeatBuyerDiscount={project.repeatBuyerDiscount}
                   selectedIndex={viewedSubprojectIndex}
                   onSelectIndex={setViewedSubprojectIndex}
                   dateLabels={comparisonTableDateLabels}
@@ -1057,7 +1170,7 @@ export default function ProjectDetailPage() {
                         )}
                       </div>
                       <p className='font-semibold text-blue-600'>
-                        {formatCurrency(option.price) ?? 'N/A'}
+                        {formatCurrency(customerPrice(option.price)) ?? 'N/A'}
                       </p>
                     </div>
                   ))}

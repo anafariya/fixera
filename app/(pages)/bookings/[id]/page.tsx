@@ -62,6 +62,11 @@ interface BookingDetail {
   _id: string
   bookingType: "professional" | "project"
   status: BookingStatus
+  payment?: {
+    status?: string
+    currency?: string
+    totalWithVat?: number
+  }
   rfqData?: {
     serviceType?: string
     description?: string
@@ -533,7 +538,18 @@ export default function BookingDetailPage() {
   const postBookingQuestions = booking?.project?.postBookingQuestions || []
   const hasPostBookingQuestions = postBookingQuestions.length > 0
   const alreadyAnswered = (booking?.postBookingData?.length || 0) > 0
-  const shouldShowPostBookingForm = showPostBookingQuestions && hasPostBookingQuestions && !alreadyAnswered && !answersSubmitted
+  const paymentCompletedForPostBooking =
+    booking?.payment?.status === "authorized" ||
+    booking?.payment?.status === "completed"
+  const customerCanAnswerPostBooking =
+    user?.role === "customer" &&
+    (booking?.customer?._id ? user?._id === booking.customer._id : true)
+  const shouldShowPostBookingForm =
+    hasPostBookingQuestions &&
+    !alreadyAnswered &&
+    !answersSubmitted &&
+    customerCanAnswerPostBooking &&
+    (showPostBookingQuestions || paymentCompletedForPostBooking)
   const currencyRange = booking ? formatCurrencyRange(booking) : null
   const warrantyDurationValue = Number(booking?.warrantyCoverage?.duration?.value || 0)
   const hasWarrantyCoverage = warrantyDurationValue > 0

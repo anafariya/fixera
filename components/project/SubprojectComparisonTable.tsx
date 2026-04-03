@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Check, Clock, Shield, ArrowRight, Calendar } from 'lucide-react'
 import { formatCurrency } from '@/lib/formatters'
+import { useCommissionRate } from '@/hooks/useCommissionRate'
 
 interface SubprojectPricing {
   type: 'fixed' | 'unit' | 'rfq'
@@ -16,6 +17,10 @@ interface SubprojectPricing {
 interface Subproject {
   name: string
   description: string
+  professionalInputs?: Array<{
+    fieldName: string
+    value: string | number | { min: number; max: number } | undefined
+  }>
   pricing: SubprojectPricing
   included: Array<{
     name: string
@@ -40,6 +45,12 @@ interface SubprojectComparisonTableProps {
   subprojects: Subproject[]
   onSelectPackage: (index: number) => void
   priceModel?: string
+  repeatBuyerDiscount?: {
+    enabled: boolean
+    percentage: number
+    minPreviousBookings: number
+    maxDiscountAmount?: number | null
+  }
   selectedIndex: number
   onSelectIndex: (index: number) => void
   dateLabels?: DateLabels
@@ -64,6 +75,7 @@ export default function SubprojectComparisonTable({
   subprojects,
   onSelectPackage,
   priceModel,
+  repeatBuyerDiscount,
   selectedIndex,
   onSelectIndex,
   dateLabels,
@@ -72,6 +84,7 @@ export default function SubprojectComparisonTable({
   companyBlockedRanges,
   onContactProfessional
 }: SubprojectComparisonTableProps) {
+  const { customerPrice } = useCommissionRate()
 
 
   const formatDuration = (duration?: { value: number; unit: 'hours' | 'days' }): string => {
@@ -84,7 +97,42 @@ export default function SubprojectComparisonTable({
     return `${warranty.value} ${warranty.unit}`
   }
 
+  const formatProfessionalInputValue = (
+    value: string | number | { min: number; max: number } | undefined
+  ): string => {
+    if (value == null || value === '') return 'Not provided'
+    if (typeof value === 'object' && 'min' in value && 'max' in value) {
+      return `${value.min} - ${value.max}`
+    }
+    return String(value)
+  }
+
   const currentSubproject = subprojects[selectedIndex]
+
+  const toCustomerAmount = (amount?: number | null) => {
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) return null
+    return customerPrice(amount)
+  }
+
+  const applyConfiguredDiscount = (amount?: number | null) => {
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) return null
+    if (!repeatBuyerDiscount?.enabled || repeatBuyerDiscount.percentage <= 0) {
+      return null
+    }
+
+    let discountAmount = +(amount * (repeatBuyerDiscount.percentage / 100)).toFixed(2)
+    if (
+      typeof repeatBuyerDiscount.maxDiscountAmount === 'number' &&
+      Number.isFinite(repeatBuyerDiscount.maxDiscountAmount)
+    ) {
+      discountAmount = Math.min(discountAmount, repeatBuyerDiscount.maxDiscountAmount)
+    }
+
+    return +Math.max(0, amount - discountAmount).toFixed(2)
+  }
+
+  const currentCustomerAmount = toCustomerAmount(currentSubproject.pricing.amount)
+  const currentDiscountedAmount = applyConfiguredDiscount(currentCustomerAmount)
 
   const allIncludedItems = useMemo(() => {
     // Collect all unique included items across all subprojects, preserving their order of appearance
@@ -168,23 +216,46 @@ export default function SubprojectComparisonTable({
                       <span className="text-2xl">Request Quote</span>
                     ) : currentSubproject.pricing.type === 'unit' ? (
                       <>
-                        {formatCurrency(currentSubproject.pricing.amount)}
+                        {currentDiscountedAmount != null && currentCustomerAmount != null ? (
+                          <span className="flex flex-col">
+                            <span className="text-xl font-semibold text-gray-400 line-through">
+                              {formatCurrency(currentCustomerAmount)}
+                            </span>
+                            <span>{formatCurrency(currentDiscountedAmount)}</span>
+                          </span>
+                        ) : (
+                          formatCurrency(currentCustomerAmount ?? currentSubproject.pricing.amount)
+                        )}
                         <span className="text-lg font-normal text-gray-500 ml-2">
                           /{priceModel || 'unit'}
                         </span>
                       </>
                     ) : (
-                      formatCurrency(currentSubproject.pricing.amount)
+                      currentDiscountedAmount != null && currentCustomerAmount != null ? (
+                        <span className="flex flex-col">
+                          <span className="text-xl font-semibold text-gray-400 line-through">
+                            {formatCurrency(currentCustomerAmount)}
+                          </span>
+                          <span>{formatCurrency(currentDiscountedAmount)}</span>
+                        </span>
+                      ) : (
+                        formatCurrency(currentCustomerAmount ?? currentSubproject.pricing.amount)
+                      )
                     )}
                   </div>
                   {currentSubproject.pricing.type === 'unit' && currentSubproject.pricing.minProjectValue && (
                     <p className="text-sm text-gray-500 mt-2">
-                      Min. order: {formatCurrency(currentSubproject.pricing.minProjectValue)}
+                      Min. order: {formatCurrency(toCustomerAmount(currentSubproject.pricing.minProjectValue) ?? currentSubproject.pricing.minProjectValue)}
                     </p>
                   )}
                   {currentSubproject.pricing.type === 'rfq' && currentSubproject.pricing.priceRange && (
                     <p className="text-sm text-gray-500 mt-2">
-                      Estimated range: {formatCurrency(currentSubproject.pricing.priceRange.min)} - {formatCurrency(currentSubproject.pricing.priceRange.max)}
+                      Estimated range: {formatCurrency(toCustomerAmount(currentSubproject.pricing.priceRange.min) ?? currentSubproject.pricing.priceRange.min)} - {formatCurrency(toCustomerAmount(currentSubproject.pricing.priceRange.max) ?? currentSubproject.pricing.priceRange.max)}
+                    </p>
+                  )}
+                  {repeatBuyerDiscount?.enabled && currentDiscountedAmount != null && currentCustomerAmount != null && currentDiscountedAmount < currentCustomerAmount && (
+                    <p className="text-sm text-green-600 mt-2">
+                      Returning customer price available
                     </p>
                   )}
                 </div>
@@ -232,6 +303,30 @@ export default function SubprojectComparisonTable({
                 </div>
               </div>
             )}
+
+            {currentSubproject.professionalInputs &&
+              currentSubproject.professionalInputs.length > 0 && (
+                <div className="mb-8 border-t border-gray-100 pt-6">
+                  <h4 className="font-semibold text-base text-gray-900 mb-4">
+                    Service Parameters
+                  </h4>
+                  <div className="space-y-2">
+                    {currentSubproject.professionalInputs.map((input, index) => (
+                      <div
+                        key={`${input.fieldName}-${index}`}
+                        className="flex items-start justify-between gap-4 rounded-lg bg-gray-50 px-4 py-3"
+                      >
+                        <span className="text-sm font-medium text-gray-700">
+                          {input.fieldName}
+                        </span>
+                        <span className="text-sm font-semibold text-gray-900 text-right">
+                          {formatProfessionalInputValue(input.value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
             {/* Date Availability (Clean & Simplistic) */}
             <div className="mb-6 space-y-2">

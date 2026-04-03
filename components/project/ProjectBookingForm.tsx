@@ -33,6 +33,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getViewerTimezone, normalizeTimezone } from '@/lib/timezoneDisplay';
 import { formatCurrency } from '@/lib/formatters';
 import { getAuthToken } from '@/lib/utils';
+import { useCommissionRate } from '@/hooks/useCommissionRate';
 
 // Get unit label from priceModel (e.g., "m² of floor surface" ? "m²")
 const getUnitLabel = (priceModel?: string): string => {
@@ -143,6 +144,12 @@ interface Project {
     description?: string;
     price: number;
   }>;
+  repeatBuyerDiscount?: {
+    enabled: boolean;
+    percentage: number;
+    minPreviousBookings: number;
+    maxDiscountAmount?: number | null;
+  };
   postBookingQuestions?: Array<{
     id?: string;
     question: string;
@@ -317,6 +324,7 @@ export default function ProjectBookingForm({
   onBack,
   selectedSubprojectIndex,
 }: ProjectBookingFormProps) {
+  const { customerPrice } = useCommissionRate();
   const router = useRouter();
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
@@ -2178,6 +2186,40 @@ export default function ProjectBookingForm({
     return multiplier * selectedPackage.pricing.amount;
   };
 
+  const toCustomerDisplayAmount = (amount?: number | null): number | null => {
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) {
+      return null;
+    }
+    return customerPrice(amount);
+  };
+
+  const applyConfiguredRepeatBuyerDiscount = (
+    amount?: number | null
+  ): number | null => {
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) {
+      return null;
+    }
+    if (
+      !project.repeatBuyerDiscount?.enabled ||
+      project.repeatBuyerDiscount.percentage <= 0
+    ) {
+      return null;
+    }
+
+    let discountAmount = +(amount * (project.repeatBuyerDiscount.percentage / 100)).toFixed(2);
+    if (
+      typeof project.repeatBuyerDiscount.maxDiscountAmount === 'number' &&
+      Number.isFinite(project.repeatBuyerDiscount.maxDiscountAmount)
+    ) {
+      discountAmount = Math.min(
+        discountAmount,
+        project.repeatBuyerDiscount.maxDiscountAmount
+      );
+    }
+
+    return +Math.max(0, amount - discountAmount).toFixed(2);
+  };
+
   const calculateTotal = (): number => {
     let total = 0;
 
@@ -2219,6 +2261,12 @@ export default function ProjectBookingForm({
   const finalActionLoadingLabel = shouldPayAtCheckoutFlow
     ? 'Preparing Payment...'
     : 'Submitting RFQ...';
+  const displayPackagePrice = toCustomerDisplayAmount(getEffectivePackagePrice());
+  const displayTotalPrice = toCustomerDisplayAmount(calculateTotal());
+  const discountedDisplayPackagePrice =
+    applyConfiguredRepeatBuyerDiscount(displayPackagePrice);
+  const discountedDisplayTotalPrice =
+    applyConfiguredRepeatBuyerDiscount(displayTotalPrice);
   const stepLabels = [
     'Confirm Package',
     'Choose Date',
@@ -3280,8 +3328,11 @@ export default function ProjectBookingForm({
                           <span className='font-semibold'>
                             {selectedPackage.pricing.type === 'rfq'
                               ? 'Quote Required'
-                              : typeof effectivePackagePrice === 'number'
-                                ? formatCurrency(effectivePackagePrice)
+                              : typeof displayPackagePrice === 'number'
+                                ? discountedDisplayPackagePrice != null &&
+                                  discountedDisplayPackagePrice < displayPackagePrice
+                                  ? `${formatCurrency(displayPackagePrice)} -> ${formatCurrency(discountedDisplayPackagePrice)}`
+                                  : formatCurrency(displayPackagePrice)
                                 : 'Quote Required'}
                           </span>
                         </div>
@@ -3305,7 +3356,9 @@ export default function ProjectBookingForm({
                                     {option.name}
                                   </span>
                                   <span className='font-semibold text-green-600'>
-                                    +{formatCurrency(option.price)}
+                                    +{formatCurrency(
+                                      toCustomerDisplayAmount(option.price) ?? option.price
+                                    )}
                                   </span>
                                 </div>
                               );
@@ -3317,12 +3370,20 @@ export default function ProjectBookingForm({
                               </span>
                               <span className='font-semibold'>
                                 {formatCurrency(
-                                  selectedExtraOptions.reduce(
-                                    (sum, idx) =>
-                                      sum +
-                                      (project.extraOptions[idx]?.price || 0),
-                                    0
-                                  )
+                                  toCustomerDisplayAmount(
+                                    selectedExtraOptions.reduce(
+                                      (sum, idx) =>
+                                        sum +
+                                        (project.extraOptions[idx]?.price || 0),
+                                      0
+                                    )
+                                  ) ??
+                                    selectedExtraOptions.reduce(
+                                      (sum, idx) =>
+                                        sum +
+                                        (project.extraOptions[idx]?.price || 0),
+                                      0
+                                    )
                                 )}
                               </span>
                             </div>
@@ -3336,7 +3397,11 @@ export default function ProjectBookingForm({
                               Grand Total:
                             </span>
                             <span className='text-2xl font-bold text-blue-600'>
-                              {formatCurrency(calculateTotal())}
+                              {discountedDisplayTotalPrice != null &&
+                              typeof displayTotalPrice === 'number' &&
+                              discountedDisplayTotalPrice < displayTotalPrice
+                                ? `${formatCurrency(displayTotalPrice)} -> ${formatCurrency(discountedDisplayTotalPrice)}`
+                                : formatCurrency(displayTotalPrice ?? calculateTotal())}
                             </span>
                           </div>
                         )}
@@ -3345,7 +3410,10 @@ export default function ProjectBookingForm({
                           <p className='text-xs text-gray-600 pt-2'>
                             Based on {estimatedUsage}{' '}
                             {getUnitLabel(project.priceModel)} at{' '}
-                            {formatCurrency(selectedPackage.pricing.amount)}/
+                            {formatCurrency(
+                              toCustomerDisplayAmount(selectedPackage.pricing.amount) ??
+                                selectedPackage.pricing.amount
+                            )}/
                             {getUnitLabel(project.priceModel)}
                           </p>
                         )}
@@ -3699,8 +3767,11 @@ export default function ProjectBookingForm({
                         <span className='font-semibold'>
                           {selectedPackage.pricing.type === 'rfq'
                             ? 'Quote Required'
-                            : typeof effectivePackagePrice === 'number'
-                              ? formatCurrency(effectivePackagePrice)
+                            : typeof displayPackagePrice === 'number'
+                              ? discountedDisplayPackagePrice != null &&
+                                discountedDisplayPackagePrice < displayPackagePrice
+                                ? `${formatCurrency(displayPackagePrice)} -> ${formatCurrency(discountedDisplayPackagePrice)}`
+                                : formatCurrency(displayPackagePrice)
                               : 'Quote Required'}
                         </span>
                       </div>
@@ -3743,7 +3814,9 @@ export default function ProjectBookingForm({
                                   </div>
                                 </div>
                                 <span className='font-semibold text-green-600 ml-4 flex-shrink-0'>
-                                  +{formatCurrency(option.price)}
+                                  +{formatCurrency(
+                                    toCustomerDisplayAmount(option.price) ?? option.price
+                                  )}
                                 </span>
                               </div>
                             );
@@ -3756,12 +3829,20 @@ export default function ProjectBookingForm({
                             </span>
                             <span className='font-semibold'>
                               {formatCurrency(
-                                selectedExtraOptions.reduce(
-                                  (sum, idx) =>
-                                    sum +
-                                    (project.extraOptions[idx]?.price || 0),
-                                  0
-                                )
+                                toCustomerDisplayAmount(
+                                  selectedExtraOptions.reduce(
+                                    (sum, idx) =>
+                                      sum +
+                                      (project.extraOptions[idx]?.price || 0),
+                                    0
+                                  )
+                                ) ??
+                                  selectedExtraOptions.reduce(
+                                    (sum, idx) =>
+                                      sum +
+                                      (project.extraOptions[idx]?.price || 0),
+                                    0
+                                  )
                               )}
                             </span>
                           </div>
@@ -3780,7 +3861,11 @@ export default function ProjectBookingForm({
                             Grand Total:
                           </span>
                           <span className='text-2xl font-bold text-blue-600'>
-                            {formatCurrency(calculateTotal())}
+                            {discountedDisplayTotalPrice != null &&
+                            typeof displayTotalPrice === 'number' &&
+                            discountedDisplayTotalPrice < displayTotalPrice
+                              ? `${formatCurrency(displayTotalPrice)} -> ${formatCurrency(discountedDisplayTotalPrice)}`
+                              : formatCurrency(displayTotalPrice ?? calculateTotal())}
                           </span>
                         </div>
                       )}
