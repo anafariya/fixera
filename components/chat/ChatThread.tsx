@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { ChatAttachment, ChatMessage } from "@/types/chat";
 import { cn, getAuthToken } from "@/lib/utils";
-import { FileText, Download, Star, MessageSquare, Loader2, Reply, Flag } from "lucide-react";
+import { FileText, Download, Star, MessageSquare, Loader2, Reply, Flag, ShieldCheck, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,6 +18,7 @@ interface ChatThreadProps {
   currentUserImage?: string | null;
   currentUserName?: string;
   loading: boolean;
+  conversationId?: string | null;
   onReviewReplySubmitted?: () => void;
   onReplyTo?: (message: ChatMessage) => void;
 }
@@ -261,6 +263,47 @@ function ReviewNotificationCard({
   );
 }
 
+function WarrantyNotificationCard({ message }: { message: ChatMessage }) {
+  const router = useRouter();
+  const meta = message.warrantyMeta;
+
+  if (!meta) return null;
+
+  const handleOpenClaim = () => {
+    const params = new URLSearchParams();
+    params.set("claimId", meta.claimId);
+    router.push(`/dashboard/warranty-claims?${params.toString()}`);
+  };
+
+  return (
+    <div className="flex justify-center my-4">
+      <button
+        type="button"
+        onClick={handleOpenClaim}
+        className="w-[92%] max-w-lg rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 to-indigo-50 p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldCheck className="h-5 w-5 text-sky-600" />
+              <span className="text-sm font-semibold text-slate-900">Warranty Claim Update</span>
+            </div>
+            <p className="text-sm font-medium text-slate-800">{meta.claimNumber}</p>
+            {message.text && <p className="mt-1 text-sm text-slate-600">{message.text}</p>}
+          </div>
+          <ArrowRight className="h-4 w-4 text-sky-600 shrink-0 mt-1" />
+        </div>
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-xs text-slate-500">
+            {meta.status ? `Status: ${meta.status.replace(/_/g, " ")}` : "Open claim details"}
+          </span>
+          <span className="text-xs font-medium text-sky-700">Open warranty page</span>
+        </div>
+      </button>
+    </div>
+  );
+}
+
 function ReplyToPreview({ replyTo, isMine }: { replyTo: ChatMessage["replyTo"]; isMine: boolean }) {
   if (!replyTo) return null;
   const sender = replyTo.senderId as unknown;
@@ -306,8 +349,24 @@ function ReplyToPreview({ replyTo, isMine }: { replyTo: ChatMessage["replyTo"]; 
   );
 }
 
-export default function ChatThread({ messages, currentUserId, currentUserRole, currentUserImage, currentUserName, loading, onReviewReplySubmitted, onReplyTo }: ChatThreadProps) {
+export default function ChatThread({ messages, currentUserId, currentUserRole, currentUserImage, currentUserName, loading, conversationId, onReviewReplySubmitted, onReplyTo }: ChatThreadProps) {
   const [reportingId, setReportingId] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      if (bottomRef.current) {
+        bottomRef.current.scrollIntoView({ behavior: "auto", block: "end" });
+      } else if (containerRef.current) {
+        containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [conversationId, loading, messages.length]);
 
   if (loading) {
     return (
@@ -326,7 +385,7 @@ export default function ChatThread({ messages, currentUserId, currentUserRole, c
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4 space-y-3 bg-slate-50/50">
+    <div ref={containerRef} className="h-full overflow-y-auto p-4 space-y-3 bg-slate-50/50">
       {messages.map((message, index) => {
         if (message.messageType === "review_notification") {
           return (
@@ -336,6 +395,14 @@ export default function ChatThread({ messages, currentUserId, currentUserRole, c
               isProfessional={currentUserRole === "professional"}
               onReplySubmitted={onReviewReplySubmitted}
             />
+          );
+        }
+
+        if (message.messageType === "warranty_notification") {
+          return (
+            <div key={message._id} id={`msg-${message._id}`}>
+              <WarrantyNotificationCard message={message} />
+            </div>
           );
         }
 
@@ -515,6 +582,7 @@ export default function ChatThread({ messages, currentUserId, currentUserRole, c
           </div>
         );
       })}
+      <div ref={bottomRef} />
 
       {/* Report dialog */}
       <ReportDialog

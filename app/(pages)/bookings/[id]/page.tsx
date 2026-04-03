@@ -20,21 +20,19 @@ import StartChatButton from "@/components/chat/StartChatButton"
 import ReviewModal from "@/components/booking/ReviewModal"
 import QuotationWizard from "@/components/quotation/QuotationWizard"
 import type { QuoteVersion, BookingMilestone } from "@/types/quotation"
+import { BOOKING_STATUSES, type BookingStatus } from "@/lib/dashboardBookingHelpers"
 
-type BookingStatus =
-  | "rfq"
-  | "rfq_accepted"
-  | "draft_quote"
-  | "quoted"
-  | "quote_accepted"
-  | "quote_rejected"
-  | "payment_pending"
-  | "booked"
-  | "in_progress"
-  | "completed"
-  | "cancelled"
-  | "dispute"
-  | "refunded"
+const PRE_SERVICE_BOOKING_STATUSES: BookingStatus[] = BOOKING_STATUSES.filter((status) =>
+  [
+    "rfq",
+    "rfq_accepted",
+    "draft_quote",
+    "quoted",
+    "quote_accepted",
+    "payment_pending",
+    "booked",
+  ].includes(status)
+) as BookingStatus[]
 
 interface PostBookingQuestion {
   _id?: string
@@ -62,6 +60,11 @@ interface BookingDetail {
   _id: string
   bookingType: "professional" | "project"
   status: BookingStatus
+  payment?: {
+    status?: string
+    currency?: string
+    totalWithVat?: number
+  }
   rfqData?: {
     serviceType?: string
     description?: string
@@ -533,7 +536,20 @@ export default function BookingDetailPage() {
   const postBookingQuestions = booking?.project?.postBookingQuestions || []
   const hasPostBookingQuestions = postBookingQuestions.length > 0
   const alreadyAnswered = (booking?.postBookingData?.length || 0) > 0
-  const shouldShowPostBookingForm = showPostBookingQuestions && hasPostBookingQuestions && !alreadyAnswered && !answersSubmitted
+  const paymentCompletedForPostBooking =
+    booking?.payment?.status === "authorized" ||
+    booking?.payment?.status === "completed"
+  const customerCanAnswerPostBooking =
+    user?.role === "customer" &&
+    (booking?.customer?._id ? user?._id === booking.customer._id : true)
+  const isPreServiceBookingStatus = booking?.status ? PRE_SERVICE_BOOKING_STATUSES.includes(booking.status) : false
+  const shouldShowPostBookingForm =
+    isPreServiceBookingStatus &&
+    hasPostBookingQuestions &&
+    !alreadyAnswered &&
+    !answersSubmitted &&
+    customerCanAnswerPostBooking &&
+    (showPostBookingQuestions || paymentCompletedForPostBooking)
   const currencyRange = booking ? formatCurrencyRange(booking) : null
   const warrantyDurationValue = Number(booking?.warrantyCoverage?.duration?.value || 0)
   const hasWarrantyCoverage = warrantyDurationValue > 0
@@ -939,12 +955,12 @@ export default function BookingDetailPage() {
     }
   }
 
-  const handleEscalateWarrantyClaim = async () => {
+  const handleEscalateWarrantyClaim = async (reason = "Manual escalation requested") => {
     if (!warrantyClaim?._id) return
     setWarrantyActionLoading(true)
     try {
       const data = await callWarrantyAction(`${warrantyClaim._id}/escalate`, {
-        reason: "Manual escalation requested from booking dashboard",
+        reason,
       })
       setWarrantyClaim(data.claim || null)
       toast.success("Claim escalated to admin.")
@@ -2788,7 +2804,9 @@ export default function BookingDetailPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={handleEscalateWarrantyClaim}
+                              onClick={() =>
+                                handleEscalateWarrantyClaim("Customer declined final warranty resolution")
+                              }
                               disabled={warrantyActionLoading}
                               className="border-rose-300 text-rose-700"
                             >
@@ -2796,20 +2814,6 @@ export default function BookingDetailPage() {
                             </Button>
                           </div>
                         )}
-
-                        {user?.role === "professional" &&
-                          warrantyClaim.status !== "closed" &&
-                          warrantyClaim.status !== "escalated" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={handleEscalateWarrantyClaim}
-                              disabled={warrantyActionLoading}
-                              className="border-amber-300 text-amber-700"
-                            >
-                              Escalate Claim
-                            </Button>
-                          )}
                       </div>
                     )}
                   </div>

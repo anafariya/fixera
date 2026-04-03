@@ -748,6 +748,7 @@ export default function ChatPage() {
                 currentUserImage={user?.profileImage}
                 currentUserName={user?.name}
                 loading={loadingMessages}
+                conversationId={selectedConversationId}
                 onReplyTo={(msg) => setReplyToMessage(msg)}
               />
             </div>

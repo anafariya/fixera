@@ -54,6 +54,13 @@ export interface ReviewNotificationMeta {
   customerName: string;
 }
 
+export interface WarrantyNotificationMeta {
+  claimId: string;
+  claimNumber: string;
+  bookingId?: string;
+  status?: string;
+}
+
 export interface ReplyToMessage {
   _id: string;
   text?: string;
@@ -67,11 +74,12 @@ export interface ChatMessage {
   conversationId: string;
   senderId: ChatUserSummary;
   senderRole: "customer" | "professional" | "system";
-  messageType?: "text" | "review_notification";
+  messageType?: "text" | "review_notification" | "warranty_notification";
   text?: string;
   images: string[];
   attachments?: ChatAttachment[];
   reviewMeta?: ReviewNotificationMeta;
+  warrantyMeta?: WarrantyNotificationMeta;
   replyTo?: ReplyToMessage;
   createdAt: string;
   updatedAt: string;
