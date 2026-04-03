@@ -955,12 +955,12 @@ export default function BookingDetailPage() {
     }
   }
 
-  const handleEscalateWarrantyClaim = async () => {
+  const handleEscalateWarrantyClaim = async (reason = "Manual escalation requested") => {
     if (!warrantyClaim?._id) return
     setWarrantyActionLoading(true)
     try {
       const data = await callWarrantyAction(`${warrantyClaim._id}/escalate`, {
-        reason: "Manual escalation requested from booking dashboard",
+        reason,
       })
       setWarrantyClaim(data.claim || null)
       toast.success("Claim escalated to admin.")
@@ -2804,7 +2804,9 @@ export default function BookingDetailPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={handleEscalateWarrantyClaim}
+                              onClick={() =>
+                                handleEscalateWarrantyClaim("Customer declined final warranty resolution")
+                              }
                               disabled={warrantyActionLoading}
                               className="border-rose-300 text-rose-700"
                             >
@@ -2812,20 +2814,6 @@ export default function BookingDetailPage() {
                             </Button>
                           </div>
                         )}
-
-                        {user?.role === "professional" &&
-                          warrantyClaim.status !== "closed" &&
-                          warrantyClaim.status !== "escalated" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={handleEscalateWarrantyClaim}
-                              disabled={warrantyActionLoading}
-                              className="border-amber-300 text-amber-700"
-                            >
-                              Escalate Claim
-                            </Button>
-                          )}
                       </div>
                     )}
                   </div>

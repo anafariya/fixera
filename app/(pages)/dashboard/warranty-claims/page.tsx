@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { getAuthToken } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,6 +28,14 @@ interface ClaimRecord {
     _id: string
     name?: string
     email?: string
+  } | null
+  professional?: {
+    _id: string
+    name?: string
+    email?: string
+    businessInfo?: {
+      companyName?: string
+    }
   } | null
   proposal?: {
     message?: string
@@ -67,9 +75,12 @@ const getClaimAttachments = (claim: ClaimRecord) => [
   ...(Array.isArray(claim.resolution?.attachments) ? claim.resolution.attachments : []),
 ]
 
-export default function ProfessionalWarrantyClaimsPage() {
+export default function WarrantyClaimsPage() {
   const { user, isAuthenticated, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const claimIdFromQuery = searchParams.get("claimId") || null
+  const statusFromQuery = searchParams.get("status")
 
   const [claims, setClaims] = useState<ClaimRecord[]>([])
   const [statusFilter, setStatusFilter] = useState<"all" | WarrantyClaimStatus>("all")
@@ -86,13 +97,26 @@ export default function ProfessionalWarrantyClaimsPage() {
   }, [isAuthenticated, loading, router])
 
   useEffect(() => {
-    if (!loading && isAuthenticated && user?.role !== "professional") {
+    if (!loading && isAuthenticated && user?.role !== "professional" && user?.role !== "customer") {
       router.push("/dashboard")
     }
   }, [isAuthenticated, loading, router, user?.role])
 
+  useEffect(() => {
+    if (!statusFromQuery) return
+    if (statusFromQuery === "all") {
+      setStatusFilter("all")
+      return
+    }
+
+    const isValidStatus = STATUS_OPTIONS.some((option) => option.value === statusFromQuery)
+    if (isValidStatus) {
+      setStatusFilter(statusFromQuery as WarrantyClaimStatus)
+    }
+  }, [statusFromQuery])
+
   const fetchClaims = useCallback(async (signal?: AbortSignal) => {
-    if (!isAuthenticated || user?.role !== "professional") return
+    if (!isAuthenticated || (user?.role !== "professional" && user?.role !== "customer")) return
     setIsLoadingClaims(true)
     setError(null)
     try {
@@ -135,6 +159,22 @@ export default function ProfessionalWarrantyClaimsPage() {
     return () => controller.abort()
   }, [fetchClaims])
 
+  useEffect(() => {
+    if (!claimIdFromQuery || claims.length === 0) return
+
+    const frame = window.requestAnimationFrame(() => {
+      const el = document.getElementById(`claim-${claimIdFromQuery}`)
+      if (!el) return
+      el.scrollIntoView({ behavior: "smooth", block: "center" })
+      el.classList.add("ring-2", "ring-sky-400", "ring-offset-2")
+      window.setTimeout(() => {
+        el.classList.remove("ring-2", "ring-sky-400", "ring-offset-2")
+      }, 2200)
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [claimIdFromQuery, claims])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-50 via-indigo-50 to-cyan-50 p-4">
@@ -147,7 +187,9 @@ export default function ProfessionalWarrantyClaimsPage() {
     )
   }
 
-  if (!isAuthenticated || user?.role !== "professional") return null
+  if (!isAuthenticated || (user?.role !== "professional" && user?.role !== "customer")) return null
+
+  const isProfessional = user?.role === "professional"
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-indigo-50 to-cyan-50 p-4">
@@ -159,7 +201,9 @@ export default function ProfessionalWarrantyClaimsPage() {
               Warranty Claims
             </h1>
             <p className="text-slate-600">
-              Manage post-completion warranty issues raised by customers.
+              {isProfessional
+                ? "Manage post-completion warranty issues raised by customers."
+                : "Track your warranty claims, proposals, escalations, and resolution updates."}
             </p>
           </div>
           <div className="flex gap-2">
@@ -223,7 +267,7 @@ export default function ProfessionalWarrantyClaimsPage() {
                   const attachments = getClaimAttachments(claim)
 
                   return (
-                  <div key={claim._id} className="rounded-lg border bg-white p-4 space-y-3">
+                  <div id={`claim-${claim._id}`} key={claim._id} className="rounded-lg border bg-white p-4 space-y-3 transition-shadow">
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">{claim.claimNumber}</p>
@@ -244,12 +288,19 @@ export default function ProfessionalWarrantyClaimsPage() {
                         <p>{claim.booking?.bookingNumber || claim.booking?._id || "-"}</p>
                       </div>
                       <div>
-                        <p className="font-medium text-slate-800">Customer</p>
-                        <p>{claim.customer?.name || claim.customer?.email || "-"}</p>
+                        <p className="font-medium text-slate-800">{isProfessional ? "Customer" : "Professional"}</p>
+                        <p>
+                          {isProfessional
+                            ? (claim.customer?.name || claim.customer?.email || "-")
+                            : (claim.professional?.businessInfo?.companyName ||
+                              claim.professional?.name ||
+                              claim.professional?.email ||
+                              "-")}
+                        </p>
                       </div>
                       <div>
-                        <p className="font-medium text-slate-800">Response SLA</p>
-                        <p>{formatDate(claim.sla?.professionalResponseDueAt)}</p>
+                        <p className="font-medium text-slate-800">{isProfessional ? "Response SLA" : "Confirmation SLA"}</p>
+                        <p>{formatDate(isProfessional ? claim.sla?.professionalResponseDueAt : claim.sla?.customerConfirmationDueAt)}</p>
                       </div>
                     </div>
 
@@ -306,17 +357,17 @@ export default function ProfessionalWarrantyClaimsPage() {
                       )}
                       {claim.status === "open" && (
                         <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
-                          Action needed: send a proposal
+                          {isProfessional ? "Action needed: send a proposal" : "Claim opened and awaiting professional response"}
                         </span>
                       )}
                       {claim.status === "proposal_accepted" && (
                         <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] text-violet-700">
-                          Action needed: complete repair and mark resolved
+                          {isProfessional ? "Action needed: complete repair and mark resolved" : "Proposal accepted. Waiting for repair completion"}
                         </span>
                       )}
                       {claim.status === "resolved" && (
                         <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-700">
-                          Waiting for customer confirmation
+                          {isProfessional ? "Waiting for customer confirmation" : "Action needed: review the resolution and confirm"}
                         </span>
                       )}
                       {claim.status === "escalated" && (

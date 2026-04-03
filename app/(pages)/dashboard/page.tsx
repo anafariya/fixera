@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { User, Mail, Phone, Shield, Calendar, Crown, Settings, TrendingUp, Users, Award, CheckCircle, XCircle, Clock, AlertTriangle, Plus, Briefcase, Package, CreditCard, FileText, Star, Gift, Play, Loader2, Info } from "lucide-react"
+import { User, Mail, Phone, Shield, Calendar, Crown, Settings, TrendingUp, Users, Award, CheckCircle, XCircle, Clock, AlertTriangle, Plus, Briefcase, Package, CreditCard, FileText, Star, Gift, Play, Loader2, Info, MessageSquareWarning, EyeOff } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -413,7 +413,7 @@ export default function DashboardPage() {
 
   if (user?.role === 'admin') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.96),_rgba(238,242,255,0.92)_38%,_rgba(224,231,255,0.88)_100%)] p-4">
         <div className="max-w-7xl mx-auto pt-20">
           <div className="mb-8 flex items-center justify-between">
             <div>
@@ -437,19 +437,84 @@ export default function DashboardPage() {
           </div>
 
           <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="services">Services</TabsTrigger>
-              <TabsTrigger value="loyalty">Loyalty System</TabsTrigger>
-              <TabsTrigger value="approvals">Professional Approvals</TabsTrigger>
-              <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsList className="grid h-auto w-full grid-cols-1 gap-3 bg-transparent p-0 sm:grid-cols-2 xl:grid-cols-5">
+              <TabsTrigger
+                value="overview"
+                className="group min-h-[88px] justify-start rounded-2xl border-0 bg-gradient-to-r from-fuchsia-500 via-pink-500 to-rose-500 px-5 py-4 text-left text-white shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl data-[state=active]:ring-4 data-[state=active]:ring-fuchsia-200/70 data-[state=active]:shadow-fuchsia-200/80 data-[state=active]:shadow-2xl"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex rounded-xl bg-white/20 p-2.5 shadow-sm backdrop-blur-sm">
+                    <Crown className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-white">Overview</div>
+                    <div className="mt-0.5 text-xs leading-5 text-white/85">Open platform controls</div>
+                  </div>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger
+                value="services"
+                className="group min-h-[88px] justify-start rounded-2xl border-0 bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500 px-5 py-4 text-left text-white shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl data-[state=active]:ring-4 data-[state=active]:ring-violet-200/70 data-[state=active]:shadow-violet-200/80 data-[state=active]:shadow-2xl"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex rounded-xl bg-white/20 p-2.5 shadow-sm backdrop-blur-sm">
+                    <Package className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-white">Services</div>
+                    <div className="mt-0.5 text-xs leading-5 text-white/85">Open service setup</div>
+                  </div>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger
+                value="loyalty"
+                className="group min-h-[88px] justify-start rounded-2xl border-0 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 px-5 py-4 text-left text-white shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl data-[state=active]:ring-4 data-[state=active]:ring-amber-200/70 data-[state=active]:shadow-amber-200/80 data-[state=active]:shadow-2xl"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex rounded-xl bg-white/20 p-2.5 shadow-sm backdrop-blur-sm">
+                    <Award className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-white">Loyalty System</div>
+                    <div className="mt-0.5 text-xs leading-5 text-white/85">Open loyalty controls</div>
+                  </div>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger
+                value="approvals"
+                className="group min-h-[88px] justify-start rounded-2xl border-0 bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-500 px-5 py-4 text-left text-white shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl data-[state=active]:ring-4 data-[state=active]:ring-sky-200/70 data-[state=active]:shadow-sky-200/80 data-[state=active]:shadow-2xl"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex rounded-xl bg-white/20 p-2.5 shadow-sm backdrop-blur-sm">
+                    <Users className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-white">Professional Approvals</div>
+                    <div className="mt-0.5 text-xs leading-5 text-white/85">Open approval queues</div>
+                  </div>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger
+                value="payments"
+                className="group min-h-[88px] justify-start rounded-2xl border-0 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-5 py-4 text-left text-white shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl data-[state=active]:ring-4 data-[state=active]:ring-emerald-200/70 data-[state=active]:shadow-emerald-200/80 data-[state=active]:shadow-2xl"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex rounded-xl bg-white/20 p-2.5 shadow-sm backdrop-blur-sm">
+                    <CreditCard className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-white">Payments</div>
+                    <div className="mt-0.5 text-xs leading-5 text-white/85">Open payment oversight</div>
+                  </div>
+                </div>
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
               <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
                 {/* Quick Stats */}
                 <Card
-                  className="cursor-pointer hover:shadow-lg transition-shadow"
+                  className="cursor-pointer border-blue-100 bg-gradient-to-br from-white via-blue-50 to-indigo-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl"
                   onClick={() => window.open('/admin/projects/approval', '_blank')}
                 >
                   <CardHeader className="pb-2">
@@ -466,7 +531,7 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-emerald-100 bg-gradient-to-br from-white via-emerald-50 to-teal-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-sm">
                       <Users className="h-4 w-4 text-green-500" />
@@ -480,7 +545,7 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-cyan-100 bg-gradient-to-br from-white via-cyan-50 to-sky-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-sm">
                       <TrendingUp className="h-4 w-4 text-emerald-500" />
@@ -494,7 +559,7 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-amber-100 bg-gradient-to-br from-white via-amber-50 to-orange-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-sm">
                       <Clock className="h-4 w-4 text-orange-500" />
@@ -509,7 +574,7 @@ export default function DashboardPage() {
                 </Card>
 
                 <Card
-                  className="cursor-pointer hover:shadow-lg transition-shadow"
+                  className="cursor-pointer border-rose-100 bg-gradient-to-br from-white via-rose-50 to-orange-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl"
                   onClick={() => window.open('/admin/warranty-claims', '_blank')}
                 >
                   <CardHeader className="pb-2">
@@ -529,7 +594,8 @@ export default function DashboardPage() {
                 </Card>
               </div>
 
-              <Card>
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+              <Card className="border-purple-100 bg-gradient-to-br from-white via-purple-50 to-fuchsia-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Gift className="h-5 w-5 text-purple-500" />
@@ -537,7 +603,17 @@ export default function DashboardPage() {
                   </CardTitle>
                   <CardDescription>Configure rewards, view analytics, and manage referrals</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-purple-100 bg-white/80 p-3 shadow-sm">
+                      <p className="text-xs text-purple-700">Rewards</p>
+                      <p className="text-sm font-semibold text-slate-900">Customer + professional incentives</p>
+                    </div>
+                    <div className="rounded-xl border border-fuchsia-100 bg-white/80 p-3 shadow-sm">
+                      <p className="text-xs text-fuchsia-700">Visibility</p>
+                      <p className="text-sm font-semibold text-slate-900">Track usage and revoke abuse</p>
+                    </div>
+                  </div>
                   <Button
                     onClick={() => window.open('/admin/referral', '_blank')}
                     className="w-full bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900"
@@ -548,7 +624,39 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-amber-100 bg-gradient-to-br from-white via-amber-50 to-rose-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquareWarning className="h-5 w-5 text-amber-600" />
+                    Review Moderation
+                  </CardTitle>
+                  <CardDescription>Hide or restore customer reviews that are misleading, abusive, or incorrect</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-amber-200 bg-white/80 p-3 shadow-sm">
+                      <p className="text-xs text-amber-700">Moderation</p>
+                      <p className="text-sm font-semibold text-slate-900">Review reports and suspicious ratings fast</p>
+                    </div>
+                    <div className="rounded-xl border border-rose-200 bg-white/80 p-3 shadow-sm">
+                      <p className="text-xs text-rose-700">Impact</p>
+                      <p className="text-sm font-semibold text-slate-900">Public scores update immediately after hiding</p>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Public ratings update immediately when a review is hidden.
+                  </div>
+                  <Button
+                    onClick={() => window.open('/admin/reviews', '_blank')}
+                    className="w-full bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600"
+                  >
+                    <EyeOff className="h-4 w-4 mr-2" />
+                    Moderate Reviews
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-slate-200 bg-gradient-to-br from-white via-slate-50 to-gray-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Settings className="h-5 w-5 text-gray-500" />
@@ -567,7 +675,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-blue-100 bg-gradient-to-br from-white via-blue-50 to-cyan-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Briefcase className="h-5 w-5 text-blue-500" />
@@ -586,7 +694,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-rose-100 bg-gradient-to-br from-white via-rose-50 to-orange-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5 text-rose-500" />
@@ -596,17 +704,17 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid md:grid-cols-3 gap-3">
-                    <div className="rounded-lg border bg-slate-50 p-3">
+                    <div className="rounded-xl border border-rose-100 bg-white/80 p-3 shadow-sm">
                       <p className="text-xs text-slate-500">Claims (window)</p>
                       <p className="text-lg font-semibold">{warrantyAnalytics?.summary?.totalClaims ?? '\u2014'}</p>
                     </div>
-                    <div className="rounded-lg border bg-slate-50 p-3">
+                    <div className="rounded-xl border border-orange-100 bg-white/80 p-3 shadow-sm">
                       <p className="text-xs text-slate-500">Avg resolution</p>
                       <p className="text-lg font-semibold">
                         {warrantyAnalytics?.summary?.avgResolutionHours != null ? `${Number(warrantyAnalytics.summary.avgResolutionHours).toFixed(1)}h` : '\u2014'}
                       </p>
                     </div>
-                    <div className="rounded-lg border bg-slate-50 p-3">
+                    <div className="rounded-xl border border-amber-100 bg-white/80 p-3 shadow-sm">
                       <p className="text-xs text-slate-500">Flagged professionals</p>
                       <p className="text-lg font-semibold">{warrantyAnalytics?.flaggedProfessionals?.length ?? '\u2014'}</p>
                     </div>
@@ -620,7 +728,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-indigo-100 bg-gradient-to-br from-white via-indigo-50 to-blue-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl xl:col-span-2">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Play className="h-5 w-5 text-indigo-500" />
@@ -676,11 +784,12 @@ export default function DashboardPage() {
                   </div>
                 </CardContent>
               </Card>
+              </div>
             </TabsContent>
 
             <TabsContent value="services" className="space-y-6">
               {/* Service Configuration Management */}
-              <Card>
+              <Card className="border-purple-100 bg-gradient-to-br from-white via-purple-50 to-pink-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Package className="h-5 w-5 text-purple-500" />
@@ -727,7 +836,7 @@ export default function DashboardPage() {
             <TabsContent value="loyalty" className="space-y-6">
               {/* Loyalty System Management */}
               <div className="grid md:grid-cols-2 gap-6">
-                <Card>
+                <Card className="border-violet-100 bg-gradient-to-br from-white via-violet-50 to-purple-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Award className="h-5 w-5 text-purple-500" />
@@ -749,7 +858,7 @@ export default function DashboardPage() {
                     ) : (
                       <div className="space-y-3">
                         {loyaltyStats?.tierDistribution.map((tier) => (
-                          <div key={tier._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div key={tier._id} className="flex items-center justify-between rounded-xl border border-purple-100 bg-white/80 p-3 shadow-sm">
                             <div>
                               <span className="font-medium">{tier._id || 'Bronze'}</span>
                               <p className="text-sm text-gray-600">{tier.count} customers</p>
@@ -765,7 +874,7 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-slate-200 bg-gradient-to-br from-white via-slate-50 to-indigo-50 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Settings className="h-5 w-5 text-gray-500" />
@@ -799,7 +908,7 @@ export default function DashboardPage() {
             <TabsContent value="approvals" className="space-y-6">
               {/* Professional Approvals */}
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card>
+                <Card className="border-amber-100 bg-gradient-to-br from-white via-amber-50 to-orange-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-sm">
                       <Clock className="h-4 w-4 text-orange-500" />
@@ -811,7 +920,7 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-emerald-100 bg-gradient-to-br from-white via-emerald-50 to-green-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-sm">
                       <CheckCircle className="h-4 w-4 text-green-500" />
@@ -823,7 +932,7 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-rose-100 bg-gradient-to-br from-white via-rose-50 to-red-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-sm">
                       <XCircle className="h-4 w-4 text-red-500" />
@@ -835,7 +944,7 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-yellow-100 bg-gradient-to-br from-white via-yellow-50 to-amber-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-sm">
                       <AlertTriangle className="h-4 w-4 text-yellow-500" />
@@ -848,7 +957,7 @@ export default function DashboardPage() {
                 </Card>
               </div>
 
-              <Card>
+              <Card className="border-sky-100 bg-gradient-to-br from-white via-sky-50 to-blue-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-blue-500" />
@@ -895,7 +1004,7 @@ export default function DashboardPage() {
 
             <TabsContent value="payments" className="space-y-6">
               {/* Payment Oversight */}
-              <Card>
+              <Card className="border-blue-100 bg-gradient-to-br from-white via-blue-50 to-indigo-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CreditCard className="h-5 w-5 text-blue-500" />

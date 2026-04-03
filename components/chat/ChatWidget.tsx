@@ -606,7 +606,13 @@ export default function ChatWidget() {
             ) : (
               <>
                 <div className={cn("flex-1 min-h-0", sending && "opacity-95")}>
-                  <ChatThread messages={messages} currentUserId={userId} currentUserRole={userRole} loading={loadingMessages} />
+                  <ChatThread
+                    messages={messages}
+                    currentUserId={userId}
+                    currentUserRole={userRole}
+                    loading={loadingMessages}
+                    conversationId={selectedConversationId}
+                  />
                 </div>
                 <ChatComposer
                   disabled={!selectedConversationId || creatingConversation}
