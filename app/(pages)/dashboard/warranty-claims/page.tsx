@@ -102,7 +102,7 @@ export default function WarrantyClaimsPage() {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push(`/login?redirect=/dashboard/warranty-claims${searchSuffix}`)
+      router.push(`/login?redirect=${encodeURIComponent(`/dashboard/warranty-claims${searchSuffix}`)}`)
     }
   }, [isAuthenticated, loading, router, searchSuffix])
 
@@ -158,6 +158,7 @@ export default function WarrantyClaimsPage() {
         setStatusFilter(claim.status)
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return
+        setStatusFilter(normalizedStatusFromQuery ?? "all")
         setHighlightedClaim(null)
         setError(err instanceof Error ? err.message : "Failed to load warranty claim")
       }
@@ -191,7 +192,7 @@ export default function WarrantyClaimsPage() {
 
       const data = payload.data || {}
       const nextClaims = Array.isArray(data.claims) ? data.claims : []
-      if (highlightedClaim) {
+      if (highlightedClaim && page === 1) {
         const matchesFilter = statusFilter === "all" || highlightedClaim.status === statusFilter
         if (matchesFilter && !nextClaims.some((claim: ClaimRecord) => claim._id === highlightedClaim._id)) {
           setClaims([highlightedClaim, ...nextClaims])

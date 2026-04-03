@@ -123,7 +123,7 @@ export default function AdminReviewsPage() {
     const timeout = setTimeout(() => {
       const nextQuery = searchInput.trim()
       setSearchQuery(nextQuery)
-      setPage((currentPage) => (currentPage === 1 ? currentPage : 1))
+      setPage(1)
     }, 350)
     return () => clearTimeout(timeout)
   }, [searchInput])

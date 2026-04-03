@@ -78,6 +78,8 @@ export default function SubprojectComparisonTable({
   }
 
   const currentSubproject = subprojects[selectedIndex]
+  const effectivePricingType = (sp: (typeof subprojects)[number]) =>
+    sp.pricing?.type ?? (priceModel ? 'unit' : 'fixed')
   const repeatBuyerEligible = repeatBuyerEligibility?.eligible === true
   const getCustomerPricing = (amount?: number | null) =>
     computeCustomerPriceWithRepeatBuyerDiscount({
@@ -131,7 +133,7 @@ export default function SubprojectComparisonTable({
   const currentCustomerAmount = currentPricing.customerAmount
   const currentDiscountedAmount = currentPricing.discountedAmount
   const canShowUnitDiscountRate =
-    currentSubproject.pricing.type !== 'unit' ||
+    effectivePricingType(currentSubproject) !== 'unit' ||
     repeatBuyerDiscount?.maxDiscountAmount == null
   const hasCurrentDiscount =
     canShowUnitDiscountRate &&
@@ -198,9 +200,9 @@ export default function SubprojectComparisonTable({
               <div className="flex items-baseline justify-between mb-6">
                 <div>
                   <div className="text-4xl font-bold text-gray-900">
-                    {currentSubproject.pricing.type === 'rfq' ? (
+                    {effectivePricingType(currentSubproject) === 'rfq' ? (
                       <span className="text-2xl">RFQ</span>
-                    ) : currentSubproject.pricing.type === 'unit' ? (
+                    ) : effectivePricingType(currentSubproject) === 'unit' ? (
                       <>
                         {hasCurrentDiscount ? (
                           <span className="flex flex-col">
@@ -229,7 +231,7 @@ export default function SubprojectComparisonTable({
                       )
                     )}
                   </div>
-                  {currentSubproject.pricing.type === 'unit' && currentSubproject.pricing.minProjectValue && (
+                  {effectivePricingType(currentSubproject) === 'unit' && currentSubproject.pricing.minProjectValue && (
                     <p className="text-sm text-gray-500 mt-2">
                       Min. order: {hasMinProjectDiscount ? (
                         <>
@@ -243,7 +245,7 @@ export default function SubprojectComparisonTable({
                       )}
                     </p>
                   )}
-                  {currentSubproject.pricing.type === 'rfq' && currentSubproject.pricing.priceRange && (
+                  {effectivePricingType(currentSubproject) === 'rfq' && currentSubproject.pricing.priceRange && (
                     <p className="text-sm text-gray-500 mt-2">
                       Estimated range: {hasMinRangeDiscount ? (
                         <>

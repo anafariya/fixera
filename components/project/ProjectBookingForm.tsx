@@ -248,7 +248,7 @@ export default function ProjectBookingForm({
   onBack,
   selectedSubprojectIndex,
 }: ProjectBookingFormProps) {
-  const { customerPrice } = useCommissionRate();
+  const { customerPrice, commissionPercent } = useCommissionRate();
   const router = useRouter();
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
@@ -3897,7 +3897,7 @@ export default function ProjectBookingForm({
           ) : (
             <Button
               onClick={handleSubmit}
-              disabled={loading || isOutsideServiceArea || uploadingQuestionIndexes.size > 0}
+              disabled={loading || isOutsideServiceArea || uploadingQuestionIndexes.size > 0 || (shouldPayAtCheckoutFlow && commissionPercent == null)}
               className='bg-blue-600 hover:bg-blue-700'
             >
               {loading ? (

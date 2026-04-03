@@ -48,7 +48,7 @@ export const computeCustomerPriceWithRepeatBuyerDiscount = ({
 
   let discountAmount = +(customerAmount * (discountPercentage / 100)).toFixed(2)
   const maxDiscountAmount = toFiniteAmount(repeatBuyerDiscount.maxDiscountAmount)
-  if (maxDiscountAmount != null) {
+  if (maxDiscountAmount != null && maxDiscountAmount > 0) {
     discountAmount = Math.min(discountAmount, maxDiscountAmount)
   }
 
