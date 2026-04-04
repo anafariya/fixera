@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { authFetch } from "@/lib/utils"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -59,6 +59,15 @@ interface DisputeAnalytics {
   totalDisputes: number
 }
 
+type DisputeFilter = 'all' | 'open' | 'resolved'
+type ResolveAction = 'accept_professional' | 'reject_extra_costs' | 'adjust'
+
+interface ResolveDisputeRequest {
+  action: ResolveAction
+  resolution: string
+  adjustedAmount?: number
+}
+
 export default function AdminDisputesPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -66,13 +75,13 @@ export default function AdminDisputesPage() {
   const [disputes, setDisputes] = useState<DisputeBooking[]>([])
   const [analytics, setAnalytics] = useState<DisputeAnalytics | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'resolved'>('all')
+  const [statusFilter, setStatusFilter] = useState<DisputeFilter>('all')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
 
   const [selectedDispute, setSelectedDispute] = useState<DisputeBooking | null>(null)
   const [showResolveDialog, setShowResolveDialog] = useState(false)
-  const [resolveAction, setResolveAction] = useState<'accept_professional' | 'reject_extra_costs' | 'adjust'>('accept_professional')
+  const [resolveAction, setResolveAction] = useState<ResolveAction>('accept_professional')
   const [resolveAdjustedAmount, setResolveAdjustedAmount] = useState('')
   const [resolveResolution, setResolveResolution] = useState('')
   const [resolving, setResolving] = useState(false)
@@ -123,7 +132,7 @@ export default function AdminDisputesPage() {
     if (!selectedDispute || !resolveResolution.trim()) return
     setResolving(true)
     try {
-      const body: any = { action: resolveAction, resolution: resolveResolution }
+      const body: ResolveDisputeRequest = { action: resolveAction, resolution: resolveResolution }
       if (resolveAction === 'adjust') {
         body.adjustedAmount = parseFloat(resolveAdjustedAmount)
       }
@@ -193,7 +202,7 @@ export default function AdminDisputesPage() {
         )}
 
         <div className="flex gap-2">
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as any); setPage(1) }}>
+          <Select value={statusFilter} onValueChange={(value: DisputeFilter) => { setStatusFilter(value); setPage(1) }}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -330,7 +339,7 @@ export default function AdminDisputesPage() {
 
                 <div className="space-y-2">
                   <Label>Resolution Action</Label>
-                  <Select value={resolveAction} onValueChange={(v) => setResolveAction(v as any)}>
+                  <Select value={resolveAction} onValueChange={(value: ResolveAction) => setResolveAction(value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
