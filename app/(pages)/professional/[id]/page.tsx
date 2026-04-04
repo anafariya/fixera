@@ -40,7 +40,6 @@ interface ProfessionalData {
   username?: string
   profileImage?: string
   businessInfo?: {
-    companyName?: string
     description?: string
     website?: string
     city?: string

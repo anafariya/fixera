@@ -9,7 +9,7 @@ import type { QuoteVersion } from '@/types/quotation'
 
 interface QuoteBookingSummary {
   _id: string
-  professional?: { _id: string; name?: string; businessInfo?: { companyName?: string } }
+  professional?: { _id: string; name?: string; username?: string }
   rfqData?: { serviceType?: string }
   quotationNumber?: string
   status?: string
@@ -120,7 +120,7 @@ export default function QuoteComparisonModal({ open, onOpenChange, bookings }: Q
     v.warrantyDuration.unit === 'years' ? v.warrantyDuration.value * 12 : v.warrantyDuration.value
 
   const getProfName = (b: QuoteBookingSummary) =>
-    b.professional?.businessInfo?.companyName || b.professional?.name || 'Professional'
+    b.professional?.username || b.professional?.name || 'Professional'
 
   const rows: { label: string; icon: React.ReactNode; render: (v: QuoteVersion, b: QuoteBookingSummary) => React.ReactNode }[] = [
     {

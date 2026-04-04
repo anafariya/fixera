@@ -320,7 +320,10 @@ function BusinessDetailsStep({
   const generateSuggestions = async () => {
     setSuggestionsLoading(true)
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/generate-username`, {
+      const params = new URLSearchParams()
+      if (businessInfo.companyName) params.set('companyName', businessInfo.companyName)
+      if (businessInfo.city) params.set('city', businessInfo.city)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/generate-username?${params}`, {
         credentials: 'include',
       })
       const data = await res.json()

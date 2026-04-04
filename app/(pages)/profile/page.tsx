@@ -1878,7 +1878,10 @@ export default function ProfilePage() {
                             size="sm"
                             onClick={async () => {
                               try {
-                                const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/generate-username`, { credentials: 'include' })
+                                const params = new URLSearchParams()
+                                if (businessInfo.companyName) params.set('companyName', businessInfo.companyName)
+                                if (businessInfo.city) params.set('city', businessInfo.city)
+                                const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/generate-username?${params}`, { credentials: 'include' })
                                 const data = await res.json()
                                 if (data.suggestions?.length) {
                                   setUsernameSuggestions(data.suggestions)

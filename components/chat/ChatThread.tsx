@@ -36,8 +36,8 @@ const getSenderId = (message: ChatMessage) => {
 const getSenderName = (message: ChatMessage) => {
   const sender = message.senderId as unknown;
   if (sender && typeof sender === "object") {
-    const senderRecord = sender as { name?: string; username?: string; businessInfo?: { companyName?: string } };
-    return senderRecord.username || senderRecord.name || senderRecord.businessInfo?.companyName || "User";
+    const senderRecord = sender as { name?: string; username?: string };
+    return senderRecord.username || senderRecord.name || "User";
   }
   return "User";
 };
@@ -309,9 +309,8 @@ function ReplyToPreview({ replyTo, isMine }: { replyTo: ChatMessage["replyTo"]; 
   const sender = replyTo.senderId as unknown;
   const name =
     sender && typeof sender === "object"
-      ? (sender as { username?: string; name?: string; businessInfo?: { companyName?: string } }).username ||
+      ? (sender as { username?: string; name?: string }).username ||
         (sender as { name?: string }).name ||
-        (sender as { businessInfo?: { companyName?: string } }).businessInfo?.companyName ||
         "User"
       : "User";
   const previewText = replyTo.text?.slice(0, 100) || (replyTo.images?.length ? "[Image]" : "");

@@ -123,9 +123,6 @@ interface BookingDetail {
     email?: string
     phone?: string
     username?: string
-    businessInfo?: {
-      companyName?: string
-    }
   }
   customer?: {
     _id: string
@@ -1660,8 +1657,8 @@ export default function BookingDetailPage() {
                       )}
                       <CardTitle className="text-lg text-gray-900">
                         {booking.project?.title ||
-                          booking.professional?.name ||
                           booking.professional?.username ||
+                          booking.professional?.name ||
                           booking.rfqData?.serviceType ||
                           "Booking"}
                       </CardTitle>

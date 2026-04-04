@@ -20,7 +20,6 @@ interface Professional {
   username?: string;
   email: string;
   businessInfo?: {
-    companyName?: string;
     description?: string;
     city?: string;
     country?: string;
