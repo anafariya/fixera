@@ -55,7 +55,6 @@ interface CustomerPayment {
     name?: string;
     email?: string;
     username?: string;
-    businessInfo?: { companyName?: string };
   };
   status: PaymentStatus;
   currency: string;
@@ -294,7 +293,7 @@ function CustomerPaymentsView() {
                         </td>
                         <td className="px-4 py-4">
                           <div className="font-medium text-gray-900">
-                            {payment.professional?.username || payment.professional?.name || payment.professional?.businessInfo?.companyName || '---'}
+                            {payment.professional?.username || payment.professional?.name || '---'}
                           </div>
                         </td>
                         <td className="px-4 py-4">

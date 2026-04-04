@@ -45,9 +45,9 @@ interface ProjectCardProps {
     professionalId?: {
       _id: string;
       name: string;
+      username?: string;
       email: string;
       businessInfo?: {
-        companyName?: string;
         city?: string;
         country?: string;
       };
@@ -96,7 +96,7 @@ const ProjectCard = ({ project }: ProjectCardProps) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [viewerTimeZone, setViewerTimeZone] = useState('UTC');
   const professional = project.professionalId;
-  const professionalName = professional?.businessInfo?.companyName || professional?.name || 'Professional';
+  const professionalName = professional?.username || professional?.name || 'Professional';
   const location = [professional?.businessInfo?.city, professional?.businessInfo?.country]
     .filter(Boolean)
     .join(', ');

@@ -99,9 +99,6 @@ interface Booking {
     _id: string
     name?: string
     username?: string
-    businessInfo?: {
-      companyName?: string
-    }
   }
 }
 

@@ -13,9 +13,7 @@ interface ProfessionalCardProps {
     _id: string;
     name: string;
     username?: string;
-    email: string;
     businessInfo?: {
-      companyName?: string;
       description?: string;
       city?: string;
       country?: string;
