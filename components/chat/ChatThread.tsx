@@ -272,7 +272,6 @@ function WarrantyNotificationCard({ message }: { message: ChatMessage }) {
   const handleOpenClaim = () => {
     const params = new URLSearchParams();
     params.set("claimId", meta.claimId);
-    if (meta.status) params.set("status", meta.status);
     router.push(`/dashboard/warranty-claims?${params.toString()}`);
   };
 
@@ -400,7 +399,11 @@ export default function ChatThread({ messages, currentUserId, currentUserRole, c
         }
 
         if (message.messageType === "warranty_notification") {
-          return <WarrantyNotificationCard key={message._id} message={message} />;
+          return (
+            <div key={message._id} id={`msg-${message._id}`}>
+              <WarrantyNotificationCard message={message} />
+            </div>
+          );
         }
 
         const isMine = getSenderId(message) === currentUserId;

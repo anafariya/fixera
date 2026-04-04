@@ -20,21 +20,19 @@ import StartChatButton from "@/components/chat/StartChatButton"
 import ReviewModal from "@/components/booking/ReviewModal"
 import QuotationWizard from "@/components/quotation/QuotationWizard"
 import type { QuoteVersion, BookingMilestone } from "@/types/quotation"
+import { BOOKING_STATUSES, type BookingStatus } from "@/lib/dashboardBookingHelpers"
 
-type BookingStatus =
-  | "rfq"
-  | "rfq_accepted"
-  | "draft_quote"
-  | "quoted"
-  | "quote_accepted"
-  | "quote_rejected"
-  | "payment_pending"
-  | "booked"
-  | "in_progress"
-  | "completed"
-  | "cancelled"
-  | "dispute"
-  | "refunded"
+const PRE_SERVICE_BOOKING_STATUSES: BookingStatus[] = BOOKING_STATUSES.filter((status) =>
+  [
+    "rfq",
+    "rfq_accepted",
+    "draft_quote",
+    "quoted",
+    "quote_accepted",
+    "payment_pending",
+    "booked",
+  ].includes(status)
+) as BookingStatus[]
 
 interface PostBookingQuestion {
   _id?: string
@@ -545,7 +543,9 @@ export default function BookingDetailPage() {
   const customerCanAnswerPostBooking =
     user?.role === "customer" &&
     (booking?.customer?._id ? user?._id === booking.customer._id : true)
+  const isPreServiceBookingStatus = booking?.status ? PRE_SERVICE_BOOKING_STATUSES.includes(booking.status) : false
   const shouldShowPostBookingForm =
+    isPreServiceBookingStatus &&
     hasPostBookingQuestions &&
     !alreadyAnswered &&
     !answersSubmitted &&

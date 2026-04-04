@@ -53,121 +53,7 @@ import {
   getViewerTimezone,
 } from '@/lib/timezoneDisplay';
 import { useCommissionRate } from '@/hooks/useCommissionRate';
-
-interface Project {
-  _id: string;
-  title: string;
-  description: string;
-  category: string;
-  service: string;
-  priceModel?: string;
-  timeMode?: 'hours' | 'days' | 'mixed';
-  preparationDuration?: {
-    value: number;
-    unit: 'hours' | 'days';
-  };
-  executionDuration?: {
-    value: number;
-    unit: 'hours' | 'days';
-  };
-  bufferDuration?: {
-    value: number;
-    unit: 'hours' | 'days';
-  };
-  media: {
-    images: string[];
-    video?: string;
-  };
-  distance: {
-    address: string;
-    maxKmRange?: number;
-    noBorders: boolean;
-  };
-  firstAvailableDate?: string | null;
-  certifications?: Array<{
-    name: string;
-    isRequired?: boolean;
-    fileUrl?: string;
-  }>;
-  resources: string[];
-  minResources?: number;
-  minOverlapPercentage?: number;
-  subprojects: Array<{
-    name: string;
-    description: string;
-    pricing: {
-      type: 'fixed' | 'unit' | 'rfq';
-      amount?: number;
-      priceRange?: { min: number; max: number };
-    };
-    included: Array<{
-      name: string;
-      description?: string;
-    }>;
-    executionDuration?: {
-      value: number;
-      unit: 'hours' | 'days';
-    };
-    warrantyPeriod?: {
-      value: number;
-      unit: 'months' | 'years';
-    };
-  }>;
-  rfqQuestions: Array<{
-    question: string;
-    type: 'text' | 'multiple_choice' | 'attachment';
-    options?: string[];
-    isRequired: boolean;
-  }>;
-  extraOptions: Array<{
-    name: string;
-    description?: string;
-    price: number;
-  }>;
-  repeatBuyerDiscount?: {
-    enabled: boolean;
-    percentage: number;
-    minPreviousBookings: number;
-    maxDiscountAmount?: number | null;
-  };
-  customerPresence?: string;
-  termsConditions?: Array<{
-    name: string;
-    description: string;
-    type?: 'condition' | 'warning';
-    additionalCost?: number;
-  }>;
-  faq: Array<{
-    question: string;
-    answer: string;
-  }>;
-  professionalId: {
-    _id: string;
-    name: string;
-    username?: string;
-    businessInfo?: {
-      companyName?: string;
-      timezone?: string;
-    };
-    email: string;
-    phone: string;
-    companyAvailability?: {
-      monday?: { available: boolean; startTime?: string; endTime?: string };
-      tuesday?: { available: boolean; startTime?: string; endTime?: string };
-      wednesday?: { available: boolean; startTime?: string; endTime?: string };
-      thursday?: { available: boolean; startTime?: string; endTime?: string };
-      friday?: { available: boolean; startTime?: string; endTime?: string };
-      saturday?: { available: boolean; startTime?: string; endTime?: string };
-      sunday?: { available: boolean; startTime?: string; endTime?: string };
-    };
-    companyBlockedRanges?: Array<{
-      startDate: string;
-      endDate: string;
-      reason?: string;
-      isHoliday?: boolean;
-    }>;
-  };
-}
+import type { PublicProjectDto as Project } from '@/types/project';
 
 interface ScheduleProposalsResponse {
   success: boolean;
@@ -914,7 +800,7 @@ export default function ProjectDetailPage() {
                                 Number.isFinite(term.additionalCost) &&
                                 term.additionalCost > 0 && (
                                   <div className='shrink-0 text-sm font-semibold text-orange-600'>
-                                    +{formatCurrency(term.additionalCost) ?? `€${term.additionalCost.toFixed(2)}`}
+                                    +{formatCurrency(customerPrice(term.additionalCost)) ?? `€${term.additionalCost.toFixed(2)}`}
                                   </div>
                                 )}
                             </div>
@@ -1108,6 +994,7 @@ export default function ProjectDetailPage() {
                   onSelectPackage={handleSelectPackage}
                   priceModel={project.priceModel}
                   repeatBuyerDiscount={project.repeatBuyerDiscount}
+                  repeatBuyerEligibility={project.repeatBuyerEligibility}
                   selectedIndex={viewedSubprojectIndex}
                   onSelectIndex={setViewedSubprojectIndex}
                   dateLabels={comparisonTableDateLabels}

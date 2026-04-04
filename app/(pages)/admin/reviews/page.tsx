@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { authFetch } from "@/lib/utils"
@@ -79,7 +79,11 @@ const formatDate = (value?: string) => {
 }
 
 const getAverageRating = (review?: CustomerReview) => {
-  if (!review?.communicationLevel || !review?.valueOfDelivery || !review?.qualityOfService) return null
+  if (
+    review?.communicationLevel == null ||
+    review?.valueOfDelivery == null ||
+    review?.qualityOfService == null
+  ) return null
   return ((review.communicationLevel + review.valueOfDelivery + review.qualityOfService) / 3).toFixed(1)
 }
 
@@ -98,6 +102,14 @@ export default function AdminReviewsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actioningReviewId, setActioningReviewId] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     if (loading) return
@@ -109,12 +121,17 @@ export default function AdminReviewsPage() {
   }, [isAuthenticated, loading, router, user?.role])
 
   useEffect(() => {
-    const timeout = setTimeout(() => setSearchQuery(searchInput.trim()), 350)
+    const timeout = setTimeout(() => {
+      const nextQuery = searchInput.trim()
+      setSearchQuery(nextQuery)
+      setPage(1)
+    }, 350)
     return () => clearTimeout(timeout)
   }, [searchInput])
 
   const fetchReviews = useCallback(async (signal?: AbortSignal) => {
     if (!isAuthenticated || user?.role !== "admin") return
+    if (signal?.aborted || !isMountedRef.current) return
     setIsLoading(true)
     setError(null)
     try {
@@ -132,6 +149,7 @@ export default function AdminReviewsPage() {
       if (!response.ok || !payload.success) {
         throw new Error(payload.msg || "Failed to load reviews")
       }
+      if (signal?.aborted || !isMountedRef.current) return
 
       const data: ReviewsPayload = payload.data
       setReviews(Array.isArray(data.reviews) ? data.reviews : [])
@@ -140,6 +158,7 @@ export default function AdminReviewsPage() {
       setTotalReviews(data.pagination?.total || 0)
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return
+      if (signal?.aborted || !isMountedRef.current) return
       console.error("[ADMIN][REVIEWS] fetch failed", err)
       setReviews([])
       setStats({ total: 0, hidden: 0, visible: 0 })
@@ -147,6 +166,7 @@ export default function AdminReviewsPage() {
       setTotalReviews(0)
       setError(err instanceof Error ? err.message : "Failed to load reviews")
     } finally {
+      if (!isMountedRef.current || signal?.aborted) return
       setIsLoading(false)
     }
   }, [isAuthenticated, page, searchQuery, statusFilter, user?.role])
@@ -155,7 +175,7 @@ export default function AdminReviewsPage() {
     const controller = new AbortController()
     fetchReviews(controller.signal)
     return () => controller.abort()
-  }, [fetchReviews])
+  }, [fetchReviews, refreshKey])
 
   const mutateVisibility = async (review: ReviewRecord, nextAction: "hide" | "unhide") => {
     setActioningReviewId(review._id)
@@ -174,7 +194,9 @@ export default function AdminReviewsPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : `Failed to ${nextAction} review`)
     } finally {
-      setActioningReviewId(null)
+      if (isMountedRef.current) {
+        setActioningReviewId(null)
+      }
     }
   }
 
@@ -221,7 +243,7 @@ export default function AdminReviewsPage() {
             <Button
               onClick={() => {
                 setPage(1)
-                fetchReviews()
+                setRefreshKey((prev) => prev + 1)
               }}
               disabled={isLoading}
               className="bg-amber-600 hover:bg-amber-700"
@@ -293,10 +315,7 @@ export default function AdminReviewsPage() {
                   <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
                     value={searchInput}
-                    onChange={(e) => {
-                      setPage(1)
-                      setSearchInput(e.target.value)
-                    }}
+                    onChange={(e) => setSearchInput(e.target.value)}
                     placeholder="Search comment or booking number"
                     className="pl-9"
                   />
@@ -325,7 +344,11 @@ export default function AdminReviewsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {error && (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+              >
                 {error}
               </div>
             )}

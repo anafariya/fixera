@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { getAuthToken } from "@/lib/utils"
@@ -80,6 +80,7 @@ export default function WarrantyClaimsPage() {
   const { user, isAuthenticated, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const searchSuffix = searchParams.toString() ? `?${searchParams.toString()}` : ""
   const claimIdFromQuery = searchParams.get("claimId") || null
   const statusFromQuery = searchParams.get("status")
 
@@ -90,12 +91,21 @@ export default function WarrantyClaimsPage() {
   const [totalClaims, setTotalClaims] = useState(0)
   const [isLoadingClaims, setIsLoadingClaims] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [highlightedClaim, setHighlightedClaim] = useState<ClaimRecord | null>(null)
+
+  const normalizedStatusFromQuery = useMemo(() => {
+    if (!statusFromQuery) return null
+    if (statusFromQuery === "all") return "all"
+    return STATUS_OPTIONS.some((option) => option.value === statusFromQuery)
+      ? (statusFromQuery as WarrantyClaimStatus)
+      : null
+  }, [statusFromQuery])
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push("/login?redirect=/dashboard/warranty-claims")
+      router.push(`/login?redirect=${encodeURIComponent(`/dashboard/warranty-claims${searchSuffix}`)}`)
     }
-  }, [isAuthenticated, loading, router])
+  }, [isAuthenticated, loading, router, searchSuffix])
 
   useEffect(() => {
     if (!loading && isAuthenticated && user?.role !== "professional" && user?.role !== "customer") {
@@ -104,17 +114,59 @@ export default function WarrantyClaimsPage() {
   }, [isAuthenticated, loading, router, user?.role])
 
   useEffect(() => {
-    if (!statusFromQuery) return
-    if (statusFromQuery === "all") {
-      setStatusFilter("all")
+    if (claimIdFromQuery) return
+    setStatusFilter(normalizedStatusFromQuery ?? "all")
+    setPage((currentPage) => (currentPage === 1 ? currentPage : 1))
+  }, [claimIdFromQuery, normalizedStatusFromQuery])
+
+  const fetchClaimById = useCallback(async (claimId: string, signal?: AbortSignal) => {
+    if (!isAuthenticated || (user?.role !== "professional" && user?.role !== "customer")) return null
+
+    const token = getAuthToken()
+    const headers: Record<string, string> = {}
+    if (token) headers.Authorization = `Bearer ${token}`
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/warranty-claims/${claimId}`,
+      { credentials: "include", headers, signal }
+    )
+    const payload = await response.json()
+    const claim = payload.claim || payload.data?.claim
+    if (!response.ok || !payload.success || !claim) {
+      throw new Error(payload.msg || "Failed to load warranty claim")
+    }
+
+    return claim as ClaimRecord
+  }, [isAuthenticated, user?.role])
+
+  useEffect(() => {
+    if (!claimIdFromQuery) {
+      setHighlightedClaim(null)
+      setStatusFilter(normalizedStatusFromQuery ?? "all")
+      setPage((currentPage) => (currentPage === 1 ? currentPage : 1))
       return
     }
 
-    const isValidStatus = STATUS_OPTIONS.some((option) => option.value === statusFromQuery)
-    if (isValidStatus) {
-      setStatusFilter(statusFromQuery as WarrantyClaimStatus)
-    }
-  }, [statusFromQuery])
+    const controller = new AbortController()
+
+    ;(async () => {
+      try {
+        const claim = await fetchClaimById(claimIdFromQuery, controller.signal)
+        if (!claim) return
+
+        setHighlightedClaim(claim)
+        setPage(1)
+        setStatusFilter(claim.status)
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return
+        setStatusFilter(normalizedStatusFromQuery ?? "all")
+        setHighlightedClaim(null)
+        setError(err instanceof Error ? err.message : "Failed to load warranty claim")
+      }
+    })()
+
+    return () => controller.abort()
+  }, [claimIdFromQuery, fetchClaimById, normalizedStatusFromQuery])
 
   const fetchClaims = useCallback(async (signal?: AbortSignal) => {
     if (!isAuthenticated || (user?.role !== "professional" && user?.role !== "customer")) return
@@ -140,7 +192,18 @@ export default function WarrantyClaimsPage() {
       }
 
       const data = payload.data || {}
-      setClaims(Array.isArray(data.claims) ? data.claims : [])
+      const nextClaims = Array.isArray(data.claims) ? data.claims : []
+      if (highlightedClaim && page === 1) {
+        const matchesFilter = statusFilter === "all" || highlightedClaim.status === statusFilter
+        if (matchesFilter && !nextClaims.some((claim: ClaimRecord) => claim._id === highlightedClaim._id)) {
+          setClaims([highlightedClaim, ...nextClaims])
+          setTotalClaims(Math.max(data.pagination?.total || 0, nextClaims.length + 1))
+          setTotalPages(Math.max(data.pagination?.totalPages || 1, 1))
+          return
+        }
+      }
+
+      setClaims(nextClaims)
       setTotalPages(data.pagination?.totalPages || 1)
       setTotalClaims(data.pagination?.total || 0)
     } catch (err) {
@@ -152,7 +215,7 @@ export default function WarrantyClaimsPage() {
     } finally {
       setIsLoadingClaims(false)
     }
-  }, [isAuthenticated, page, statusFilter, user?.role])
+  }, [highlightedClaim, isAuthenticated, page, statusFilter, user?.role])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -415,8 +478,17 @@ export default function WarrantyClaimsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-slate-700 space-y-1">
-            <p>Respond to new claims within 5 business days to avoid automatic escalation.</p>
-            <p>Use the booking detail page to send proposals, mark repairs resolved, and track confirmations.</p>
+            {isProfessional ? (
+              <>
+                <p>Respond to new claims within 5 business days to avoid automatic escalation.</p>
+                <p>Use the booking detail page to send proposals, mark repairs resolved, and track confirmations.</p>
+              </>
+            ) : (
+              <>
+                <p>Open the related booking to review claim details, proposal updates, and repair progress.</p>
+                <p>Use the booking page to accept or decline proposals, confirm resolutions, or escalate if the issue remains unresolved.</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
