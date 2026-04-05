@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { ArrowLeft, Calendar, Clock, Package, Briefcase, User, Mail, Phone, Shield, CheckCircle, XCircle, Play, CheckCheck, CreditCard, FileText, Loader2, Upload, Star, Gift, ChevronDown, ChevronUp, MessageSquare, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
@@ -159,6 +160,8 @@ interface BookingDetail {
     description?: string
     rfqQuestions?: PostBookingQuestion[]
     postBookingQuestions?: PostBookingQuestion[]
+    extraOptions?: Array<{ name?: string; price?: number }>
+    termsConditions?: Array<{ name?: string; additionalCost?: number }>
   }
   professional?: {
     _id: string
@@ -247,6 +250,11 @@ type CompletionExtraCost = {
   actualUnits?: number
   unitPrice?: number
 }
+
+const UNSELECTED_REFERENCE_INDEX = -1
+
+const hasSelectedReferenceIndex = (referenceIndex?: number) =>
+  typeof referenceIndex === "number" && referenceIndex >= 0
 
 const DETAIL_STATUS_STYLES: Record<string, string> = {
   rfq: "bg-indigo-50 text-indigo-700 border border-indigo-100",
@@ -1488,6 +1496,26 @@ export default function BookingDetailPage() {
 
   const handleProfessionalComplete = async () => {
     if (!bookingId) return
+
+    const invalidExtraCost = completionExtraCosts.find((cost) => {
+      if (!cost.justification.trim()) return true
+      if ((cost.type === 'condition' || cost.type === 'option') && !hasSelectedReferenceIndex(cost.referenceIndex)) {
+        return true
+      }
+      return false
+    })
+
+    if (invalidExtraCost) {
+      toast.error(
+        invalidExtraCost.type === 'condition'
+          ? 'Select a project condition before confirming completion.'
+          : invalidExtraCost.type === 'option'
+            ? 'Select a project option before confirming completion.'
+            : 'Each extra cost requires a justification.'
+      )
+      return
+    }
+
     setSubmittingCompletion(true)
     try {
       const token = getAuthToken()
@@ -1653,7 +1681,7 @@ export default function BookingDetailPage() {
       justification: '',
       amount: 0,
       ...(type === 'unit_adjustment' ? { estimatedUnits: 0, actualUnits: 0, unitPrice: 0 } : {}),
-      ...(type === 'condition' || type === 'option' ? { referenceIndex: 0 } : {}),
+      ...(type === 'condition' || type === 'option' ? { referenceIndex: UNSELECTED_REFERENCE_INDEX } : {}),
     }])
   }
 
@@ -1730,6 +1758,18 @@ export default function BookingDetailPage() {
   if (!isAuthenticated) {
     return null
   }
+
+  const allMilestonesCompleted = !booking?.milestonePayments?.length
+    || booking.milestonePayments.every((milestone) => (milestone.workStatus || 'pending') === 'completed')
+  const invalidCompletionExtraCosts = completionExtraCosts.some((cost) => {
+    if (!cost.justification.trim()) return true
+    if ((cost.type === 'condition' || cost.type === 'option') && !hasSelectedReferenceIndex(cost.referenceIndex)) {
+      return true
+    }
+    return false
+  })
+  const projectConditions = booking?.project?.termsConditions || []
+  const projectOptions = booking?.project?.extraOptions || []
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-pink-50 p-4">
@@ -2389,8 +2429,15 @@ export default function BookingDetailPage() {
                         const prevPaid = booking.milestonePayments!.slice(0, i).every(m => m.status === 'paid')
                         const prevCompleted = booking.milestonePayments!.slice(0, i).every(m => (m.workStatus || 'pending') === 'completed')
                         const canPay = !isPaid && prevPaid && user?.role === 'customer'
-                        const canStart = user?.role === 'professional' && workStatus === 'pending' && prevCompleted && booking.status !== 'completed'
-                        const canComplete = user?.role === 'professional' && workStatus === 'in_progress' && booking.status !== 'completed'
+                        const canStart = user?.role === 'professional'
+                          && workStatus === 'pending'
+                          && prevCompleted
+                          && booking.status !== 'professional_completed'
+                          && booking.status !== 'completed'
+                        const canComplete = user?.role === 'professional'
+                          && workStatus === 'in_progress'
+                          && booking.status !== 'professional_completed'
+                          && booking.status !== 'completed'
 
                         return (
                           <div key={i} className={`rounded border p-3 ${isPaid ? 'bg-green-50 border-green-200' : 'bg-white border-slate-200'}`}>
@@ -2727,7 +2774,7 @@ export default function BookingDetailPage() {
                 )}
 
                 {/* Professional: Confirm Completion (when status is in_progress) */}
-                {user?.role === "professional" && booking.status === "in_progress" && (
+                {user?.role === "professional" && booking.status === "in_progress" && allMilestonesCompleted && (
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -3875,14 +3922,44 @@ export default function BookingDetailPage() {
                     {cost.type === 'condition' && (
                       <div>
                         <Label className="text-xs">Condition (select from project)</Label>
-                        <Input type="number" placeholder="Condition index" value={cost.referenceIndex ?? ''} onChange={(e) => updateExtraCost(i, 'referenceIndex', parseInt(e.target.value) || 0)} className="h-8 text-sm" />
+                        <Select
+                          value={hasSelectedReferenceIndex(cost.referenceIndex) ? String(cost.referenceIndex) : undefined}
+                          onValueChange={(value) => updateExtraCost(i, 'referenceIndex', parseInt(value, 10))}
+                        >
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue placeholder={projectConditions.length > 0 ? "Select a condition" : "No project conditions available"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {projectConditions.map((condition, conditionIndex) => (
+                              <SelectItem key={`condition-${conditionIndex}`} value={String(conditionIndex)}>
+                                {(condition.name || `Condition ${conditionIndex + 1}`)}
+                                {typeof condition.additionalCost === 'number' ? ` (+${condition.additionalCost.toFixed(2)})` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
 
                     {cost.type === 'option' && (
                       <div>
                         <Label className="text-xs">Option (select from project)</Label>
-                        <Input type="number" placeholder="Option index" value={cost.referenceIndex ?? ''} onChange={(e) => updateExtraCost(i, 'referenceIndex', parseInt(e.target.value) || 0)} className="h-8 text-sm" />
+                        <Select
+                          value={hasSelectedReferenceIndex(cost.referenceIndex) ? String(cost.referenceIndex) : undefined}
+                          onValueChange={(value) => updateExtraCost(i, 'referenceIndex', parseInt(value, 10))}
+                        >
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue placeholder={projectOptions.length > 0 ? "Select an option" : "No project options available"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {projectOptions.map((option, optionIndex) => (
+                              <SelectItem key={`option-${optionIndex}`} value={String(optionIndex)}>
+                                {(option.name || `Option ${optionIndex + 1}`)}
+                                {typeof option.price === 'number' ? ` (+${option.price.toFixed(2)})` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
 
@@ -3926,7 +4003,7 @@ export default function BookingDetailPage() {
                 <Button variant="outline" onClick={() => setShowCompletionModal(false)}>Cancel</Button>
                 <Button
                   onClick={handleProfessionalComplete}
-                  disabled={submittingCompletion || completionExtraCosts.some(c => !c.justification)}
+                  disabled={submittingCompletion || invalidCompletionExtraCosts}
                   className="bg-green-600 hover:bg-green-700 text-white"
                 >
                   {submittingCompletion ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCheck className="h-4 w-4 mr-2" />}

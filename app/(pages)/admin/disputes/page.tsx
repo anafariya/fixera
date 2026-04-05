@@ -86,6 +86,18 @@ export default function AdminDisputesPage() {
   const [resolveResolution, setResolveResolution] = useState('')
   const [resolving, setResolving] = useState(false)
 
+  const resetResolveForm = useCallback(() => {
+    setResolveAction('accept_professional')
+    setResolveAdjustedAmount('')
+    setResolveResolution('')
+  }, [])
+
+  const openResolveDialog = useCallback((dispute: DisputeBooking) => {
+    resetResolveForm()
+    setSelectedDispute(dispute)
+    setShowResolveDialog(true)
+  }, [resetResolveForm])
+
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) {
       router.push('/dashboard')
@@ -130,11 +142,28 @@ export default function AdminDisputesPage() {
 
   const handleResolve = async () => {
     if (!selectedDispute || !resolveResolution.trim()) return
+
+    let parsedAdjustedAmount: number | undefined
+    if (resolveAction === 'adjust') {
+      parsedAdjustedAmount = Number(resolveAdjustedAmount)
+      const maxAdjustedAmount = selectedDispute.extraCostTotal
+      const isOutOfRange = typeof maxAdjustedAmount === 'number' && parsedAdjustedAmount > maxAdjustedAmount
+
+      if (!Number.isFinite(parsedAdjustedAmount) || parsedAdjustedAmount < 0 || isOutOfRange) {
+        toast.error(
+          typeof maxAdjustedAmount === 'number'
+            ? `Adjusted amount must be a valid number between 0 and ${maxAdjustedAmount.toFixed(2)}`
+            : 'Adjusted amount must be a valid number greater than or equal to 0'
+        )
+        return
+      }
+    }
+
     setResolving(true)
     try {
-      const body: ResolveDisputeRequest = { action: resolveAction, resolution: resolveResolution }
-      if (resolveAction === 'adjust') {
-        body.adjustedAmount = parseFloat(resolveAdjustedAmount)
+      const body: ResolveDisputeRequest = { action: resolveAction, resolution: resolveResolution.trim() }
+      if (resolveAction === 'adjust' && parsedAdjustedAmount != null) {
+        body.adjustedAmount = parsedAdjustedAmount
       }
       const res = await authFetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/disputes/${selectedDispute._id}/resolve`,
@@ -145,8 +174,7 @@ export default function AdminDisputesPage() {
         toast.success('Dispute resolved successfully')
         setShowResolveDialog(false)
         setSelectedDispute(null)
-        setResolveResolution('')
-        setResolveAdjustedAmount('')
+        resetResolveForm()
         fetchDisputes()
         fetchAnalytics()
       } else {
@@ -266,10 +294,7 @@ export default function AdminDisputesPage() {
                         <Button
                           size="sm"
                           className="h-7 text-xs"
-                          onClick={() => {
-                            setSelectedDispute(d)
-                            setShowResolveDialog(true)
-                          }}
+                          onClick={() => openResolveDialog(d)}
                         >
                           Resolve
                         </Button>
@@ -380,7 +405,16 @@ export default function AdminDisputesPage() {
                 </div>
 
                 <div className="flex gap-2 justify-end">
-                  <Button variant="outline" onClick={() => setShowResolveDialog(false)}>Cancel</Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      resetResolveForm()
+                      setSelectedDispute(null)
+                      setShowResolveDialog(false)
+                    }}
+                  >
+                    Cancel
+                  </Button>
                   <Button
                     onClick={handleResolve}
                     disabled={resolving || !resolveResolution.trim() || (resolveAction === 'adjust' && !resolveAdjustedAmount)}
