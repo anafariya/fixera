@@ -765,7 +765,12 @@ export default function CustomerDashboard() {
 
       <QuoteComparisonModal
         open={showComparison}
-        onOpenChange={setShowComparison}
+        onOpenChange={(open) => {
+          setShowComparison(open)
+          if (!open) {
+            setSelectedQuoteIds(new Set())
+          }
+        }}
         bookings={comparisonBookings}
       />
     </div>

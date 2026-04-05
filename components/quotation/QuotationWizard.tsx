@@ -17,6 +17,7 @@ interface QuotationWizardProps {
   bookingId: string
   existingVersion?: QuoteVersion
   isEditing?: boolean
+  commissionPercent?: number
   onSuccess: () => void
   onCancel: () => void
 }
@@ -71,7 +72,7 @@ const getDefaultFormData = (existing?: QuoteVersion): QuotationWizardFormData =>
   return {
     scope: '',
     warrantyDuration: { value: 12, unit: 'months' },
-    materialsIncluded: false,
+    materialsIncluded: null,
     materials: [{ ...EMPTY_MATERIAL }],
     description: '',
     totalAmount: 0,
@@ -87,7 +88,7 @@ const getDefaultFormData = (existing?: QuoteVersion): QuotationWizardFormData =>
   }
 }
 
-export default function QuotationWizard({ bookingId, existingVersion, isEditing, onSuccess, onCancel }: QuotationWizardProps) {
+export default function QuotationWizard({ bookingId, existingVersion, isEditing, commissionPercent, onSuccess, onCancel }: QuotationWizardProps) {
   const [form, setForm] = useState<QuotationWizardFormData>(getDefaultFormData(existingVersion))
   const [submitting, setSubmitting] = useState(false)
 
@@ -127,6 +128,10 @@ export default function QuotationWizard({ bookingId, existingVersion, isEditing,
     }
     if (!form.description) {
       toast.error('Description is required')
+      return
+    }
+    if (form.materialsIncluded === null) {
+      toast.error('Please specify whether materials are included')
       return
     }
     if (!form.totalAmount || form.totalAmount <= 0) {
@@ -257,10 +262,10 @@ export default function QuotationWizard({ bookingId, existingVersion, isEditing,
         {/* Materials */}
         <div>
           <Label className="text-sm font-medium flex items-center gap-1">
-            <Package className="h-4 w-4" /> Materials Included
+            <Package className="h-4 w-4" /> Materials Included *
           </Label>
           <RadioGroup
-            value={form.materialsIncluded ? 'yes' : 'no'}
+            value={form.materialsIncluded === null ? '' : form.materialsIncluded ? 'yes' : 'no'}
             onValueChange={v => updateForm('materialsIncluded', v === 'yes')}
             className="flex gap-4 mt-1"
           >
@@ -338,6 +343,13 @@ export default function QuotationWizard({ bookingId, existingVersion, isEditing,
             className="mt-1"
           />
 
+          {form.totalAmount > 0 && typeof commissionPercent === 'number' && commissionPercent > 0 && (
+            <p className="text-xs text-gray-500 mt-1">
+              Price shown to customer: <span className="font-semibold text-gray-700">EUR {(form.totalAmount * (1 + commissionPercent / 100)).toFixed(2)}</span>
+              <span className="text-gray-400 ml-1">({commissionPercent}% commission included)</span>
+            </p>
+          )}
+
           {/* Milestone toggle */}
           <div className="mt-3">
             <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -379,6 +391,7 @@ export default function QuotationWizard({ bookingId, existingVersion, isEditing,
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="on_start">On Project Start</SelectItem>
+                          <SelectItem value="on_milestone_start">On Milestone Start</SelectItem>
                           <SelectItem value="on_milestone_completion">On Milestone Completion</SelectItem>
                           <SelectItem value="on_project_completion">On Project Completion</SelectItem>
                           <SelectItem value="custom_date">Custom Date</SelectItem>

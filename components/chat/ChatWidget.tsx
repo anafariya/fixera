@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { MessageSquare, X, Minus, ArrowLeft, Loader2, Plus, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatPolling } from "@/hooks/useChatPolling";
@@ -62,6 +64,39 @@ export default function ChatWidget() {
   const [loadingProfessionals, setLoadingProfessionals] = useState(false);
   const [professionalsError, setProfessionalsError] = useState<string | null>(null);
   const [creatingSendQuotation, setCreatingSendQuotation] = useState(false);
+  const [showQuotationDialog, setShowQuotationDialog] = useState(false);
+  const [activeProjects, setActiveProjects] = useState<Array<{ _id: string; title?: string }>>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("none");
+
+  const loadActiveProjects = useCallback(async () => {
+    setLoadingProjects(true);
+    try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/quotations/active-projects`,
+        { credentials: "include", headers }
+      );
+      const data = await response.json();
+      if (response.ok && data?.success) {
+        const projects = Array.isArray(data.data?.projects) ? data.data.projects : [];
+        setActiveProjects(projects);
+        if (projects.length === 1) {
+          setSelectedProjectId(projects[0]._id);
+        }
+      } else {
+        setActiveProjects([]);
+      }
+    } catch (err) {
+      console.error("Error loading active projects:", err);
+      setActiveProjects([]);
+    } finally {
+      setLoadingProjects(false);
+    }
+  }, []);
 
   const handleSendQuotation = async () => {
     if (!selectedConversation || userRole !== "professional") return;
@@ -76,10 +111,19 @@ export default function ChatWidget() {
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/quotations/direct`,
-        { method: "POST", headers, credentials: "include", body: JSON.stringify({ customerId }) }
+        {
+          method: "POST",
+          headers,
+          credentials: "include",
+          body: JSON.stringify({
+            customerId,
+            projectId: selectedProjectId !== "none" ? selectedProjectId : undefined,
+          }),
+        }
       );
       const data = await response.json();
       if (response.ok && data?.success) {
+        setShowQuotationDialog(false);
         setOpen(false);
         chatRouter.push(`/bookings/${data.data.bookingId}?action=quote`);
       } else {
@@ -93,7 +137,13 @@ export default function ChatWidget() {
     }
   };
 
+  const openQuotationDialog = () => {
+    setShowQuotationDialog(true);
+    void loadActiveProjects();
+  };
+
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const conversationListRef = useRef<ChatConversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [professionalOptions, setProfessionalOptions] = useState<ProfessionalOption[]>([]);
@@ -132,6 +182,7 @@ export default function ChatWidget() {
         const data = await fetchConversations({ page: 1, limit: 50 });
         const list = data.conversations || [];
         setConversations(list);
+        conversationListRef.current = list;
 
         // Messenger-like behavior:
         // Keep the user's current view. Do NOT auto-open latest conversation.
@@ -194,7 +245,7 @@ export default function ChatWidget() {
 
   const ensureConversation = useCallback(
     async (detail: ChatWidgetOpenDetail) => {
-      if (!isAuthenticated || userRole !== "customer") return;
+      if (!isAuthenticated || !isAllowedRole(userRole)) return;
 
       if (detail.conversationId) {
         setManualNewChatPanel(false);
@@ -202,7 +253,21 @@ export default function ChatWidget() {
         return;
       }
 
-      if (!detail.professionalId) return;
+      if (userRole === "professional" && detail.customerId) {
+        await loadConversationList(false);
+        const existing = conversationListRef.current.find(
+          (c) => c.customerId?._id === detail.customerId
+        );
+        if (existing) {
+          setManualNewChatPanel(false);
+          setSelectedConversationId(existing._id);
+        } else {
+          toast.info("No conversation found with this customer yet.");
+        }
+        return;
+      }
+
+      if (!detail.professionalId || userRole !== "customer") return;
 
       setCreatingConversation(true);
       try {
@@ -415,7 +480,7 @@ export default function ChatWidget() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-white hover:bg-white/20"
-                        onClick={handleSendQuotation}
+                        onClick={openQuotationDialog}
                         disabled={creatingSendQuotation}
                         aria-label="Send quotation"
                         title="Send Quotation"
@@ -607,6 +672,46 @@ export default function ChatWidget() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={showQuotationDialog} onOpenChange={setShowQuotationDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Direct Quotation</DialogTitle>
+            <DialogDescription>
+              Choose whether this quotation should be linked to one of your published projects.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-900">Linked project</p>
+              {loadingProjects ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading projects...
+                </div>
+              ) : (
+                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No linked project</SelectItem>
+                    {activeProjects.map(project => (
+                      <SelectItem key={project._id} value={project._id}>
+                        {project.title || "Untitled project"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <Button onClick={handleSendQuotation} disabled={creatingSendQuotation} className="w-full">
+              {creatingSendQuotation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+              Create quotation draft
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

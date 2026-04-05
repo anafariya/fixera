@@ -366,7 +366,7 @@ export default function SubprojectComparisonTable({
               onClick={() => onSelectPackage(selectedIndex)}
               className="w-full bg-black hover:bg-gray-900 text-white h-12 text-base font-semibold group"
             >
-              Continue
+              {currentSubproject.pricing?.type === 'rfq' ? 'Request Quote' : 'Continue'}
               <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>
 

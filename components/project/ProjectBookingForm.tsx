@@ -14,8 +14,10 @@ import AddressAutocomplete from '@/components/professional/project-wizard/Addres
 import {
   ArrowLeft,
   Calendar,
+  FileText,
   Loader2,
   Upload,
+  X,
   CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -104,6 +106,7 @@ interface RFQAnswer {
   question: string;
   answer: string;
   type: string;
+  fieldType?: string;
 }
 
 interface BlockedRange {
@@ -295,6 +298,8 @@ export default function ProjectBookingForm({
     []
   );
   const [additionalNotes, setAdditionalNotes] = useState('');
+  const [rfqAttachments, setRfqAttachments] = useState<{ url: string; fileName: string }[]>([]);
+  const [uploadingRfqAttachment, setUploadingRfqAttachment] = useState(false);
   const [useProfileAddress, setUseProfileAddress] = useState(true);
   const [manualAddress, setManualAddress] = useState('');
   const [isServiceAddressValid, setIsServiceAddressValid] = useState(false);
@@ -302,6 +307,7 @@ export default function ProjectBookingForm({
     selectedPackageIndex !== null
       ? project.subprojects[selectedPackageIndex]
       : null;
+  const isRfqPackage = selectedPackage?.pricing?.type === 'rfq';
 
   // Check if unit pricing - either explicit type or inferred from priceModel for old projects
   const isUnitPricing =
@@ -1709,10 +1715,12 @@ export default function ProjectBookingForm({
   const handleRFQAnswerChange = (index: number, answer: string) => {
     setRFQAnswers((prev) => {
       const newAnswers = [...prev];
+      const questionType = project.rfqQuestions[index].type;
       newAnswers[index] = {
         question: project.rfqQuestions[index].question,
         answer,
-        type: project.rfqQuestions[index].type,
+        type: questionType,
+        ...(questionType === 'attachment' ? { fieldType: 'file' } : {}),
       };
       return newAnswers;
     });
@@ -1758,6 +1766,42 @@ export default function ProjectBookingForm({
     }
   };
 
+  const handleRfqGeneralAttachmentUpload = async (file: File | null) => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File must be less than 10MB');
+      return;
+    }
+    setUploadingRfqAttachment(true);
+    try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/rfq-upload`,
+        { method: 'POST', credentials: 'include', headers, body: formData }
+      );
+      const data = await response.json();
+      if (!response.ok || !data?.success || !data?.data?.url) {
+        toast.error(data?.msg || 'Failed to upload attachment');
+        return;
+      }
+      setRfqAttachments(prev => [...prev, { url: data.data.url, fileName: data.data.fileName || file.name }]);
+      toast.success('Attachment uploaded');
+    } catch (error) {
+      console.error('Failed to upload RFQ attachment:', error);
+      toast.error('Failed to upload attachment');
+    } finally {
+      setUploadingRfqAttachment(false);
+    }
+  };
+
+  const removeRfqAttachment = (index: number) => {
+    setRfqAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleExtraOptionToggle = (index: number) => {
     setSelectedExtraOptions((prev) =>
       prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
@@ -1787,6 +1831,9 @@ export default function ProjectBookingForm({
     }
 
     if (currentStep === 2) {
+      if (isRfqPackage) {
+        return true;
+      }
       if (!selectedDate) {
         toast.error('Please select a preferred start date');
         return false;
@@ -1915,16 +1962,18 @@ export default function ProjectBookingForm({
 
     try {
       const usageRequired = shouldCollectUsage(selectedPackage.pricing.type);
-      const usageDetails = usageRequired
-        ? ` Estimated usage: ${estimatedUsage}.`
-        : '';
-      const additionalNotesText = additionalNotes
-        ? ` Additional notes: ${additionalNotes}`
-        : '';
-      const addressText = confirmedAddress
-        ? ` Service address: ${confirmedAddress}.`
-        : '';
-      const serviceDescription = `Booking for ${project.title}. Selected package: ${selectedPackage.name}.${usageDetails}${additionalNotesText}${addressText}`;
+      const descriptionParts: string[] = [];
+      descriptionParts.push(`Package: ${selectedPackage.name}`);
+      if (usageRequired && estimatedUsage) {
+        descriptionParts.push(`Estimated usage: ${estimatedUsage}`);
+      }
+      if (additionalNotes) {
+        descriptionParts.push(`Notes: ${additionalNotes}`);
+      }
+      if (confirmedAddress) {
+        descriptionParts.push(`Service address: ${confirmedAddress}`);
+      }
+      const serviceDescription = descriptionParts.join('\n');
       const totalPrice = finalDisplayTotal;
       const isRfqPackage = selectedPackage.pricing.type === 'rfq';
       const hasValidPackageAmount =
@@ -1936,9 +1985,11 @@ export default function ProjectBookingForm({
       const bookingData = {
         bookingType: 'project',
         projectId: project._id,
-        preferredStartDate: selectedDate,
+        preferredStartDate: isRfqPackage ? undefined : selectedDate,
         preferredStartTime:
-          projectMode === 'hours' && selectedTime ? selectedTime : undefined,
+          !isRfqPackage && projectMode === 'hours' && selectedTime
+            ? selectedTime
+            : undefined,
         selectedSubprojectIndex: selectedPackageIndex,
         estimatedUsage: usageRequired ? estimatedUsage : undefined,
         selectedExtraOptions:
@@ -1948,9 +1999,11 @@ export default function ProjectBookingForm({
           serviceType: project.title,
           description: serviceDescription,
           answers: rfqAnswers,
-          preferredStartDate: selectedDate,
+          preferredStartDate: isRfqPackage ? undefined : selectedDate,
           preferredStartTime:
-            projectMode === 'hours' && selectedTime ? selectedTime : undefined,
+            !isRfqPackage && projectMode === 'hours' && selectedTime
+              ? selectedTime
+              : undefined,
           budget:
             totalPrice > 0
               ? {
@@ -1959,6 +2012,7 @@ export default function ProjectBookingForm({
                 currency: 'EUR',
               }
               : undefined,
+          attachments: rfqAttachments.map(a => a.url),
         },
         urgency: 'medium',
       };
@@ -2009,13 +2063,19 @@ export default function ProjectBookingForm({
             return;
           }
 
-          // Check if project has post-booking questions
+          const isRfq = selectedPackage?.pricing?.type === 'rfq';
+
+          if (isRfq) {
+            toast.success('Your quotation request has been submitted successfully! The professional will review your request and provide a quote.');
+            router.replace('/dashboard');
+            return;
+          }
+
           if (
             project.postBookingQuestions &&
             project.postBookingQuestions.length > 0 &&
             data.booking?._id
           ) {
-            // Redirect to booking detail page with post-booking questions flag
             router.replace(
               `/bookings/${data.booking._id}?postBookingQuestions=true`
             );
@@ -2228,7 +2288,7 @@ export default function ProjectBookingForm({
     : 'Submitting RFQ...';
   const stepLabels = [
     'Confirm Package',
-    'Choose Date',
+    isRfqPackage ? 'Before Booking' : 'Choose Date',
     'Answer Questions',
     finalStepLabel,
   ];
@@ -3241,8 +3301,8 @@ export default function ProjectBookingForm({
             {/* Step 3: RFQ Questions & Add-ons */}
             {currentStep === 3 && (
               <div className='space-y-6'>
-                {/* Add-ons Section */}
-                {project.extraOptions && project.extraOptions.length > 0 && (
+                {/* Add-ons Section — hidden for RFQ packages */}
+                {selectedPackage?.pricing?.type !== 'rfq' && project.extraOptions && project.extraOptions.length > 0 && (
                   <div className='space-y-4 pb-6 border-b'>
                     <div>
                       <h2 className='text-xl font-semibold mb-2'>
@@ -3309,11 +3369,9 @@ export default function ProjectBookingForm({
                         <div className='flex justify-between items-center text-sm'>
                           <span className='text-gray-700'>Package Price:</span>
                           <span className='font-semibold'>
-                            {selectedPackage.pricing.type === 'rfq'
-                              ? 'Quote Required'
-                              : typeof displayPackagePrice === 'number'
-                                ? formatCurrency(displayPackagePrice)
-                                : 'Quote Required'}
+                            {typeof displayPackagePrice === 'number'
+                              ? formatCurrency(displayPackagePrice)
+                              : 'Quote Required'}
                           </span>
                         </div>
 
@@ -3429,6 +3487,29 @@ export default function ProjectBookingForm({
                       )}
                     </Label>
 
+                    {Array.isArray((question as { professionalAttachments?: string[] }).professionalAttachments) &&
+                      (question as { professionalAttachments?: string[] }).professionalAttachments!.length > 0 && (
+                        <div className='rounded-lg border border-blue-100 bg-blue-50 p-3'>
+                          <p className='text-xs font-semibold text-blue-900 mb-2'>
+                            Files from the professional
+                          </p>
+                          <div className='space-y-1'>
+                            {(question as { professionalAttachments?: string[] }).professionalAttachments!.map((attachment, attachmentIndex) => (
+                              <a
+                                key={`${idx}-${attachmentIndex}`}
+                                href={attachment}
+                                target='_blank'
+                                rel='noreferrer noopener'
+                                className='inline-flex items-center text-sm text-blue-700 hover:underline'
+                              >
+                                <FileText className='mr-2 h-4 w-4' />
+                                Download attachment {attachmentIndex + 1}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                     {question.type === 'text' && (
                       <Textarea
                         id={`question-${idx}`}
@@ -3521,6 +3602,49 @@ export default function ProjectBookingForm({
                     rows={3}
                   />
                 </div>
+
+                {/* Attachments */}
+                <div className='space-y-2 pt-4 border-t'>
+                  <Label>Attachments (Optional)</Label>
+                  <p className='text-gray-500 text-xs mb-2'>
+                    Upload any relevant files (max 10MB per file)
+                  </p>
+                  {rfqAttachments.map((att, idx) => (
+                    <div key={idx} className='flex items-center gap-2 text-sm bg-gray-50 p-2 rounded'>
+                      <FileText className='h-4 w-4 text-blue-600 flex-shrink-0' />
+                      <span className='truncate flex-1'>{att.fileName}</span>
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='sm'
+                        className='h-6 w-6 p-0'
+                        onClick={() => removeRfqAttachment(idx)}
+                      >
+                        <X className='h-3 w-3' />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className='border-2 border-dashed border-gray-300 rounded-lg p-4 text-center'>
+                    <Upload className='h-6 w-6 text-gray-400 mx-auto mb-1' />
+                    <Input
+                      type='file'
+                      accept='.pdf,.doc,.docx,.xls,.xlsx,image/*'
+                      className='mt-2'
+                      disabled={uploadingRfqAttachment}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        void handleRfqGeneralAttachmentUpload(file);
+                        e.currentTarget.value = '';
+                      }}
+                    />
+                    {uploadingRfqAttachment && (
+                      <div className='mt-2 inline-flex items-center text-xs text-indigo-600'>
+                        <Loader2 className='h-3.5 w-3.5 mr-1 animate-spin' />
+                        Uploading...
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -3529,7 +3653,7 @@ export default function ProjectBookingForm({
               <div className='space-y-6'>
                 <div>
                   <h2 className='text-xl font-semibold mb-2'>
-                    Review Your Booking
+                    {selectedPackage?.pricing?.type === 'rfq' ? 'Review Your Quotation Request' : 'Review Your Booking'}
                   </h2>
                   <p className='text-gray-600 text-sm mb-6'>
                     {finalStepDescription}
@@ -3582,6 +3706,7 @@ export default function ProjectBookingForm({
                 </div>
 
                 {/* Selected Date */}
+                {!isRfqPackage && (
                 <div className='space-y-3'>
                   <h3 className='font-semibold'>Project Timeline</h3>
                   <div className='bg-gray-50 p-4 rounded space-y-3'>
@@ -3685,6 +3810,7 @@ export default function ProjectBookingForm({
                       )}
                   </div>
                 </div>
+                )}
 
                 {/* Service Address Confirmation */}
                 <div className='space-y-3'>
@@ -3718,6 +3844,21 @@ export default function ProjectBookingForm({
                     />
                   </div>
                 </div>
+
+                {/* Attachments review */}
+                {rfqAttachments.length > 0 && (
+                  <div className='space-y-3'>
+                    <h3 className='font-semibold'>Attachments</h3>
+                    <div className='bg-gray-50 p-4 rounded space-y-2'>
+                      {rfqAttachments.map((att, idx) => (
+                        <div key={idx} className='flex items-center gap-2 text-sm'>
+                          <FileText className='h-4 w-4 text-blue-600 flex-shrink-0' />
+                          <span className='truncate'>{att.fileName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Loyalty visibility before checkout */}
                 {user?.role === 'customer' &&
@@ -3777,8 +3918,8 @@ export default function ProjectBookingForm({
                         </p>
                       )}
 
-                      {/* Selected Add-ons */}
-                      {selectedExtraOptions.length > 0 && (
+                      {/* Selected Add-ons — hidden for RFQ */}
+                      {selectedPackage?.pricing?.type !== 'rfq' && selectedExtraOptions.length > 0 && (
                         <div className='space-y-2 pt-2 border-t border-blue-300'>
                           <p className='text-sm font-semibold text-gray-700'>
                             Selected Add-ons:

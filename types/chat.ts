@@ -62,6 +62,17 @@ export interface WarrantyNotificationMeta {
   status?: string;
 }
 
+export interface QuotationNotificationMeta {
+  bookingId: string;
+  quotationNumber: string;
+  version: number;
+  scope: string;
+  totalAmount: number;
+  currency: string;
+  validUntil: string;
+  status?: string;
+}
+
 export interface ReplyToMessage {
   _id: string;
   text?: string;
@@ -75,12 +86,13 @@ export interface ChatMessage {
   conversationId: string;
   senderId: ChatUserSummary;
   senderRole: "customer" | "professional" | "system";
-  messageType?: "text" | "review_notification" | "warranty_notification";
+  messageType?: "text" | "review_notification" | "warranty_notification" | "quotation_notification";
   text?: string;
   images: string[];
   attachments?: ChatAttachment[];
   reviewMeta?: ReviewNotificationMeta;
   warrantyMeta?: WarrantyNotificationMeta;
+  quotationMeta?: QuotationNotificationMeta;
   replyTo?: ReplyToMessage;
   createdAt: string;
   updatedAt: string;
