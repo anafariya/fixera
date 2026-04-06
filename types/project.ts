@@ -124,6 +124,7 @@ export interface ProjectDto {
     isRequired: boolean
   }>
   extraOptions: Array<{
+    _id?: string
     name: string
     description?: string
     price: number

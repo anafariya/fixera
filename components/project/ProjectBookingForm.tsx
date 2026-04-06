@@ -2001,7 +2001,7 @@ export default function ProjectBookingForm({
         selectedSubprojectIndex: selectedPackageIndex,
         estimatedUsage: usageRequired ? estimatedUsage : undefined,
         selectedExtraOptions:
-          selectedExtraOptions.length > 0 ? selectedExtraOptions : undefined,
+          !isRfqPackage && selectedExtraOptions.length > 0 ? selectedExtraOptions : undefined,
         paymentAtCheckout: shouldPayAtCheckout,
         rfqData: {
           serviceType: project.title,
