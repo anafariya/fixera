@@ -117,7 +117,7 @@ export interface BookingBase {
 }
 
 export const isProjectBooking = (booking: BookingBase) =>
-  booking.bookingType === "project" || Boolean(booking.project?.title?.trim())
+  booking.bookingType === "project"
 
 export const getBookingTitle = (booking: BookingBase) => {
   const trimmedTitle = booking.project?.title?.trim()

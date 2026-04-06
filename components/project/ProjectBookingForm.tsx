@@ -298,7 +298,7 @@ export default function ProjectBookingForm({
     []
   );
   const [additionalNotes, setAdditionalNotes] = useState('');
-  const [rfqAttachments, setRfqAttachments] = useState<{ url: string; fileName: string }[]>([]);
+  const [rfqAttachments, setRfqAttachments] = useState<{ url: string; name: string }[]>([]);
   const [uploadingRfqAttachment, setUploadingRfqAttachment] = useState(false);
   const [useProfileAddress, setUseProfileAddress] = useState(true);
   const [manualAddress, setManualAddress] = useState('');
@@ -1805,7 +1805,7 @@ export default function ProjectBookingForm({
         toast.error(data?.msg || 'Failed to upload attachment');
         return;
       }
-      setRfqAttachments(prev => [...prev, { url: data.data.url, fileName: data.data.fileName || file.name }]);
+      setRfqAttachments(prev => [...prev, { url: data.data.url, name: data.data.fileName || file.name }]);
       toast.success('Attachment uploaded');
     } catch (error) {
       console.error('Failed to upload RFQ attachment:', error);
@@ -3648,13 +3648,13 @@ export default function ProjectBookingForm({
                   {rfqAttachments.map((att, idx) => (
                     <div key={idx} className='flex items-center gap-2 text-sm bg-gray-50 p-2 rounded'>
                       <FileText className='h-4 w-4 text-blue-600 flex-shrink-0' />
-                      <span className='truncate flex-1'>{att.fileName}</span>
+                      <span className='truncate flex-1'>{att.name}</span>
                       <Button
                         type='button'
                         variant='ghost'
                         size='sm'
                         className='h-6 w-6 p-0'
-                        aria-label={`Remove attachment ${att.fileName}`}
+                        aria-label={`Remove attachment ${att.name}`}
                         onClick={() => removeRfqAttachment(idx)}
                       >
                         <X className='h-3 w-3' />
@@ -3890,7 +3890,7 @@ export default function ProjectBookingForm({
                       {rfqAttachments.map((att, idx) => (
                         <div key={idx} className='flex items-center gap-2 text-sm'>
                           <FileText className='h-4 w-4 text-blue-600 flex-shrink-0' />
-                          <span className='truncate'>{att.fileName}</span>
+                          <span className='truncate'>{att.name}</span>
                         </div>
                       ))}
                     </div>

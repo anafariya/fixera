@@ -557,6 +557,8 @@ export default function BookingPaymentPage() {
           return acc;
         }, {});
         setPostBookingAnswers(hydratedAnswers);
+      } else {
+        setPostBookingAnswers({});
       }
       setLoading(false);
 

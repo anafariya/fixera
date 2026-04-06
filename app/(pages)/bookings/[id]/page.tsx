@@ -39,6 +39,33 @@ const PRE_SERVICE_BOOKING_STATUSES: BookingStatus[] = BOOKING_STATUSES.filter((s
   ].includes(status)
 ) as BookingStatus[]
 
+const formatValidUntilLabel = (value?: string) => {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return "N/A"
+  }
+
+  const [year, month, day] = value.split("-").map((part) => Number.parseInt(part, 10))
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day)
+  ) {
+    return "N/A"
+  }
+
+  const parsed = new Date(year, month - 1, day)
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return "N/A"
+  }
+
+  return parsed.toLocaleDateString()
+}
+
 interface PostBookingQuestion {
   _id?: string
   id?: string
@@ -2249,7 +2276,7 @@ export default function BookingDetailPage() {
                         <span className="text-2xl font-bold text-green-600">EUR {currentVersion.totalAmount.toFixed(2)}</span>
                       </div>
                       <p className="text-xs text-gray-500">
-                        Valid until: {(() => { const [y, m, d] = String(currentVersion.validUntil).split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(); })()}
+                        Valid until: {formatValidUntilLabel(currentVersion?.validUntil)}
                       </p>
                     </div>
 
@@ -2317,7 +2344,7 @@ export default function BookingDetailPage() {
                     <div className="bg-white rounded-lg p-3 space-y-2 text-sm">
                       <p><span className="text-gray-500">Scope:</span> {currentVersion.scope}</p>
                       <p><span className="text-gray-500">Total:</span> <strong>EUR {currentVersion.totalAmount.toFixed(2)}</strong></p>
-                      <p><span className="text-gray-500">Valid until:</span> {(() => { const [y, m, d] = String(currentVersion.validUntil).split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(); })()}</p>
+                      <p><span className="text-gray-500">Valid until:</span> {formatValidUntilLabel(currentVersion?.validUntil)}</p>
                       <p className="text-xs text-gray-500">Waiting for customer response...</p>
                     </div>
                   </div>
