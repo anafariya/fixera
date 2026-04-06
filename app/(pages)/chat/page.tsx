@@ -107,6 +107,7 @@ export default function ChatPage() {
 
   const handleSendQuotation = async () => {
     if (!selectedConversation || userRole !== "professional") return;
+    if (loadingProjects) return;
     const customerId = selectedConversation.customerId?._id;
     if (!customerId) { toast.error("Customer not found"); return; }
 
@@ -912,7 +913,7 @@ export default function ChatPage() {
                 </Select>
               )}
             </div>
-            <Button onClick={handleSendQuotation} disabled={creatingSendQuotation} className="w-full">
+            <Button onClick={handleSendQuotation} disabled={creatingSendQuotation || loadingProjects} className="w-full">
               {creatingSendQuotation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
               Create quotation draft
             </Button>

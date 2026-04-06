@@ -117,9 +117,8 @@ export const isProjectBooking = (booking: BookingBase) =>
 
 export const getBookingTitle = (booking: BookingBase) => {
   const trimmedTitle = booking.project?.title?.trim()
-  return (
-    (isProjectBooking(booking) && trimmedTitle ? trimmedTitle : booking.rfqData?.serviceType || booking.professional?.businessInfo?.companyName) ||
-    booking.rfqData?.serviceType ||
-    "Booking"
-  )
+  if (booking.bookingType === "project") {
+    return trimmedTitle || "Booking"
+  }
+  return trimmedTitle || booking.rfqData?.serviceType || booking.professional?.businessInfo?.companyName || "Booking"
 }

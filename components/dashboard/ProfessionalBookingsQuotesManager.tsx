@@ -91,7 +91,13 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
     })
   }, [])
 
+  const fetchActiveCustomersControllerRef = useRef<AbortController | null>(null)
+
   const fetchActiveCustomers = async () => {
+    fetchActiveCustomersControllerRef.current?.abort()
+    const controller = new AbortController()
+    fetchActiveCustomersControllerRef.current = controller
+
     setLoadingCustomers(true)
     setLoadingCustomersError(null)
     setActiveCustomers([])
@@ -102,19 +108,24 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/quotations/active-customers`,
-        { credentials: "include", headers }
+        { credentials: "include", headers, signal: controller.signal }
       )
+      if (controller.signal.aborted) return
       const data = await response.json()
+      if (controller.signal.aborted) return
       if (response.ok && data?.success) {
         setActiveCustomers(data.data?.customers || [])
       } else {
         setLoadingCustomersError("Failed to load customers")
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
       console.error("Error fetching active customers:", err)
       setLoadingCustomersError("Failed to load customers")
     } finally {
-      setLoadingCustomers(false)
+      if (!controller.signal.aborted) {
+        setLoadingCustomers(false)
+      }
     }
   }
 
@@ -205,12 +216,18 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
   useEffect(() => {
     if (!showCreateQuoteModal) {
       setSelectedProjectId("none")
+      fetchActiveCustomersControllerRef.current?.abort()
       fetchActiveProjectsControllerRef.current?.abort()
       return
     }
 
     void fetchActiveCustomers()
     void fetchActiveProjects()
+
+    return () => {
+      fetchActiveCustomersControllerRef.current?.abort()
+      fetchActiveProjectsControllerRef.current?.abort()
+    }
   }, [showCreateQuoteModal])
 
   const statusOptions = mode === "quotes"

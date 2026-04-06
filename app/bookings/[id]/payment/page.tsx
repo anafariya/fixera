@@ -238,7 +238,7 @@ export default function BookingPaymentPage() {
         return;
       }
       const postBookingQuestions = booking?.project?.postBookingQuestions || [];
-      if (postBookingQuestions.length > 0 && (!booking?.postBookingData || booking.postBookingData.length === 0)) {
+      if (postBookingQuestions.length > 0) {
         const missingRequired = postBookingQuestions.some((question, index) => {
           if (!question.isRequired) return false;
           return !postBookingAnswers[index]?.trim();
@@ -381,8 +381,14 @@ export default function BookingPaymentPage() {
       setBooking(bookingInfo);
       setSelectedExtraOptions(storedExtrasToIndexes(bookingInfo?.selectedExtraOptions, bookingInfo?.project?.extraOptions));
       if (Array.isArray(bookingInfo?.postBookingData) && bookingInfo.postBookingData.length > 0) {
-        const hydratedAnswers = bookingInfo.postBookingData.reduce<Record<number, string>>((acc, answer, index) => {
-          acc[index] = answer.answer;
+        const savedLookup = new Map(
+          bookingInfo.postBookingData.map((a: { questionId: string; answer: string }) => [a.questionId, a.answer])
+        );
+        const questions = bookingInfo?.project?.postBookingQuestions || [];
+        const hydratedAnswers = questions.reduce<Record<number, string>>((acc, q, index) => {
+          const qid = q._id || q.id || `post-booking-${index}`;
+          const saved = savedLookup.get(qid);
+          if (saved) acc[index] = saved;
           return acc;
         }, {});
         setPostBookingAnswers(hydratedAnswers);
@@ -552,7 +558,7 @@ export default function BookingPaymentPage() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const minDate = scheduleProposals?.earliestBookableDate
       ? scheduleProposals.earliestBookableDate.slice(0, 10)
-      : tomorrow.toISOString().split('T')[0];
+      : `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
     const scheduleMode = scheduleProposals?.mode || 'days';
     const projectExtraOptions = booking?.project?.extraOptions || [];
     const postBookingQuestions = booking?.project?.postBookingQuestions || [];

@@ -439,7 +439,7 @@ export default function ChatThread({ messages, currentUserId, currentUserRole, c
         const senderName = getSenderName(message);
         const senderImage = getSenderImage(message);
         const prevMessage = index > 0 ? messages[index - 1] : null;
-        const showAvatar = !prevMessage || getSenderId(prevMessage) !== getSenderId(message) || prevMessage.messageType === "review_notification";
+        const showAvatar = !prevMessage || getSenderId(prevMessage) !== getSenderId(message) || prevMessage.messageType === "review_notification" || prevMessage.messageType === "quotation_notification" || prevMessage.messageType === "warranty_notification";
 
         return (
           <div

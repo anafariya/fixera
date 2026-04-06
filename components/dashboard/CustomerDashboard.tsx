@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useCallback } from "react"
+import { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -130,6 +130,13 @@ export default function CustomerDashboard() {
 
   const [selectedQuoteIds, setSelectedQuoteIds] = useState<Set<string>>(new Set())
   const [showComparison, setShowComparison] = useState(false)
+  const comparisonCleanupRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (comparisonCleanupRef.current) clearTimeout(comparisonCleanupRef.current)
+    }
+  }, [])
 
   // Debounce
   useEffect(() => {
@@ -769,7 +776,8 @@ export default function CustomerDashboard() {
         onOpenChange={(open) => {
           setShowComparison(open)
           if (!open) {
-            setTimeout(() => setSelectedQuoteIds(new Set()), 300)
+            if (comparisonCleanupRef.current) clearTimeout(comparisonCleanupRef.current)
+            comparisonCleanupRef.current = setTimeout(() => setSelectedQuoteIds(new Set()), 300)
           }
         }}
         bookings={comparisonBookings}

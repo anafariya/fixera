@@ -413,6 +413,7 @@ export default function ProjectBookingForm({
       fetchScheduleProposals(packageIndex);
     } else {
       setLoadingAvailability(false);
+      setSelectedExtraOptions([]);
     }
     setHasUserSelectedDate(false);
   }, [selectedPackageIndex]);
@@ -3637,6 +3638,7 @@ export default function ProjectBookingForm({
                         variant='ghost'
                         size='sm'
                         className='h-6 w-6 p-0'
+                        aria-label={`Remove attachment ${att.fileName}`}
                         onClick={() => removeRfqAttachment(idx)}
                       >
                         <X className='h-3 w-3' />
