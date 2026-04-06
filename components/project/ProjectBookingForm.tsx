@@ -3507,14 +3507,13 @@ export default function ProjectBookingForm({
                       )}
                     </Label>
 
-                    {Array.isArray((question as { professionalAttachments?: string[] }).professionalAttachments) &&
-                      (question as { professionalAttachments?: string[] }).professionalAttachments!.length > 0 && (
+                    {(question.professionalAttachments?.length ?? 0) > 0 && (
                         <div className='rounded-lg border border-blue-100 bg-blue-50 p-3'>
                           <p className='text-xs font-semibold text-blue-900 mb-2'>
                             Files from the professional
                           </p>
                           <div className='space-y-1'>
-                            {(question as { professionalAttachments?: string[] }).professionalAttachments!.map((attachment, attachmentIndex) => (
+                            {question.professionalAttachments?.map((attachment, attachmentIndex) => (
                               <a
                                 key={`${idx}-${attachmentIndex}`}
                                 href={attachment}

@@ -804,7 +804,7 @@ export default function BookingPaymentPage() {
                 <button
                   type="button"
                   onClick={handleConfirmSchedule}
-                  disabled={!selectedStartDate || savingSchedule || (scheduleMode === 'hours' && !selectedStartTime)}
+                  disabled={!selectedStartDate || savingSchedule || loadingScheduleProposals || (scheduleMode === 'hours' && !selectedStartTime)}
                   className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {savingSchedule ? 'Saving...' : 'Continue to Payment'}

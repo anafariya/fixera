@@ -500,7 +500,7 @@ export default function CustomerDashboard() {
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              {booking.bookingType === "project" ? (
+              {isProjectBooking(booking) ? (
                 <Package className="h-4 w-4 text-indigo-500" />
               ) : (
                 <Briefcase className="h-4 w-4 text-indigo-500" />

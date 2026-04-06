@@ -122,6 +122,7 @@ export interface ProjectDto {
     type: "text" | "multiple_choice" | "attachment"
     options?: string[]
     isRequired: boolean
+    professionalAttachments?: string[]
   }>
   extraOptions: Array<{
     _id?: string
