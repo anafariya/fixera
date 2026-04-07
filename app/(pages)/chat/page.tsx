@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, MessageSquare, Search, PanelRightOpen, PanelRightClose, ArrowLeft, Plus, X, AlertTriangle } from "lucide-react";
+import { Loader2, MessageSquare, Search, PanelRightOpen, PanelRightClose, ArrowLeft, Plus, X, AlertTriangle, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import ChatList from "@/components/chat/ChatList";
@@ -30,7 +32,7 @@ import {
 } from "@/lib/chatApi";
 import type { ProfessionalOption } from "@/lib/chatApi";
 import type { ChatAttachment, ChatConversation, ChatMessage, ChatFilter } from "@/types/chat";
-import { cn } from "@/lib/utils";
+import { cn, getAuthToken } from "@/lib/utils";
 
 const isAllowedRole = (role?: string) => role === "customer" || role === "professional";
 
@@ -62,6 +64,90 @@ export default function ChatPage() {
   const [chatFilter, setChatFilter] = useState<ChatFilter>("all");
   const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
   const [absence, setAbsence] = useState<{ from: string; to: string } | null>(null);
+
+  // Quotation
+  const [creatingSendQuotation, setCreatingSendQuotation] = useState(false);
+  const [showQuotationDialog, setShowQuotationDialog] = useState(false);
+  const [activeProjects, setActiveProjects] = useState<Array<{ _id: string; title?: string }>>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("none");
+
+  const loadActiveProjects = useCallback(async () => {
+    setLoadingProjects(true);
+    try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/quotations/active-projects`,
+        { credentials: "include", headers }
+      );
+      const data = await response.json();
+      if (response.ok && data?.success) {
+        const projects = Array.isArray(data.data?.projects) ? data.data.projects : [];
+        setActiveProjects(projects);
+        if (projects.length === 1) {
+          setSelectedProjectId(projects[0]._id);
+        } else {
+          setSelectedProjectId("none");
+        }
+      } else {
+        setActiveProjects([]);
+        setSelectedProjectId("none");
+      }
+    } catch (err) {
+      console.error("Error loading active projects:", err);
+      setActiveProjects([]);
+      setSelectedProjectId("none");
+    } finally {
+      setLoadingProjects(false);
+    }
+  }, []);
+
+  const handleSendQuotation = async () => {
+    if (!selectedConversation || userRole !== "professional") return;
+    if (loadingProjects) return;
+    const customerId = selectedConversation.customerId?._id;
+    if (!customerId) { toast.error("Customer not found"); return; }
+
+    setCreatingSendQuotation(true);
+    try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/quotations/direct`,
+        {
+          method: "POST",
+          headers,
+          credentials: "include",
+          body: JSON.stringify({
+            customerId,
+            projectId: selectedProjectId !== "none" ? selectedProjectId : undefined,
+          }),
+        }
+      );
+      const data = await response.json();
+      if (response.ok && data?.success) {
+        setShowQuotationDialog(false);
+        router.push(`/bookings/${data.data.bookingId}?action=quote`);
+      } else {
+        toast.error(data?.error?.message || "Failed to create quotation");
+      }
+    } catch (err) {
+      console.error("Error creating direct quotation:", err);
+      toast.error("Failed to create quotation");
+    } finally {
+      setCreatingSendQuotation(false);
+    }
+  };
+
+  const openQuotationDialog = () => {
+    setShowQuotationDialog(true);
+    void loadActiveProjects();
+  };
 
   // In-chat search
   const [chatSearchOpen, setChatSearchOpen] = useState(false);
@@ -625,6 +711,20 @@ export default function ChatPage() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                {/* Send Quotation button for professionals */}
+                {userRole === "professional" && selectedConversation && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-gray-500 hover:text-indigo-600"
+                    onClick={openQuotationDialog}
+                    disabled={creatingSendQuotation}
+                    aria-label="Send quotation"
+                    title="Send Quotation"
+                  >
+                    {creatingSendQuotation ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                  </Button>
+                )}
                 {/* Chat search toggle */}
                 <Button
                   variant="ghost"
@@ -780,6 +880,46 @@ export default function ChatPage() {
           />
         </div>
       )}
+
+      <Dialog open={showQuotationDialog} onOpenChange={setShowQuotationDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Direct Quotation</DialogTitle>
+            <DialogDescription>
+              Choose whether this quotation should be linked to one of your published projects.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-900">Linked project</p>
+              {loadingProjects ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading projects...
+                </div>
+              ) : (
+                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No linked project</SelectItem>
+                    {activeProjects.map(project => (
+                      <SelectItem key={project._id} value={project._id}>
+                        {project.title || "Untitled project"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <Button onClick={handleSendQuotation} disabled={creatingSendQuotation || loadingProjects} className="w-full">
+              {creatingSendQuotation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+              Create quotation draft
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -56,8 +56,13 @@ export const fetchProfessionals = async (limit = PROFESSIONALS_LIMIT): Promise<P
 };
 
 export const createOrGetConversation = async (payload: {
-  professionalId: string;
+  professionalId?: string;
+  customerId?: string;
 }) => {
+  if (!payload.professionalId && !payload.customerId) {
+    throw new Error("Either professionalId or customerId is required to start a conversation");
+  }
+
   const response = await fetch(`${API_BASE}/conversations`, {
     method: "POST",
     credentials: "include",

@@ -163,7 +163,7 @@ export default function ChatList({
                   type="button"
                   onClick={() => onSelect(conversation._id)}
                   className={cn(
-                    "w-full px-4 py-3 text-left transition-colors hover:bg-slate-50",
+                    "w-full px-4 py-3 pr-14 text-left transition-colors hover:bg-slate-50",
                     isSelected && "bg-indigo-50"
                   )}
                 >
@@ -229,7 +229,7 @@ export default function ChatList({
                   <button
                     type="button"
                     className={cn(
-                      "absolute top-2 right-3 p-1.5 rounded-md bg-white border border-slate-200 shadow-sm transition-opacity",
+                      "absolute top-3 right-3 p-1.5 rounded-md bg-white border border-slate-200 shadow-sm transition-opacity",
                       "hover:bg-slate-100 hover:border-slate-300",
                       "focus:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-indigo-500",
                       "[@media(hover:none)]:opacity-0 [@media(hover:none)]:pointer-events-none",

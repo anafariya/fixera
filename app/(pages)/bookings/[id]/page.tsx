@@ -24,6 +24,8 @@ import { StripeProvider } from "@/components/stripe/StripeProvider"
 import { PaymentForm } from "@/components/stripe/PaymentForm"
 import type { QuoteVersion, BookingMilestone } from "@/types/quotation"
 import { BOOKING_STATUSES, type BookingStatus } from "@/lib/dashboardBookingHelpers"
+import { useCommissionRate } from "@/hooks/useCommissionRate"
+import { createOrGetConversation } from "@/lib/chatApi"
 
 const PRE_SERVICE_BOOKING_STATUSES: BookingStatus[] = BOOKING_STATUSES.filter((status) =>
   [
@@ -36,6 +38,33 @@ const PRE_SERVICE_BOOKING_STATUSES: BookingStatus[] = BOOKING_STATUSES.filter((s
     "booked",
   ].includes(status)
 ) as BookingStatus[]
+
+const formatValidUntilLabel = (value?: string) => {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return "N/A"
+  }
+
+  const [year, month, day] = value.split("-").map((part) => Number.parseInt(part, 10))
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day)
+  ) {
+    return "N/A"
+  }
+
+  const parsed = new Date(year, month - 1, day)
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return "N/A"
+  }
+
+  return parsed.toLocaleDateString()
+}
 
 interface PostBookingQuestion {
   _id?: string
@@ -397,6 +426,7 @@ const validateWarrantyFiles = (fileList: FileList | File[] | null | undefined) =
 
 export default function BookingDetailPage() {
   const { user, isAuthenticated, loading } = useAuth()
+  const { commissionPercent } = useCommissionRate()
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
@@ -1229,12 +1259,8 @@ export default function BookingDetailPage() {
 
       if (response.ok && data?.success) {
         if (action === 'accepted') {
-          toast.success("Quotation accepted! Redirecting to payment...")
-          if (data.data?.clientSecret) {
-            router.push(`/bookings/${bookingId}/payment`)
-          } else {
-            await refreshBooking()
-          }
+          toast.success("Quotation accepted! Please select your start date and complete the booking.")
+          router.push(`/bookings/${bookingId}/payment`)
         } else {
           toast.success("Quotation rejected. The professional will be notified.")
           setQuoteRejectionReason('')
@@ -1396,43 +1422,8 @@ export default function BookingDetailPage() {
 
       if (response.ok && data?.success) {
         if (action === "accept") {
-          toast.success("Quote accepted! Checking payment readiness...")
-          const POLL_INTERVAL = 1000
-          const POLL_TIMEOUT = 10000
-          const startedAt = Date.now()
-          let isReadyForPayment = false
-
-          while (Date.now() - startedAt < POLL_TIMEOUT) {
-            try {
-              const pollHeaders: Record<string, string> = {}
-              if (token) pollHeaders['Authorization'] = `Bearer ${token}`
-              const pollRes = await fetch(
-                `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/${bookingId}`,
-                { credentials: "include", headers: pollHeaders }
-              )
-              if (pollRes.ok) {
-                const { data: pollData } = await parseResponseBody<BookingApiResponse>(pollRes)
-                if (
-                  isBookingApiResponse(pollData) &&
-                  pollData.booking &&
-                  ["quote_accepted", "payment_pending", "booked"].includes(pollData.booking.status)
-                ) {
-                  isReadyForPayment = true
-                  break
-                }
-              }
-            } catch {
-              break
-            }
-            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL))
-          }
-
-          if (isReadyForPayment) {
-            router.push(`/bookings/${bookingId}/payment`)
-          } else {
-            toast.error("Quote acceptance is still syncing. Please refresh and try again in a moment.")
-            await refreshBooking()
-          }
+          toast.success("Quote accepted! Please select your start date and proceed to payment.")
+          router.push(`/bookings/${bookingId}/payment`)
         } else {
           toast.success("Quote rejected.")
           await refreshBooking()
@@ -2067,7 +2058,20 @@ export default function BookingDetailPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => toast.info("Use the chat widget in the bottom right to message this customer.")}
+                            onClick={async () => {
+                              const customerId = booking.customer?._id
+                              if (customerId) {
+                                try {
+                                  const conversation = await createOrGetConversation({ customerId })
+                                  router.push(`/chat?conversationId=${conversation._id}`)
+                                } catch (error) {
+                                  console.error("Failed to open chat:", error)
+                                  toast.info("Unable to open the conversation right now")
+                                }
+                              } else {
+                                toast.info("Customer information not available")
+                              }
+                            }}
                           >
                             <MessageSquare className="h-4 w-4 mr-2" />
                             Chat for More Info
@@ -2158,6 +2162,7 @@ export default function BookingDetailPage() {
                     {showQuotationWizard ? (
                       <QuotationWizard
                         bookingId={bookingId!}
+                        commissionPercent={commissionPercent ?? undefined}
                         onSuccess={async () => { setShowQuotationWizard(false); await refreshBooking() }}
                         onCancel={() => setShowQuotationWizard(false)}
                       />
@@ -2183,6 +2188,7 @@ export default function BookingDetailPage() {
                   showQuotationWizard ? (
                     <QuotationWizard
                       bookingId={bookingId!}
+                      commissionPercent={commissionPercent ?? undefined}
                       onSuccess={async () => { setShowQuotationWizard(false); await refreshBooking() }}
                       onCancel={() => setShowQuotationWizard(false)}
                     />
@@ -2270,7 +2276,7 @@ export default function BookingDetailPage() {
                         <span className="text-2xl font-bold text-green-600">EUR {currentVersion.totalAmount.toFixed(2)}</span>
                       </div>
                       <p className="text-xs text-gray-500">
-                        Valid until: {new Date(currentVersion.validUntil).toLocaleDateString()}
+                        Valid until: {formatValidUntilLabel(currentVersion?.validUntil)}
                       </p>
                     </div>
 
@@ -2338,7 +2344,7 @@ export default function BookingDetailPage() {
                     <div className="bg-white rounded-lg p-3 space-y-2 text-sm">
                       <p><span className="text-gray-500">Scope:</span> {currentVersion.scope}</p>
                       <p><span className="text-gray-500">Total:</span> <strong>EUR {currentVersion.totalAmount.toFixed(2)}</strong></p>
-                      <p><span className="text-gray-500">Valid until:</span> {new Date(currentVersion.validUntil).toLocaleDateString()}</p>
+                      <p><span className="text-gray-500">Valid until:</span> {formatValidUntilLabel(currentVersion?.validUntil)}</p>
                       <p className="text-xs text-gray-500">Waiting for customer response...</p>
                     </div>
                   </div>
@@ -2350,6 +2356,7 @@ export default function BookingDetailPage() {
                     bookingId={bookingId!}
                     existingVersion={currentVersion || undefined}
                     isEditing
+                    commissionPercent={commissionPercent ?? undefined}
                     onSuccess={async () => { setShowQuotationWizard(false); await refreshBooking() }}
                     onCancel={() => setShowQuotationWizard(false)}
                   />
@@ -2378,6 +2385,7 @@ export default function BookingDetailPage() {
                         bookingId={bookingId!}
                         existingVersion={currentVersion || undefined}
                         isEditing
+                        commissionPercent={commissionPercent ?? undefined}
                         onSuccess={async () => { setShowQuotationWizard(false); await refreshBooking() }}
                         onCancel={() => setShowQuotationWizard(false)}
                       />

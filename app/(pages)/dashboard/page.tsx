@@ -13,7 +13,7 @@ import { getAuthToken } from "@/lib/utils"
 import ReferralCard from "@/components/dashboard/ReferralCard"
 import BenefitsProgramCard from "@/components/dashboard/BenefitsProgramCard"
 import CustomerDashboard from "@/components/dashboard/CustomerDashboard"
-import { type BookingStatus, getBookingStatusMeta, getBookingTitle } from "@/lib/dashboardBookingHelpers"
+import { type BookingStatus, getBookingStatusMeta, getBookingTitle, isProjectBooking } from "@/lib/dashboardBookingHelpers"
 import { getProfessionalActionItems } from "@/lib/actionNeededHelpers"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
@@ -692,6 +692,25 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
+              <Card className="border-emerald-100 bg-gradient-to-br from-white via-emerald-50 to-teal-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-emerald-500" />
+                    Customer Management
+                  </CardTitle>
+                  <CardDescription>Manage customer levels, points, spending, and account status</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={() => window.open('/admin/customers', '_blank')}
+                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800"
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Open Customer Management
+                  </Button>
+                </CardContent>
+              </Card>
+
               <Card className="border-rose-100 bg-gradient-to-br from-white via-rose-50 to-orange-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1289,7 +1308,7 @@ export default function DashboardPage() {
               {!bookingsLoading && !bookingsError && (actionItems.length > 0 || (!warrantyClaimsLoading && !warrantyClaimsError && warrantyActionItems.length > 0)) && (
                 <div className="space-y-3">
                   {actionItems.map((item) => {
-                    const isProject = item.booking.bookingType === "project"
+                    const isProject = isProjectBooking(item.booking)
                     const title = getBookingTitle(item.booking)
                     const { label: statusLabel, className: statusClasses } = getBookingStatusMeta(item.booking.status)
                     const severityClasses = item.severity === "urgent"

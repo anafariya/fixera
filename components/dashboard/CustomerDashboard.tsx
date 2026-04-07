@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useCallback } from "react"
+import { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,7 @@ import {
   type BookingStatus,
   getBookingStatusMeta,
   getBookingTitle,
+  isProjectBooking,
   CUSTOMER_QUOTE_STATUSES,
   CUSTOMER_BOOKING_STATUSES,
   CUSTOMER_QUOTE_STATUS_FILTERS,
@@ -129,6 +130,13 @@ export default function CustomerDashboard() {
 
   const [selectedQuoteIds, setSelectedQuoteIds] = useState<Set<string>>(new Set())
   const [showComparison, setShowComparison] = useState(false)
+  const comparisonCleanupRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (comparisonCleanupRef.current) clearTimeout(comparisonCleanupRef.current)
+    }
+  }, [])
 
   // Debounce
   useEffect(() => {
@@ -335,7 +343,7 @@ export default function CustomerDashboard() {
 
   const renderBookingCard = (booking: Booking, colorAccent: string, opts?: { selectable?: boolean; selected?: boolean; onToggle?: () => void }) => {
     const accent = ACCENT_CLASSES[(colorAccent as AccentKey)] ?? ACCENT_CLASSES.indigo
-    const isProject = booking.bookingType === "project"
+    const isProject = isProjectBooking(booking)
     const title = getBookingTitle(booking)
     const { label: statusLabel, className: statusClasses } = getBookingStatusMeta(booking.status)
     const createdAt = booking.createdAt ? new Date(booking.createdAt) : null
@@ -492,7 +500,7 @@ export default function CustomerDashboard() {
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              {booking.bookingType === "project" ? (
+              {isProjectBooking(booking) ? (
                 <Package className="h-4 w-4 text-indigo-500" />
               ) : (
                 <Briefcase className="h-4 w-4 text-indigo-500" />
@@ -765,7 +773,13 @@ export default function CustomerDashboard() {
 
       <QuoteComparisonModal
         open={showComparison}
-        onOpenChange={setShowComparison}
+        onOpenChange={(open) => {
+          setShowComparison(open)
+          if (!open) {
+            if (comparisonCleanupRef.current) clearTimeout(comparisonCleanupRef.current)
+            comparisonCleanupRef.current = setTimeout(() => setSelectedQuoteIds(new Set()), 300)
+          }
+        }}
         bookings={comparisonBookings}
       />
     </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { getAuthToken } from "@/lib/utils"
@@ -21,6 +21,7 @@ import {
   PROFESSIONAL_BOOKING_MODE_STATUSES,
   getBookingStatusMeta,
   getBookingTitle,
+  isProjectBooking,
 } from "@/lib/dashboardBookingHelpers"
 
 type ManagerMode = "bookings" | "quotes"
@@ -71,8 +72,12 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
   const [allServices, setAllServices] = useState<string[]>([])
   const [showCreateQuoteModal, setShowCreateQuoteModal] = useState(false)
   const [activeCustomers, setActiveCustomers] = useState<Array<{ _id: string; name?: string; email?: string }>>([])
+  const [activeProjects, setActiveProjects] = useState<Array<{ _id: string; title?: string }>>([])
   const [loadingCustomers, setLoadingCustomers] = useState(false)
   const [loadingCustomersError, setLoadingCustomersError] = useState<string | null>(null)
+  const [loadingProjects, setLoadingProjects] = useState(false)
+  const [loadingProjectsError, setLoadingProjectsError] = useState<string | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("none")
   const [creatingQuote, setCreatingQuote] = useState(false)
   const [selectedQuoteIds, setSelectedQuoteIds] = useState<Set<string>>(new Set())
   const [showComparison, setShowComparison] = useState(false)
@@ -86,7 +91,13 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
     })
   }, [])
 
+  const fetchActiveCustomersControllerRef = useRef<AbortController | null>(null)
+
   const fetchActiveCustomers = async () => {
+    fetchActiveCustomersControllerRef.current?.abort()
+    const controller = new AbortController()
+    fetchActiveCustomersControllerRef.current = controller
+
     setLoadingCustomers(true)
     setLoadingCustomersError(null)
     setActiveCustomers([])
@@ -97,19 +108,68 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/quotations/active-customers`,
-        { credentials: "include", headers }
+        { credentials: "include", headers, signal: controller.signal }
       )
+      if (controller.signal.aborted) return
       const data = await response.json()
+      if (controller.signal.aborted) return
       if (response.ok && data?.success) {
         setActiveCustomers(data.data?.customers || [])
       } else {
         setLoadingCustomersError("Failed to load customers")
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
       console.error("Error fetching active customers:", err)
       setLoadingCustomersError("Failed to load customers")
     } finally {
-      setLoadingCustomers(false)
+      if (!controller.signal.aborted) {
+        setLoadingCustomers(false)
+      }
+    }
+  }
+
+  const fetchActiveProjectsControllerRef = useRef<AbortController | null>(null)
+
+  const fetchActiveProjects = async () => {
+    fetchActiveProjectsControllerRef.current?.abort()
+    const controller = new AbortController()
+    fetchActiveProjectsControllerRef.current = controller
+
+    setLoadingProjects(true)
+    setLoadingProjectsError(null)
+    setActiveProjects([])
+    try {
+      const token = getAuthToken()
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/quotations/active-projects`,
+        { credentials: "include", headers, signal: controller.signal }
+      )
+      if (controller.signal.aborted) return
+      const data = await response.json()
+      if (controller.signal.aborted) return
+      if (response.ok && data?.success) {
+        const projects = Array.isArray(data.data?.projects) ? data.data.projects : []
+        setActiveProjects(projects)
+        if (projects.length === 1) {
+          setSelectedProjectId(projects[0]._id)
+        } else {
+          setSelectedProjectId("none")
+        }
+      } else {
+        setLoadingProjectsError("Failed to load active projects")
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      console.error("Error fetching active projects:", err)
+      setLoadingProjectsError("Failed to load active projects")
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoadingProjects(false)
+      }
     }
   }
 
@@ -126,7 +186,10 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
           method: "POST",
           headers,
           credentials: "include",
-          body: JSON.stringify({ customerId }),
+          body: JSON.stringify({
+            customerId,
+            projectId: selectedProjectId !== "none" ? selectedProjectId : undefined,
+          }),
         }
       )
       const data = await response.json()
@@ -149,6 +212,23 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500)
     return () => clearTimeout(timer)
   }, [searchTerm])
+
+  useEffect(() => {
+    if (!showCreateQuoteModal) {
+      setSelectedProjectId("none")
+      fetchActiveCustomersControllerRef.current?.abort()
+      fetchActiveProjectsControllerRef.current?.abort()
+      return
+    }
+
+    void fetchActiveCustomers()
+    void fetchActiveProjects()
+
+    return () => {
+      fetchActiveCustomersControllerRef.current?.abort()
+      fetchActiveProjectsControllerRef.current?.abort()
+    }
+  }, [showCreateQuoteModal])
 
   const statusOptions = mode === "quotes"
     ? [
@@ -367,7 +447,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
     return (
       <div className="space-y-3">
         {items.map((booking) => {
-          const isProject = booking.bookingType === "project"
+          const isProject = isProjectBooking(booking)
           const { label, className } = getBookingStatusMeta(booking.status)
           const createdAt = booking.createdAt ? new Date(booking.createdAt).toLocaleDateString() : null
 
@@ -456,7 +536,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
             )}
             {mode === "quotes" && (
               <Button
-                onClick={() => { setShowCreateQuoteModal(true); fetchActiveCustomers() }}
+                onClick={() => { setShowCreateQuoteModal(true) }}
                 className="bg-purple-600 hover:bg-purple-700 text-white"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -611,9 +691,37 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Direct Quotation</DialogTitle>
-            <DialogDescription>Select a customer from your active conversations to send a quotation.</DialogDescription>
+            <DialogDescription>Select a customer from your active conversations and optionally link the quote to one of your published projects.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-900">Linked project</p>
+              {loadingProjects ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading projects...
+                </div>
+              ) : loadingProjectsError ? (
+                <p className="text-sm text-red-500">{loadingProjectsError}</p>
+              ) : (
+                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No linked project</SelectItem>
+                    {activeProjects.map(project => (
+                      <SelectItem key={project._id} value={project._id}>
+                        {project.title || "Untitled project"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <p className="text-xs text-gray-500">
+                Linking a project lets the quote reuse its title and booking configuration later in the flow.
+              </p>
+            </div>
             {loadingCustomers ? (
               <div className="flex items-center gap-2 text-sm text-gray-500 py-4 justify-center">
                 <Loader2 className="h-4 w-4 animate-spin" />

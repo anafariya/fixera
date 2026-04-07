@@ -2,7 +2,7 @@ export interface QuotationMilestone {
   title: string
   amount: number
   description?: string
-  dueCondition: 'on_start' | 'on_milestone_completion' | 'on_project_completion' | 'custom_date'
+  dueCondition: 'on_start' | 'on_milestone_start' | 'on_milestone_completion' | 'on_project_completion' | 'custom_date'
   customDueDate?: string
   order: number
   status: 'pending' | 'invoiced' | 'paid' | 'overdue'
@@ -46,7 +46,7 @@ export interface QuoteVersion {
 export interface QuotationWizardFormData {
   scope: string
   warrantyDuration: { value: number; unit: 'months' | 'years' }
-  materialsIncluded: boolean
+  materialsIncluded: boolean | null
   materials: QuoteMaterial[]
   description: string
   totalAmount: number

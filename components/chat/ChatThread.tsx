@@ -402,11 +402,44 @@ export default function ChatThread({ messages, currentUserId, currentUserRole, c
           );
         }
 
+        if (message.messageType === "quotation_notification" && message.quotationMeta) {
+          const meta = message.quotationMeta;
+          return (
+            <div key={message._id} id={`msg-${message._id}`} className="flex justify-center my-2">
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 max-w-sm w-full">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-purple-700 font-semibold text-sm">
+                    {meta.version > 1 ? 'Updated Quotation' : 'New Quotation'}
+                  </span>
+                  <span className="text-xs text-purple-500">{meta.quotationNumber}</span>
+                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-purple-700">
+                    v{meta.version}
+                  </span>
+                  {meta.status && (
+                    <span className="rounded-full border border-purple-200 bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-purple-600">
+                      {String(meta.status).replace(/_/g, ' ')}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-700 mb-1"><strong>Scope:</strong> {meta.scope}</p>
+                <p className="text-xs text-gray-700 mb-1"><strong>Amount:</strong> {meta.currency} {Number(meta.totalAmount).toFixed(2)}</p>
+                <p className="text-xs text-gray-500 mb-3">Valid until {(() => { const [y, m, d] = String(meta.validUntil).split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(); })()}</p>
+                <a
+                  href={`/bookings/${meta.bookingId}`}
+                  className="inline-block text-xs font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 px-3 py-1.5 rounded transition-colors"
+                >
+                  View & Respond
+                </a>
+              </div>
+            </div>
+          );
+        }
+
         const isMine = getSenderId(message) === currentUserId;
         const senderName = getSenderName(message);
         const senderImage = getSenderImage(message);
         const prevMessage = index > 0 ? messages[index - 1] : null;
-        const showAvatar = !prevMessage || getSenderId(prevMessage) !== getSenderId(message) || prevMessage.messageType === "review_notification";
+        const showAvatar = !prevMessage || getSenderId(prevMessage) !== getSenderId(message) || prevMessage.messageType === "review_notification" || prevMessage.messageType === "quotation_notification" || prevMessage.messageType === "warranty_notification";
 
         return (
           <div
