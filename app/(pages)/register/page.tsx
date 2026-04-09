@@ -339,7 +339,7 @@ function RegisterForm() {
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-700 font-medium">Welcome, Professional!</p>
                 <p className="text-xs text-blue-600 mt-1">
-                  After verification, you&apos;ll complete your business profile including VAT validation and ID verification.
+                  After email and phone verification, you&apos;ll continue with Stripe, ID verification, availability, and the rest of the onboarding wizard.
                 </p>
               </div>
 

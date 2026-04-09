@@ -58,7 +58,8 @@ export default function AddressAutocomplete({
 
     console.log('✅ Initializing Google Places Autocomplete');
     autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
-      types: ['address']
+      types: ['address'],
+      fields: ['formatted_address', 'geometry', 'address_components']
     });
 
     autocompleteRef.current.addListener('place_changed', () => {

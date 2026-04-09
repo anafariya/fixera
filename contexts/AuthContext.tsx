@@ -102,6 +102,22 @@ interface User {
   profileImage?: string
   profileCompletedAt?: string
   professionalOnboardingCompletedAt?: string
+  onboardingAgreements?: {
+    rulesAccepted?: boolean
+    termsAccepted?: boolean
+    selfBillingAccepted?: boolean
+    acceptedAt?: string
+  }
+  stripe?: {
+    accountId?: string
+    onboardingCompleted?: boolean
+    payoutsEnabled?: boolean
+    detailsSubmitted?: boolean
+    chargesEnabled?: boolean
+    accountStatus?: 'pending' | 'active' | 'restricted' | 'rejected'
+    lastOnboardingRefresh?: string
+    createdAt?: string
+  }
   points?: number
   pointsExpiry?: string
   loyaltyLevel?: string
@@ -232,8 +248,19 @@ const isProtectedRoute = (pathname: string): boolean => {
 }
 
 const isProfessionalOnboardingRoute = (pathname: string): boolean => {
-  return pathname.startsWith('/professional/onboarding')
+  return pathname.startsWith('/professional/onboarding') || pathname.startsWith('/professional/stripe')
 }
+
+const isProfessionalVerified = (user: User | null): boolean =>
+  Boolean(user?.isEmailVerified && user?.isPhoneVerified)
+
+const needsProfessionalOnboarding = (user: User | null): boolean =>
+  Boolean(
+    user?.role === 'professional' &&
+    isProfessionalVerified(user) &&
+    !user.professionalOnboardingCompletedAt &&
+    user.professionalStatus === 'draft'
+  )
 
 // Returns all roles that have access to this route
 const getAllowedRoles = (pathname: string): string[] => {
@@ -327,9 +354,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAuthToken(data.token)
         toast.success('Login successful!')
         
-        const needsOnboarding = data.user?.role === 'professional'
-          && !data.user?.professionalOnboardingCompletedAt
-          && data.user?.professionalStatus === 'draft'
+        const needsOnboarding = needsProfessionalOnboarding(data.user)
         if (needsOnboarding) {
           router.push('/professional/onboarding')
         } else {
@@ -426,14 +451,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const isRoleRestrictedRoute = allowedRoles.length > 0
 
     // Force professional onboarding before accessing other pages
+    if (isUserAuthenticated && needsProfessionalOnboarding(currentUser) && !isProfessionalOnboardingRoute(pathname)) {
+      router.replace('/professional/onboarding')
+      return
+    }
+
     if (
       isUserAuthenticated &&
       currentUser?.role === 'professional' &&
-      !currentUser.professionalOnboardingCompletedAt &&
-      currentUser?.professionalStatus === 'draft' &&
-      !isProfessionalOnboardingRoute(pathname)
+      pathname.startsWith('/projects/create') &&
+      (!currentUser.stripe?.accountId || !currentUser.stripe?.onboardingCompleted)
     ) {
-      router.replace('/professional/onboarding')
+      router.replace('/professional/onboarding?step=3')
       return
     }
 

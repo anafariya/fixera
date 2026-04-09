@@ -6,10 +6,13 @@
  */
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function StripeRefreshPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const source = searchParams.get('source');
+  const isFromOnboarding = source === 'onboarding';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
@@ -26,8 +29,8 @@ export default function StripeRefreshPage() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          returnUrl: `${window.location.origin}/professional/stripe/complete`,
-          refreshUrl: `${window.location.origin}/professional/stripe/refresh`,
+          returnUrl: `${window.location.origin}/professional/stripe/complete${isFromOnboarding ? '?source=onboarding' : ''}`,
+          refreshUrl: `${window.location.origin}/professional/stripe/refresh${isFromOnboarding ? '?source=onboarding' : ''}`,
         }),
       });
 
@@ -88,10 +91,10 @@ export default function StripeRefreshPage() {
 
         <button
           type="button"
-          onClick={() => router.push('/dashboard')}
+          onClick={() => router.push(isFromOnboarding ? '/professional/onboarding' : '/dashboard')}
           className="w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-50"
         >
-          Back to Dashboard
+          {isFromOnboarding ? 'Back to Onboarding' : 'Back to Dashboard'}
         </button>
 
         <p className="text-xs text-gray-500 mt-4">

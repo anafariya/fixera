@@ -107,22 +107,41 @@ export default function CategoryPage() {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState('');
 
-  // Convert slug to display name
-  const getCategoryName = (slug: string) => {
-    const nameMap: Record<string, string> = {
-      'small-tasks': 'Small tasks',
-      'interior': 'Interior',
-      'exterior': 'Exterior',
-      'outdoor-work': 'Outdoor work',
-      'renovation': 'Renovation',
-      'inspections': 'Inspections'
-    };
-    return nameMap[slug] || slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-  };
+  const getFallbackName = (slug: string) =>
+    slug
+      .split('-')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
 
-  const categoryName = getCategoryName(categorySlug);
-  const categoryDescription = `Find verified professionals for all your ${categoryName.toLowerCase()} needs`;
+  useEffect(() => {
+    if (!categorySlug) return
+    const controller = new AbortController()
+    const loadCategoryName = async () => {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/service-categories/active?country=BE`,
+          { signal: controller.signal, credentials: 'include' }
+        )
+        const data = await response.json()
+        if (response.ok && Array.isArray(data)) {
+          const match = data.find((entry: { slug?: string; name?: string }) => entry.slug === categorySlug)
+          setCategoryName(match?.name || getFallbackName(categorySlug))
+          return
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return
+      }
+      setCategoryName(getFallbackName(categorySlug))
+    }
+
+    void loadCategoryName()
+    return () => controller.abort()
+  }, [categorySlug])
+
+  const resolvedCategoryName = categoryName || getFallbackName(categorySlug);
+  const categoryDescription = `Find verified professionals for all your ${resolvedCategoryName.toLowerCase()} needs`;
 
   const fetchProfessionals = useCallback(async () => {
     setIsLoading(true);
@@ -225,7 +244,7 @@ export default function CategoryPage() {
       <div className="relative h-72 md:h-96 w-full">
         <Image
           src="/images/banner.jpg"
-          alt={`${categoryName} professionals`}
+          alt={`${resolvedCategoryName} professionals`}
           fill
           className="object-cover"
           priority
@@ -241,7 +260,7 @@ export default function CategoryPage() {
               <span>Categories</span>
             </div>
             <h1 className="text-4xl md:text-6xl font-bold text-white tracking-tight mb-3">
-              {categoryName}
+              {resolvedCategoryName}
             </h1>
             <p className="text-lg md:text-xl text-white/90 max-w-2xl">
               {categoryDescription}

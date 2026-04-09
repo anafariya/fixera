@@ -166,6 +166,7 @@ interface ProfessionalBusinessInfoPayload {
   country: string;
   postalCode: string;
   username?: string;
+  serviceCategories?: string[];
 }
 
 interface MissingRequirementDetail {
@@ -287,6 +288,7 @@ export const updateProfessionalBusinessProfile = async (
           postalCode: businessInfo.postalCode.trim(),
         },
         ...(businessInfo.username ? { username: businessInfo.username.trim() } : {}),
+        ...(businessInfo.serviceCategories ? { serviceCategories: businessInfo.serviceCategories } : {}),
       }),
     });
 
@@ -311,7 +313,11 @@ export const updateProfessionalBusinessProfile = async (
     };
   }
 };
-export const submitForVerification = async (): Promise<UpdateVATResponse & { 
+export const submitForVerification = async (onboardingAgreements?: {
+  rulesAccepted: boolean;
+  termsAccepted: boolean;
+  selfBillingAccepted: boolean;
+}): Promise<UpdateVATResponse & { 
   professionalStatus?: string;
   missingRequirements?: string[];
   missingRequirementDetails?: MissingRequirementDetail[];
@@ -325,6 +331,9 @@ export const submitForVerification = async (): Promise<UpdateVATResponse & {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       credentials: 'include',
+      body: JSON.stringify(
+        onboardingAgreements ? { onboardingAgreements } : {}
+      ),
     });
 
     const data = await response.json();
