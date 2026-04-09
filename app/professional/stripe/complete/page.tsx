@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface AccountStatus {
   onboardingCompleted?: boolean;
@@ -18,6 +18,9 @@ interface AccountStatus {
 
 export default function StripeCompletePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const source = searchParams.get('source');
+  const isFromOnboarding = source === 'onboarding';
   const [status, setStatus] = useState<'checking' | 'success' | 'incomplete' | 'error'>('checking');
   const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null);
   const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
@@ -56,11 +59,11 @@ export default function StripeCompletePage() {
   };
 
   const handleContinueOnboarding = () => {
-    router.push('/professional/stripe/setup');
+    router.push(`/professional/stripe/setup${isFromOnboarding ? '?source=onboarding' : ''}`);
   };
 
   const handleGoToDashboard = () => {
-    router.push('/dashboard');
+    router.push(isFromOnboarding ? '/professional/onboarding' : '/dashboard');
   };
 
   if (status === 'checking') {
@@ -113,11 +116,11 @@ export default function StripeCompletePage() {
             onClick={handleGoToDashboard}
             className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 mb-3"
           >
-            Go to Dashboard
+            {isFromOnboarding ? 'Continue Onboarding' : 'Go to Dashboard'}
           </button>
 
           <p className="text-xs text-gray-500">
-            You can now accept bookings and receive payments
+            {isFromOnboarding ? 'You\'ll be taken back to complete the remaining onboarding steps' : 'You can now accept bookings and receive payments'}
           </p>
         </div>
       </div>
@@ -169,7 +172,7 @@ export default function StripeCompletePage() {
             onClick={handleGoToDashboard}
             className="w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-50"
           >
-            Skip for Now
+            {isFromOnboarding ? 'Back to Onboarding' : 'Skip for Now'}
           </button>
         </div>
       </div>
@@ -206,7 +209,7 @@ export default function StripeCompletePage() {
           onClick={handleGoToDashboard}
           className="w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-50"
         >
-          Back to Dashboard
+          {isFromOnboarding ? 'Back to Onboarding' : 'Back to Dashboard'}
         </button>
       </div>
     </div>

@@ -1,38 +1,54 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Shield, Building, Calendar as CalendarIcon, Users, CheckCircle2, ChevronLeft, ChevronRight, ArrowRight, Check } from 'lucide-react'
+import { Loader2, Shield, Building, Calendar as CalendarIcon, Users, CheckCircle2, ChevronLeft, ChevronRight, ArrowRight, Check, CreditCard } from 'lucide-react'
 import { Skeleton } from "@/components/ui/skeleton"
 import AddressAutocomplete, { PlaceData } from '@/components/professional/project-wizard/AddressAutocomplete'
 import EmployeeManagement from '@/components/TeamManagement'
 import { EU_COUNTRIES } from '@/lib/countries'
 import { getAuthToken, buildUsernameSuggestionParams } from '@/lib/utils'
-import { formatVATNumber, getVATCountryName, isEUVatNumber, validateVATFormat, validateVATWithAPI, updateProfessionalBusinessProfile, submitForVerification } from '@/lib/vatValidation'
+import { formatVATNumber, getVATCountryName, isEUVatNumber, validateVATFormat, validateVATWithAPI, updateProfessionalBusinessProfile, submitForVerification, COUNTRY_NAMES } from '@/lib/vatValidation'
 import { CompanyAvailability, DayAvailability, DEFAULT_COMPANY_AVAILABILITY } from '@/lib/defaults/companyAvailability'
+import { ONBOARDING_STEPS } from '@/lib/constants/onboardingSteps'
 
 const STEPS = [
-  { id: 1, title: 'ID Upload', icon: Shield, required: true, gradient: 'from-violet-200 via-purple-200 to-fuchsia-200' },
-  { id: 2, title: 'Business Info', icon: Building, required: false, gradient: 'from-blue-200 via-cyan-200 to-teal-200' },
-  { id: 3, title: 'Company Hours', icon: CalendarIcon, required: true, gradient: 'from-emerald-200 via-green-200 to-lime-200' },
-  { id: 4, title: 'Personal Hours', icon: CalendarIcon, required: false, gradient: 'from-amber-200 via-yellow-200 to-orange-200' },
-  { id: 5, title: 'Employees', icon: Users, required: false, gradient: 'from-rose-200 via-pink-200 to-fuchsia-200' },
-  { id: 6, title: 'Agreements', icon: CheckCircle2, required: true, gradient: 'from-indigo-200 via-blue-200 to-violet-200' },
+  { id: ONBOARDING_STEPS.ID_UPLOAD, title: 'ID Upload', icon: Shield, required: true, gradient: 'from-violet-200 via-purple-200 to-fuchsia-200' },
+  { id: ONBOARDING_STEPS.BUSINESS_INFO, title: 'Business Info', icon: Building, required: false, gradient: 'from-blue-200 via-cyan-200 to-teal-200' },
+  { id: ONBOARDING_STEPS.STRIPE, title: 'Stripe', icon: CreditCard, required: true, gradient: 'from-sky-200 via-cyan-200 to-blue-200' },
+  { id: ONBOARDING_STEPS.COMPANY_HOURS, title: 'Company Hours', icon: CalendarIcon, required: true, gradient: 'from-emerald-200 via-green-200 to-lime-200' },
+  { id: ONBOARDING_STEPS.PERSONAL_HOURS, title: 'Personal Hours', icon: CalendarIcon, required: false, gradient: 'from-amber-200 via-yellow-200 to-orange-200' },
+  { id: ONBOARDING_STEPS.EMPLOYEES, title: 'Employees', icon: Users, required: false, gradient: 'from-rose-200 via-pink-200 to-fuchsia-200' },
+  { id: ONBOARDING_STEPS.RULES, title: 'Rules', icon: CheckCircle2, required: true, gradient: 'from-indigo-200 via-blue-200 to-violet-200' },
 ]
 
-const AGREEMENTS = [
-  'I confirm the information I provide is accurate and up to date.',
-  'I understand Fixera will verify my profile before approval.',
-  'I will keep my availability and business details updated.',
-  'I agree to follow Fixera platform rules and professional standards.',
+const PLATFORM_RULES = [
+  'Provide accurate up-to-date information',
+  'Must comply with GDPR and data protection regulations',
+  'Deliver services professionally, safely, on time, and in accordance with applicable laws and regulations',
+  'Use the platform for all communication, agreements, and payments (no off-platform transactions)',
+  'Always inform the customer in advance before triggering platform actions to ensure transparency and smoother approval.',
+]
+
+const MISBEHAVIOR_ITEMS = [
+  'Providing misleading, incomplete, or false information (including fraudulent documents or invalid certifications)',
+  'Off-platform deals or payments',
+  'No-shows, poor execution, or abuse',
+  'Misuse of customer data or violation of privacy rules',
+]
+
+const CONSEQUENCES = [
+  'Project suspension or removal',
+  'Account suspension or permanent ban',
+  'Payment withholding/refunds',
+  'Decreasing ranking & visibility on the platform',
 ]
 
 type MissingRequirementDetail = {
@@ -42,6 +58,30 @@ type MissingRequirementDetail = {
 }
 
 type MissingRequirementInput = string | MissingRequirementDetail
+
+type StripeAccountStatus = {
+  hasAccount?: boolean
+  onboardingCompleted?: boolean
+  chargesEnabled?: boolean
+  payoutsEnabled?: boolean
+  detailsSubmitted?: boolean
+  accountStatus?: string
+}
+
+type ServiceCategoryGroup = {
+  name: string
+  slug: string
+  services: Array<{
+    name: string
+    slug: string
+  }>
+}
+
+type AgreementsState = {
+  rulesAccepted: boolean
+  termsAccepted: boolean
+  selfBillingAccepted: boolean
+}
 
 type MissingRequirementResolution = {
   step: number
@@ -55,9 +95,12 @@ const REQUIREMENT_CODE_TO_STEP: Record<string, number> = {
   ID_EXPIRATION_DATE_MISSING: 1,
   ID_EXPIRATION_DATE_INVALID: 1,
   VAT_NUMBER_MISSING: 2,
+  USERNAME_MISSING: 2,
   COMPANY_NAME_MISSING: 2,
   COMPANY_ADDRESS_MISSING: 2,
-  COMPANY_AVAILABILITY_MISSING: 3,
+  STRIPE_ONBOARDING_MISSING: 3,
+  COMPANY_AVAILABILITY_MISSING: 4,
+  AGREEMENTS_MISSING: 7,
 }
 
 const normalizeRequirementText = (value: string) =>
@@ -69,12 +112,16 @@ const normalizeRequirementText = (value: string) =>
 
 const mapRequirementToStepByKeywords = (normalizedText: string): number | null => {
   const step1Keywords = ['id', 'identity', 'document', 'proof', 'expiration', 'expiry', 'country of issue', 'passport', 'license']
-  const step2Keywords = ['vat', 'tax', 'tax id', 'company', 'business', 'address', 'postal']
-  const step3Keywords = ['availability', 'schedule', 'working hour', 'working hours', 'company hour', 'company hours']
+  const step2Keywords = ['vat', 'tax', 'tax id', 'company', 'business', 'address', 'postal', 'username', 'display']
+  const step3Keywords = ['stripe', 'payment', 'payout', 'charges']
+  const step4Keywords = ['availability', 'schedule', 'working hour', 'working hours', 'company hour', 'company hours']
+  const step7Keywords = ['agreement', 'rules', 'terms', 'self billing']
 
   if (step1Keywords.some((keyword) => normalizedText.includes(keyword))) return 1
   if (step2Keywords.some((keyword) => normalizedText.includes(keyword))) return 2
   if (step3Keywords.some((keyword) => normalizedText.includes(keyword))) return 3
+  if (step4Keywords.some((keyword) => normalizedText.includes(keyword))) return 4
+  if (step7Keywords.some((keyword) => normalizedText.includes(keyword))) return 7
 
   return null
 }
@@ -124,6 +171,15 @@ const resolveMissingRequirements = (
   }
 }
 
+const toCountryCode = (value?: string) => {
+  if (!value) return 'BE'
+  const trimmed = value.trim()
+  const byCode = EU_COUNTRIES.find((country) => country.code.toLowerCase() === trimmed.toLowerCase())
+  if (byCode) return byCode.code
+  const byName = EU_COUNTRIES.find((country) => country.name.toLowerCase() === trimmed.toLowerCase())
+  return byName?.code || 'BE'
+}
+
 const timeToMinutes = (value: string): number | null => {
   const match = /^(\d{2}):(\d{2})$/.exec(value)
   if (!match) return null
@@ -146,6 +202,111 @@ function GradientCard({ gradient, children, className = '' }: { gradient: string
   )
 }
 
+function StripeIntegrationStep({
+  gradient,
+  stripeStatus,
+  stripeLoading,
+  stripeError,
+  refreshStripeStatus,
+  setCurrentStep,
+  openStripeSetup,
+}: {
+  gradient: string
+  stripeStatus: StripeAccountStatus | null
+  stripeLoading: boolean
+  stripeError: string
+  refreshStripeStatus: () => void
+  setCurrentStep: (step: number) => void
+  openStripeSetup: () => void
+}) {
+  const stripeReady = Boolean(stripeStatus?.hasAccount && stripeStatus?.onboardingCompleted)
+
+  return (
+    <GradientCard gradient={gradient}>
+      <div className="p-6 sm:p-8 space-y-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+              <CreditCard className="h-5 w-5 text-gray-700" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Stripe Integration</h2>
+              <p className="text-sm text-gray-500">This step cannot be skipped. Stripe must be connected before onboarding can continue.</p>
+            </div>
+          </div>
+        </div>
+        {stripeLoading ? (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Checking Stripe status...
+          </div>
+        ) : (
+          <>
+            <div className={`rounded-xl border p-4 ${
+              stripeReady ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800'
+            }`}>
+              {stripeReady
+                ? 'Stripe onboarding completed.'
+                : stripeStatus?.hasAccount
+                  ? 'Stripe account exists, but onboarding is not complete yet.'
+                  : 'No Stripe account connected yet.'}
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-3 text-sm">
+              <div className="rounded-md border p-3">
+                <p className="text-muted-foreground mb-1">Account</p>
+                <p className="font-medium">{stripeStatus?.hasAccount ? 'Created' : 'Missing'}</p>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-muted-foreground mb-1">Onboarding</p>
+                <p className="font-medium">{stripeStatus?.onboardingCompleted ? 'Complete' : 'Incomplete'}</p>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-muted-foreground mb-1">Charges</p>
+                <p className="font-medium">{stripeStatus?.chargesEnabled ? 'Enabled' : 'Pending'}</p>
+              </div>
+            </div>
+
+            {stripeError && (
+              <p className="text-sm text-red-600">{stripeError}</p>
+            )}
+          </>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          <Button variant="outline" onClick={() => setCurrentStep(2)} className="rounded-xl gap-1">
+            <ChevronLeft className="h-4 w-4" /> Back
+          </Button>
+          <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={refreshStripeStatus} disabled={stripeLoading} className="rounded-xl">
+            Refresh Status
+          </Button>
+          <Button variant="outline" onClick={openStripeSetup} className="rounded-xl">
+            Open Stripe Setup
+          </Button>
+          <Button
+            onClick={() => {
+              if (stripeReady) {
+                setCurrentStep(4)
+              } else {
+                openStripeSetup()
+              }
+            }}
+            className="rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 px-6"
+          >
+            {stripeReady ? (
+              <>Continue <ArrowRight className="h-4 w-4 ml-2" /></>
+            ) : (
+              <>Go to Stripe <ArrowRight className="h-4 w-4 ml-2" /></>
+            )}
+          </Button>
+          </div>
+        </div>
+      </div>
+    </GradientCard>
+  )
+}
+
 function IdVerificationStep({
   gradient,
   userHasIdProof,
@@ -154,9 +315,10 @@ function IdVerificationStep({
   idExpirationDate,
   setIdExpirationDate,
   setIdProofFile,
-  handleStep1Continue,
+  handleIdStepContinue,
   uploading,
   idInfoSaving,
+  setCurrentStep,
 }: {
   gradient: string
   userHasIdProof: boolean
@@ -165,9 +327,10 @@ function IdVerificationStep({
   idExpirationDate: string
   setIdExpirationDate: (value: string) => void
   setIdProofFile: (file: File | null) => void
-  handleStep1Continue: () => void
+  handleIdStepContinue: () => void
   uploading: boolean
   idInfoSaving: boolean
+  setCurrentStep: (step: number) => void
 }) {
   return (
     <GradientCard gradient={gradient}>
@@ -232,9 +395,9 @@ function IdVerificationStep({
           </div>
         </div>
 
-        <div className="flex items-center justify-end pt-2">
-          <Button
-            onClick={handleStep1Continue}
+        <div className="flex items-center justify-end gap-2 pt-2">
+<Button
+            onClick={handleIdStepContinue}
             disabled={uploading || idInfoSaving}
             className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 px-6"
           >
@@ -265,8 +428,12 @@ function BusinessDetailsStep({
   validateVatNumber,
   handleAddressChange,
   setIsAddressValid,
+  serviceCatalog,
+  serviceCatalogLoading,
+  selectedServices,
+  setSelectedServices,
   setCurrentStep,
-  handleStep2Continue,
+  handleBusinessStepContinue,
   businessSaving,
 }: {
   gradient: string
@@ -279,8 +446,12 @@ function BusinessDetailsStep({
   validateVatNumber: () => void
   handleAddressChange: (fullAddress: string, placeData?: PlaceData) => void
   setIsAddressValid: (value: boolean) => void
+  serviceCatalog: ServiceCategoryGroup[]
+  serviceCatalogLoading: boolean
+  selectedServices: string[]
+  setSelectedServices: React.Dispatch<React.SetStateAction<string[]>>
   setCurrentStep: (step: number) => void
-  handleStep2Continue: () => void
+  handleBusinessStepContinue: () => void
   businessSaving: boolean
 }) {
   const [usernameCheck, setUsernameCheck] = useState<{ available?: boolean; reason?: string; checking?: boolean }>({})
@@ -297,6 +468,11 @@ function BusinessDetailsStep({
     if (usernameAbortRef.current) usernameAbortRef.current.abort()
     if (!normalized || normalized.length < 3) {
       setUsernameCheck({})
+      return
+    }
+    const normalizedCompany = businessInfo.companyName?.toLowerCase().replace(/[^a-z0-9-]/g, '')
+    if (normalizedCompany && normalized === normalizedCompany) {
+      setUsernameCheck({ available: false, reason: 'Username cannot be the same as your company name' })
       return
     }
     setUsernameCheck({ checking: true })
@@ -355,7 +531,21 @@ function BusinessDetailsStep({
           <Label className="text-sm font-medium text-gray-700">Company Name</Label>
           <Input
             value={businessInfo.companyName}
-            onChange={(e) => setBusinessInfo(prev => ({ ...prev, companyName: e.target.value }))}
+            onChange={(e) => {
+              const newCompany = e.target.value
+              setBusinessInfo(prev => ({ ...prev, companyName: newCompany }))
+              const normalizedCompany = newCompany.toLowerCase().replace(/[^a-z0-9-]/g, '')
+              const normalizedUsername = businessInfo.username?.toLowerCase().replace(/[^a-z0-9-]/g, '')
+              if (normalizedCompany && normalizedUsername && normalizedCompany === normalizedUsername) {
+                setUsernameCheck({ available: false, reason: 'Username cannot be the same as your company name' })
+              } else if (usernameCheck.reason === 'Username cannot be the same as your company name') {
+                if (normalizedUsername && normalizedUsername.length >= 3) {
+                  checkUsername(businessInfo.username)
+                } else {
+                  setUsernameCheck({})
+                }
+              }
+            }}
             className="rounded-xl"
             placeholder="Your company name"
           />
@@ -408,7 +598,12 @@ function BusinessDetailsStep({
                   type="button"
                   onClick={() => {
                     setBusinessInfo(prev => ({ ...prev, username: s }))
-                    setUsernameCheck({ available: true })
+                    const normalizedCompany = businessInfo.companyName?.toLowerCase().replace(/[^a-z0-9-]/g, '')
+                    if (normalizedCompany && s === normalizedCompany) {
+                      setUsernameCheck({ available: false, reason: 'Username cannot be the same as your company name' })
+                    } else {
+                      setUsernameCheck({ available: true })
+                    }
                   }}
                   className={`text-xs px-3 py-1 rounded-full border transition-colors ${
                     businessInfo.username === s
@@ -499,6 +694,51 @@ function BusinessDetailsStep({
           />
         </div>
 
+        <div className="space-y-3">
+          <div>
+            <Label className="text-sm font-medium text-gray-700">Services</Label>
+            <p className="text-xs text-gray-500">Loaded from the admin-managed service configuration.</p>
+          </div>
+
+          {serviceCatalogLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading services...
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {serviceCatalog.map((category) => (
+                <div key={category.slug} className="rounded-xl border border-gray-200 p-4 space-y-2">
+                  <h3 className="text-sm font-semibold text-gray-900">{category.name}</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {category.services.map((service) => {
+                      const active = selectedServices.includes(service.name)
+                      return (
+                        <button
+                          key={service.slug}
+                          type="button"
+                          onClick={() => {
+                            setSelectedServices((prev) =>
+                              active ? prev.filter((entry) => entry !== service.name) : [...prev, service.name]
+                            )
+                          }}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                            active
+                              ? 'bg-blue-50 border-blue-300 text-blue-700'
+                              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {service.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
           <Button variant="outline" onClick={() => setCurrentStep(1)} className="rounded-xl gap-1">
             <ChevronLeft className="h-4 w-4" /> Back
@@ -508,7 +748,7 @@ function BusinessDetailsStep({
               Skip for now
             </Button>
             <Button
-              onClick={handleStep2Continue}
+              onClick={handleBusinessStepContinue}
               disabled={businessSaving}
               className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-6"
             >
@@ -532,7 +772,7 @@ function CompanyAvailabilityStep({
   companyAvailabilityErrors,
   setCompanyAvailabilityErrors,
   setCurrentStep,
-  handleStep3Continue,
+  handleCompanyHoursContinue,
   companySaving,
 }: {
   gradient: string
@@ -541,7 +781,7 @@ function CompanyAvailabilityStep({
   companyAvailabilityErrors: Partial<Record<keyof CompanyAvailability, string>>
   setCompanyAvailabilityErrors: React.Dispatch<React.SetStateAction<Partial<Record<keyof CompanyAvailability, string>>>>
   setCurrentStep: (step: number) => void
-  handleStep3Continue: () => void
+  handleCompanyHoursContinue: () => void
   companySaving: boolean
 }) {
   return (
@@ -632,11 +872,11 @@ function CompanyAvailabilityStep({
         </div>
 
         <div className="flex items-center justify-between gap-3 pt-2">
-          <Button variant="outline" onClick={() => setCurrentStep(2)} className="rounded-xl gap-1">
+          <Button variant="outline" onClick={() => setCurrentStep(3)} className="rounded-xl gap-1">
             <ChevronLeft className="h-4 w-4" /> Back
           </Button>
           <Button
-            onClick={handleStep3Continue}
+            onClick={handleCompanyHoursContinue}
             disabled={companySaving}
             className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-6"
           >
@@ -652,7 +892,25 @@ function CompanyAvailabilityStep({
   )
 }
 
-function PersonalAvailabilityStep({ gradient, setCurrentStep }: { gradient: string; setCurrentStep: (step: number) => void }) {
+function PersonalAvailabilityStep({
+  gradient,
+  personalAvailability,
+  setPersonalAvailability,
+  personalAvailabilityErrors,
+  setPersonalAvailabilityErrors,
+  setCurrentStep,
+  handlePersonalHoursContinue,
+  personalSaving,
+}: {
+  gradient: string
+  personalAvailability: CompanyAvailability
+  setPersonalAvailability: React.Dispatch<React.SetStateAction<CompanyAvailability>>
+  personalAvailabilityErrors: Partial<Record<keyof CompanyAvailability, string>>
+  setPersonalAvailabilityErrors: React.Dispatch<React.SetStateAction<Partial<Record<keyof CompanyAvailability, string>>>>
+  setCurrentStep: (step: number) => void
+  handlePersonalHoursContinue: () => void
+  personalSaving: boolean
+}) {
   return (
     <GradientCard gradient={gradient}>
       <div className="p-6 sm:p-8 space-y-6">
@@ -663,28 +921,103 @@ function PersonalAvailabilityStep({ gradient, setCurrentStep }: { gradient: stri
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-900">Personal Availability</h2>
-              <p className="text-sm text-gray-500">Optional for now. You can update this later in your profile.</p>
+              <p className="text-sm text-gray-500">Optional. Set your own weekly schedule now or skip it for later.</p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-xl border-2 border-dashed border-amber-200 bg-amber-50/50 p-6 text-center">
-          <CalendarIcon className="h-8 w-8 text-amber-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-600">
-            Set personal availability and blocked dates after onboarding if needed.
-          </p>
+        <div className="space-y-3">
+          {Object.entries(personalAvailability).map(([day, schedule]) => (
+            <div
+              key={day}
+              className={`flex items-center gap-4 p-3.5 rounded-xl border transition-colors ${
+                schedule.available ? 'border-amber-200 bg-amber-50/50' : 'border-gray-200 bg-gray-50/50'
+              }`}
+            >
+              <div className="w-24 text-sm font-semibold capitalize text-gray-700">{day}</div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={schedule.available}
+                  onCheckedChange={(checked) => {
+                    setPersonalAvailability((prev) => ({
+                      ...prev,
+                      [day]: { ...prev[day as keyof typeof prev], available: Boolean(checked) }
+                    }))
+                    setPersonalAvailabilityErrors((prev) => {
+                      const next = { ...prev }
+                      delete next[day as keyof CompanyAvailability]
+                      return next
+                    })
+                  }}
+                />
+                <span className="text-sm text-gray-600">Available</span>
+              </div>
+              {schedule.available && (
+                <div className="flex items-center gap-2 ml-auto">
+                  <Input
+                    type="time"
+                    value={schedule.startTime}
+                    onChange={(e) => {
+                      setPersonalAvailability((prev) => ({
+                        ...prev,
+                        [day]: { ...prev[day as keyof typeof prev], startTime: e.target.value }
+                      }))
+                      setPersonalAvailabilityErrors((prev) => {
+                        const next = { ...prev }
+                        delete next[day as keyof CompanyAvailability]
+                        return next
+                      })
+                    }}
+                    className="w-28 rounded-xl"
+                  />
+                  <span className="text-sm text-gray-400">to</span>
+                  <Input
+                    type="time"
+                    value={schedule.endTime}
+                    onChange={(e) => {
+                      setPersonalAvailability((prev) => ({
+                        ...prev,
+                        [day]: { ...prev[day as keyof typeof prev], endTime: e.target.value }
+                      }))
+                      setPersonalAvailabilityErrors((prev) => {
+                        const next = { ...prev }
+                        delete next[day as keyof CompanyAvailability]
+                        return next
+                      })
+                    }}
+                    className="w-28 rounded-xl"
+                  />
+                </div>
+              )}
+              {personalAvailabilityErrors[day as keyof CompanyAvailability] && (
+                <div className="w-full mt-2 text-xs text-red-600">
+                  {personalAvailabilityErrors[day as keyof CompanyAvailability]}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
 
         <div className="flex items-center justify-between gap-3 pt-2">
-          <Button variant="outline" onClick={() => setCurrentStep(3)} className="rounded-xl gap-1">
+          <Button variant="outline" onClick={() => setCurrentStep(4)} className="rounded-xl gap-1">
             <ChevronLeft className="h-4 w-4" /> Back
           </Button>
-          <Button
-            onClick={() => setCurrentStep(5)}
-            className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 px-6"
-          >
-            Continue <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={() => setCurrentStep(6)} className="rounded-xl text-gray-500">
+              Skip for now
+            </Button>
+            <Button
+              onClick={handlePersonalHoursContinue}
+              disabled={personalSaving}
+              className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 px-6"
+            >
+              {personalSaving ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+              ) : (
+                <>Save & Continue <ArrowRight className="h-4 w-4 ml-2" /></>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </GradientCard>
@@ -710,15 +1043,20 @@ function EmployeesStep({ gradient, setCurrentStep }: { gradient: string; setCurr
         <EmployeeManagement />
 
         <div className="flex items-center justify-between gap-3 pt-2">
-          <Button variant="outline" onClick={() => setCurrentStep(4)} className="rounded-xl gap-1">
+          <Button variant="outline" onClick={() => setCurrentStep(5)} className="rounded-xl gap-1">
             <ChevronLeft className="h-4 w-4" /> Back
           </Button>
-          <Button
-            onClick={() => setCurrentStep(6)}
-            className="rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 px-6"
-          >
-            Continue <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={() => setCurrentStep(7)} className="rounded-xl text-gray-500">
+              Skip for now
+            </Button>
+            <Button
+              onClick={() => setCurrentStep(7)}
+              className="rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 px-6"
+            >
+              Continue <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
         </div>
       </div>
     </GradientCard>
@@ -735,8 +1073,8 @@ function AgreementsStep({
   submitting,
 }: {
   gradient: string
-  agreements: boolean[]
-  setAgreements: React.Dispatch<React.SetStateAction<boolean[]>>
+  agreements: AgreementsState
+  setAgreements: React.Dispatch<React.SetStateAction<AgreementsState>>
   submitErrors: string[]
   setCurrentStep: (step: number) => void
   handleSubmit: () => void
@@ -751,37 +1089,74 @@ function AgreementsStep({
               <CheckCircle2 className="h-5 w-5 text-gray-700" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Agreements</h2>
-              <p className="text-sm text-gray-500">Review and accept all agreements to submit your profile.</p>
+              <h2 className="text-xl font-bold text-gray-900">Platform Rules</h2>
+              <p className="text-sm text-gray-500">Review the rules and accept the required checkboxes before submitting.</p>
             </div>
           </div>
         </div>
 
+        <div className="space-y-5">
+          <section className="rounded-xl border border-gray-200 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-gray-900">Platform Rules</h3>
+            <div className="space-y-2 text-sm text-gray-700">
+              {PLATFORM_RULES.map((item) => (
+                <p key={item}>• {item}</p>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-amber-900">Misbehavior (Not Allowed)</h3>
+            <div className="space-y-2 text-sm text-amber-900">
+              {MISBEHAVIOR_ITEMS.map((item) => (
+                <p key={item}>• {item}</p>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-gray-200 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-gray-900">Consequences</h3>
+            <div className="space-y-2 text-sm text-gray-700">
+              {CONSEQUENCES.map((item) => (
+                <p key={item}>• {item}</p>
+              ))}
+            </div>
+          </section>
+        </div>
+
         <div className="space-y-3">
-          {AGREEMENTS.map((text, index) => {
-            const agreementId = `agreement-${index}`
-            return (
-              <label
-                key={text}
-                htmlFor={agreementId}
-                className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
-                  agreements[index]
-                    ? 'border-blue-200 bg-blue-50/50'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
-                }`}
-              >
-                <Checkbox
-                  id={agreementId}
-                  checked={agreements[index]}
-                  onCheckedChange={(checked) => {
-                    setAgreements(prev => prev.map((val, idx) => idx === index ? Boolean(checked) : val))
-                  }}
-                  className="mt-0.5"
-                />
-                <span className="text-sm text-gray-700 leading-relaxed">{text}</span>
-              </label>
-            )
-          })}
+          <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
+            agreements.rulesAccepted ? 'border-blue-200 bg-blue-50/50' : 'border-gray-200 bg-white hover:border-gray-300'
+          }`}>
+            <Checkbox
+              checked={agreements.rulesAccepted}
+              onCheckedChange={(checked) => setAgreements((prev) => ({ ...prev, rulesAccepted: Boolean(checked) }))}
+              className="mt-0.5"
+            />
+            <span className="text-sm text-gray-700 leading-relaxed">I agree to the platform rules and consequences</span>
+          </label>
+
+          <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
+            agreements.termsAccepted ? 'border-blue-200 bg-blue-50/50' : 'border-gray-200 bg-white hover:border-gray-300'
+          }`}>
+            <Checkbox
+              checked={agreements.termsAccepted}
+              onCheckedChange={(checked) => setAgreements((prev) => ({ ...prev, termsAccepted: Boolean(checked) }))}
+              className="mt-0.5"
+            />
+            <span className="text-sm text-gray-700 leading-relaxed">I accept the General Terms & Conditions</span>
+          </label>
+
+          <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
+            agreements.selfBillingAccepted ? 'border-blue-200 bg-blue-50/50' : 'border-gray-200 bg-white hover:border-gray-300'
+          }`}>
+            <Checkbox
+              checked={agreements.selfBillingAccepted}
+              onCheckedChange={(checked) => setAgreements((prev) => ({ ...prev, selfBillingAccepted: Boolean(checked) }))}
+              className="mt-0.5"
+            />
+            <span className="text-sm text-gray-700 leading-relaxed">I agree that Fixera prepares and issues invoices on my behalf (self-billing agreement)</span>
+          </label>
         </div>
 
         {submitErrors.length > 0 && (
@@ -796,7 +1171,7 @@ function AgreementsStep({
         )}
 
         <div className="flex items-center justify-between gap-3 pt-2">
-          <Button variant="outline" onClick={() => setCurrentStep(5)} className="rounded-xl gap-1">
+          <Button variant="outline" onClick={() => setCurrentStep(6)} className="rounded-xl gap-1">
             <ChevronLeft className="h-4 w-4" /> Back
           </Button>
           <div className="flex items-center gap-2">
@@ -896,7 +1271,11 @@ function useCompanyAvailabilityState() {
 }
 
 function useSubmissionState() {
-  const [agreements, setAgreements] = useState<boolean[]>(AGREEMENTS.map(() => false))
+  const [agreements, setAgreements] = useState<AgreementsState>({
+    rulesAccepted: false,
+    termsAccepted: false,
+    selfBillingAccepted: false,
+  })
   const [submitting, setSubmitting] = useState(false)
   const [submitErrors, setSubmitErrors] = useState<string[]>([])
 
@@ -911,9 +1290,27 @@ function useSubmissionState() {
 }
 
 export default function ProfessionalOnboardingPage() {
+  return (
+    <Suspense>
+      <ProfessionalOnboardingContent />
+    </Suspense>
+  )
+}
+
+function ProfessionalOnboardingContent() {
   const { user, loading, isAuthenticated, checkAuth } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [currentStep, setCurrentStep] = useState(1)
+  const [stripeStatus, setStripeStatus] = useState<StripeAccountStatus | null>(null)
+  const [stripeLoading, setStripeLoading] = useState(false)
+  const [stripeError, setStripeError] = useState('')
+  const [serviceCatalog, setServiceCatalog] = useState<ServiceCategoryGroup[]>([])
+  const [serviceCatalogLoading, setServiceCatalogLoading] = useState(false)
+  const [selectedServices, setSelectedServices] = useState<string[]>([])
+  const [personalAvailability, setPersonalAvailability] = useState<CompanyAvailability>(DEFAULT_COMPANY_AVAILABILITY)
+  const [personalAvailabilityErrors, setPersonalAvailabilityErrors] = useState<Partial<Record<keyof CompanyAvailability, string>>>({})
+  const [personalSaving, setPersonalSaving] = useState(false)
 
   const {
     idProofFile,
@@ -968,10 +1365,30 @@ export default function ProfessionalOnboardingPage() {
   }, [loading, isAuthenticated, router])
 
   useEffect(() => {
+    const stepParam = searchParams.get('step')
+    if (!stepParam) return
+    const parsed = Number.parseInt(stepParam, 10)
+    if (Number.isNaN(parsed)) return
+    if (parsed >= 1 && parsed <= STEPS.length) {
+      setCurrentStep(parsed)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
     if (!loading && user?.role && user.role !== 'professional') {
       router.push('/dashboard')
     }
   }, [loading, user?.role, router])
+
+  useEffect(() => {
+    if (
+      !loading &&
+      user?.role === 'professional' &&
+      (!user.isEmailVerified || !user.isPhoneVerified)
+    ) {
+      router.push('/dashboard')
+    }
+  }, [loading, user, router])
 
   useEffect(() => {
     if (
@@ -1006,11 +1423,35 @@ export default function ProfessionalOnboardingPage() {
       }))
     }
     if (user.vatNumber) setVatNumber(user.vatNumber)
+    if (user.serviceCategories) setSelectedServices(user.serviceCategories)
+    if (user.onboardingAgreements) {
+      setAgreements({
+        rulesAccepted: Boolean(user.onboardingAgreements.rulesAccepted),
+        termsAccepted: Boolean(user.onboardingAgreements.termsAccepted),
+        selfBillingAccepted: Boolean(user.onboardingAgreements.selfBillingAccepted),
+      })
+    }
 
     if (user.companyAvailability) {
       setCompanyAvailability(prev => {
         const next = { ...prev }
         Object.entries(user.companyAvailability || {}).forEach(([day, schedule]) => {
+          if (!schedule) return
+          const key = day as keyof typeof next
+          next[key] = {
+            available: schedule.available,
+            startTime: schedule.startTime || prev[key].startTime,
+            endTime: schedule.endTime || prev[key].endTime
+          }
+        })
+        return next
+      })
+    }
+
+    if (user.availability) {
+      setPersonalAvailability(prev => {
+        const next = { ...prev }
+        Object.entries(user.availability || {}).forEach(([day, schedule]) => {
           if (!schedule) return
           const key = day as keyof typeof next
           next[key] = {
@@ -1030,6 +1471,72 @@ export default function ProfessionalOnboardingPage() {
     if (token) headers['Authorization'] = `Bearer ${token}`
     return headers
   }
+
+  const refreshStripeStatus = useCallback(async () => {
+    setStripeLoading(true)
+    setStripeError('')
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/stripe/connect/account-status`, {
+        credentials: 'include',
+        headers: headersWithAuth(),
+      })
+
+      if (response.status === 404) {
+        setStripeStatus({ hasAccount: false })
+        return
+      }
+
+      const data = await response.json()
+      if (!response.ok || !data.success) {
+        setStripeError(data.error?.message || 'Failed to load Stripe status')
+        return
+      }
+
+      setStripeStatus({
+        ...data.data,
+        hasAccount: true,
+      })
+    } catch {
+      setStripeError('Failed to load Stripe status')
+    } finally {
+      setStripeLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (user?.role === 'professional') {
+      void refreshStripeStatus()
+    }
+  }, [user?.role, refreshStripeStatus])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const countryCode = toCountryCode(businessInfo.country || user?.businessInfo?.country)
+
+    const loadServices = async () => {
+      setServiceCatalogLoading(true)
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/service-categories/active?country=${encodeURIComponent(countryCode)}`,
+          {
+            credentials: 'include',
+            signal: controller.signal,
+          }
+        )
+        const data = await response.json()
+        if (response.ok && Array.isArray(data)) {
+          setServiceCatalog(data)
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return
+      } finally {
+        setServiceCatalogLoading(false)
+      }
+    }
+
+    void loadServices()
+    return () => controller.abort()
+  }, [businessInfo.country, user?.businessInfo?.country])
 
   const handleAddressChange = (fullAddress: string, placeData?: PlaceData) => {
     setBusinessInfo(prev => ({ ...prev, address: fullAddress }))
@@ -1091,7 +1598,7 @@ export default function ProfessionalOnboardingPage() {
           address: prev.address || result.parsedAddress?.streetAddress || prev.address,
           city: prev.city || result.parsedAddress?.city || prev.city,
           postalCode: prev.postalCode || result.parsedAddress?.postalCode || prev.postalCode,
-          country: prev.country || result.parsedAddress?.country || prev.country,
+          country: prev.country || (result.parsedAddress?.country ? (COUNTRY_NAMES[result.parsedAddress.country] || result.parsedAddress.country) : prev.country),
         }))
       }
     } catch {
@@ -1180,7 +1687,7 @@ export default function ProfessionalOnboardingPage() {
     }
   }
 
-  const handleStep1Continue = async () => {
+  const handleIdStepContinue = async () => {
     if (!user?.idProofUrl && !idProofFile) {
       toast.error('Please upload your ID proof')
       return
@@ -1205,7 +1712,7 @@ export default function ProfessionalOnboardingPage() {
     }
   }
 
-  const handleStep2Continue = async () => {
+  const handleBusinessStepContinue = async () => {
     if (!businessInfo.companyName.trim()) {
       toast.error('Company name is required')
       return
@@ -1244,7 +1751,8 @@ export default function ProfessionalOnboardingPage() {
         city: businessInfo.city,
         country: businessInfo.country,
         postalCode: businessInfo.postalCode,
-        username: businessInfo.username
+        username: businessInfo.username,
+        serviceCategories: selectedServices,
       })
       if (!result.success) {
         toast.error(result.error || 'Failed to save business info')
@@ -1260,7 +1768,7 @@ export default function ProfessionalOnboardingPage() {
     }
   }
 
-  const handleStep3Continue = async () => {
+  const handleCompanyHoursContinue = async () => {
     const hasAvailableDay = Object.values(companyAvailability).some((day) => day.available)
     if (!hasAvailableDay) {
       toast.error('Select at least one available day')
@@ -1302,7 +1810,7 @@ export default function ProfessionalOnboardingPage() {
       }
       toast.success('Company availability saved')
       await checkAuth()
-      setCurrentStep(4)
+      setCurrentStep(5)
     } catch {
       toast.error('Failed to save company availability')
     } finally {
@@ -1310,16 +1818,70 @@ export default function ProfessionalOnboardingPage() {
     }
   }
 
+  const handlePersonalHoursContinue = async () => {
+    const hasAvailableDay = Object.values(personalAvailability).some((day) => day.available)
+
+    if (!hasAvailableDay) {
+      setCurrentStep(6)
+      return
+    }
+
+    const availabilityErrors: Partial<Record<keyof CompanyAvailability, string>> = {}
+    for (const [day, schedule] of Object.entries(personalAvailability) as Array<[keyof CompanyAvailability, DayAvailability]>) {
+      if (!schedule.available) continue
+
+      const startMinutes = timeToMinutes(schedule.startTime)
+      const endMinutes = timeToMinutes(schedule.endTime)
+      if (startMinutes === null || endMinutes === null || startMinutes >= endMinutes) {
+        availabilityErrors[day] = 'Start time must be earlier than end time'
+      }
+    }
+
+    if (Object.keys(availabilityErrors).length > 0) {
+      setPersonalAvailabilityErrors(availabilityErrors)
+      toast.error('Please fix invalid personal availability time ranges')
+      return
+    }
+
+    setPersonalAvailabilityErrors({})
+    setPersonalSaving(true)
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/professional-profile`, {
+        method: 'PUT',
+        headers: headersWithAuth(),
+        credentials: 'include',
+        body: JSON.stringify({
+          availability: personalAvailability
+        })
+      })
+      const result = await response.json()
+      if (!response.ok || !result.success) {
+        toast.error(result.msg || 'Failed to save personal availability')
+        return
+      }
+      toast.success('Personal availability saved')
+      await checkAuth()
+      setCurrentStep(6)
+    } catch {
+      toast.error('Failed to save personal availability')
+    } finally {
+      setPersonalSaving(false)
+    }
+  }
+
   const handleSubmit = async () => {
-    const allChecked = agreements.every(Boolean)
-    if (!allChecked) {
+    if (!agreements.rulesAccepted || !agreements.termsAccepted || !agreements.selfBillingAccepted) {
       toast.error('Please accept all agreements to continue')
       return
     }
     setSubmitting(true)
     setSubmitErrors([])
     try {
-      const result = await submitForVerification()
+      const result = await submitForVerification({
+        rulesAccepted: agreements.rulesAccepted,
+        termsAccepted: agreements.termsAccepted,
+        selfBillingAccepted: agreements.selfBillingAccepted,
+      })
       if (result.success) {
         toast.success('Profile submitted for verification')
         await checkAuth()
@@ -1423,7 +1985,7 @@ export default function ProfessionalOnboardingPage() {
         </div>
 
         {/* Step indicators */}
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-3 md:grid-cols-7 gap-3">
           {STEPS.map((step) => {
             const isCompleted = step.id < currentStep
             const isCurrent = step.id === currentStep
@@ -1493,9 +2055,10 @@ export default function ProfessionalOnboardingPage() {
             idExpirationDate={idExpirationDate}
             setIdExpirationDate={setIdExpirationDate}
             setIdProofFile={setIdProofFile}
-            handleStep1Continue={handleStep1Continue}
+            handleIdStepContinue={handleIdStepContinue}
             uploading={uploading}
             idInfoSaving={idInfoSaving}
+            setCurrentStep={setCurrentStep}
           />
         )}
 
@@ -1514,13 +2077,29 @@ export default function ProfessionalOnboardingPage() {
             validateVatNumber={validateVatNumber}
             handleAddressChange={handleAddressChange}
             setIsAddressValid={setIsAddressValid}
+            serviceCatalog={serviceCatalog}
+            serviceCatalogLoading={serviceCatalogLoading}
+            selectedServices={selectedServices}
+            setSelectedServices={setSelectedServices}
             setCurrentStep={setCurrentStep}
-            handleStep2Continue={handleStep2Continue}
+            handleBusinessStepContinue={handleBusinessStepContinue}
             businessSaving={businessSaving}
           />
         )}
 
         {currentStep === 3 && (
+          <StripeIntegrationStep
+            gradient={activeStep.gradient}
+            stripeStatus={stripeStatus}
+            stripeLoading={stripeLoading}
+            stripeError={stripeError}
+            refreshStripeStatus={refreshStripeStatus}
+            openStripeSetup={() => router.push('/professional/stripe/setup?source=onboarding')}
+            setCurrentStep={setCurrentStep}
+          />
+        )}
+
+        {currentStep === 4 && (
           <CompanyAvailabilityStep
             gradient={activeStep.gradient}
             companyAvailability={companyAvailability}
@@ -1528,26 +2107,32 @@ export default function ProfessionalOnboardingPage() {
             companyAvailabilityErrors={companyAvailabilityErrors}
             setCompanyAvailabilityErrors={setCompanyAvailabilityErrors}
             setCurrentStep={setCurrentStep}
-            handleStep3Continue={handleStep3Continue}
+            handleCompanyHoursContinue={handleCompanyHoursContinue}
             companySaving={companySaving}
           />
         )}
 
-        {currentStep === 4 && (
+        {currentStep === 5 && (
           <PersonalAvailabilityStep
             gradient={activeStep.gradient}
+            personalAvailability={personalAvailability}
+            setPersonalAvailability={setPersonalAvailability}
+            personalAvailabilityErrors={personalAvailabilityErrors}
+            setPersonalAvailabilityErrors={setPersonalAvailabilityErrors}
             setCurrentStep={setCurrentStep}
+            handlePersonalHoursContinue={handlePersonalHoursContinue}
+            personalSaving={personalSaving}
           />
         )}
 
-        {currentStep === 5 && (
+        {currentStep === 6 && (
           <EmployeesStep
             gradient={activeStep.gradient}
             setCurrentStep={setCurrentStep}
           />
         )}
 
-        {currentStep === 6 && (
+        {currentStep === 7 && (
           <AgreementsStep
             gradient={activeStep.gradient}
             agreements={agreements}

@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface AccountStatus {
@@ -21,6 +21,8 @@ interface AccountStatus {
 
 export default function StripeSetupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const source = searchParams.get('source');
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -106,8 +108,8 @@ export default function StripeSetupPage() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          returnUrl: `${window.location.origin}/professional/stripe/complete`,
-          refreshUrl: `${window.location.origin}/professional/stripe/refresh`,
+          returnUrl: `${window.location.origin}/professional/stripe/complete${source ? `?source=${source}` : ''}`,
+          refreshUrl: `${window.location.origin}/professional/stripe/refresh${source ? `?source=${source}` : ''}`,
         }),
       });
 
