@@ -137,7 +137,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   loading: boolean
-  login: (email: string, password: string) => Promise<boolean>
+  login: (email: string, password: string, options?: { skipRedirect?: boolean }) => Promise<boolean>
   signup: (userData: SignupData) => Promise<boolean>
   logout: () => Promise<void>
   checkAuth: () => Promise<User | null>
@@ -198,7 +198,7 @@ const ROUTE_CONFIG = {
   ROLE_BASED: {
     admin: ['/admin'],
     professional: ['/professional', '/projects/create', '/professional/onboarding'],
-    employee: ['/professional', '/projects/create'],
+    employee: ['/professional'],
   } as Record<string, string[]>
   // Note: /professional covers /professional/earnings, /professional/projects/*, etc.
 }
@@ -255,12 +255,23 @@ const isProfessionalOnboardingRoute = (pathname: string): boolean => {
 const isProfessionalVerified = (user: User | null): boolean =>
   Boolean(user?.isEmailVerified && user?.isPhoneVerified)
 
+const isProfessionalOnboardingComplete = (user: User | null): boolean =>
+  Boolean(
+    user?.professionalOnboardingCompletedAt ||
+    (user?.role === 'professional' && user.professionalStatus && user.professionalStatus !== 'draft')
+  )
+
 const needsProfessionalOnboarding = (user: User | null): boolean =>
   Boolean(
     user?.role === 'professional' &&
     isProfessionalVerified(user) &&
-    !user.professionalOnboardingCompletedAt &&
-    user.professionalStatus === 'draft'
+    !isProfessionalOnboardingComplete(user)
+  )
+
+const mustCompleteProfessionalAccessFlow = (user: User | null): boolean =>
+  Boolean(
+    user?.role === 'professional' &&
+    (!isProfessionalVerified(user) || !isProfessionalOnboardingComplete(user))
   )
 
 // Returns all roles that have access to this route
@@ -337,7 +348,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string, options?: { skipRedirect?: boolean }): Promise<boolean> => {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/login`, {
         method: 'POST',
@@ -354,23 +365,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(data.user)
         setAuthToken(data.token)
         toast.success('Login successful!')
-        
-        const needsOnboarding = needsProfessionalOnboarding(data.user)
-        if (needsOnboarding) {
-          router.push('/professional/onboarding')
-        } else {
-          // Handle redirect after successful login
-          const intendedPath = sessionStorage.getItem('redirectAfterAuth')
-          if (intendedPath && intendedPath !== pathname) {
-            sessionStorage.removeItem('redirectAfterAuth')
-            router.push(intendedPath)
+
+        if (!options?.skipRedirect) {
+          if (mustCompleteProfessionalAccessFlow(data.user)) {
+            router.push('/professional/onboarding')
           } else {
-            // Default redirect based on role
-            const dashboardPath = '/dashboard'
-            router.push(dashboardPath)
+            // Handle redirect after successful login
+            const intendedPath = sessionStorage.getItem('redirectAfterAuth')
+            if (intendedPath && intendedPath !== pathname) {
+              sessionStorage.removeItem('redirectAfterAuth')
+              router.push(intendedPath)
+            } else {
+              // Default redirect based on role
+              const dashboardPath = '/dashboard'
+              router.push(dashboardPath)
+            }
           }
         }
-        
+
         return true
       } else {
         toast.error(data.msg || 'Login failed')
@@ -452,7 +464,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const isRoleRestrictedRoute = allowedRoles.length > 0
 
     // Force professional onboarding before accessing other pages
-    if (isUserAuthenticated && needsProfessionalOnboarding(currentUser) && !isProfessionalOnboardingRoute(pathname)) {
+    if (isUserAuthenticated && mustCompleteProfessionalAccessFlow(currentUser) && !isProfessionalOnboardingRoute(pathname)) {
       router.replace('/professional/onboarding')
       return
     }

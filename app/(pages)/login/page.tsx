@@ -19,24 +19,29 @@ function LoginPageContent() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { login, isAuthenticated, loading } = useAuth()
+  const { login, isAuthenticated, loading, user } = useAuth()
 
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      const redirectTo = searchParams.get('redirect') || '/dashboard'
+      const professionalMustFinishOnboarding =
+        user?.role === 'professional' &&
+        (!user.isEmailVerified || !user.isPhoneVerified || !user.professionalOnboardingCompletedAt)
+      const redirectTo = professionalMustFinishOnboarding
+        ? '/professional/onboarding'
+        : (searchParams.get('redirect') || '/dashboard')
       router.push(redirectTo)
     }
-  }, [isAuthenticated, loading, router, searchParams])
+  }, [isAuthenticated, loading, router, searchParams, user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
-    const success = await login(email, password)
+    const success = await login(email, password, { skipRedirect: true })
     if (success) {
-      const redirectTo = searchParams.get('redirect') || '/dashboard'
-      router.push(redirectTo)
+      setIsLoading(false)
+      return
     }
     setIsLoading(false)
   }

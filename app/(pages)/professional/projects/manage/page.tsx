@@ -176,6 +176,7 @@ export default function ManageProjectsPage() {
   const [projectCounts, setProjectCounts] = useState(() => ({ ...DEFAULT_PROJECT_COUNTS }))
   const [activeTab, setActiveTab] = useState<TabValue>('all')
   const [allServices, setAllServices] = useState<string[]>([])
+  const canCreateProjects = user?.professionalStatus === 'approved'
 
   const mapTabToStatus = (tab: TabValue): string => {
     switch (tab) {
@@ -523,6 +524,10 @@ export default function ManageProjectsPage() {
   }
 
   const editProjectWithWarning = (projectId: string) => {
+    if (!canCreateProjects) {
+      toast.error('Admin approval is required before managing projects')
+      return
+    }
     // Close dialog and redirect to edit page
     // The backend will automatically handle status change to pending_approval on save
     console.log('[ManageProjects] Editing project with warning:', projectId)
@@ -604,9 +609,9 @@ export default function ManageProjectsPage() {
   // Project Action Menu Component
   const ProjectActionMenu = ({ project }: { project: Project }) => {
     const normalizedStatus = normalizeProjectStatus(project.status)
-    const canEdit = normalizedStatus === 'draft' || normalizedStatus === 'rejected'
-    const canEditWithWarning = normalizedStatus === 'published' || normalizedStatus === 'on_hold'
-    const canSubmit = normalizedStatus === 'draft'
+    const canEdit = canCreateProjects && (normalizedStatus === 'draft' || normalizedStatus === 'rejected')
+    const canEditWithWarning = canCreateProjects && (normalizedStatus === 'published' || normalizedStatus === 'on_hold')
+    const canSubmit = canCreateProjects && normalizedStatus === 'draft'
     const canHold = normalizedStatus === 'published' || normalizedStatus === 'on_hold'
     const canDelete = normalizedStatus === 'draft' || normalizedStatus === 'rejected'
 
@@ -646,7 +651,12 @@ export default function ManageProjectsPage() {
           )}
 
           <DropdownMenuItem
+            disabled={!canCreateProjects}
             onClick={() => {
+              if (!canCreateProjects) {
+                toast.error('Admin approval is required before managing projects')
+                return
+              }
               setSelectedProject(project)
               setDuplicateDialogOpen(true)
             }}
@@ -721,15 +731,38 @@ export default function ManageProjectsPage() {
             <p className="text-sm md:text-base text-gray-600">Manage your service offerings and project submissions</p>
           </div>
           <Button
-            onClick={() => router.push('/projects/create')}
+            onClick={() => {
+              if (!canCreateProjects) {
+                toast.error('Admin approval is required before creating projects')
+                return
+              }
+              router.push('/projects/create')
+            }}
             className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto flex-shrink-0"
             size="sm"
+            disabled={!canCreateProjects}
           >
             <Plus className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Create New Project</span>
             <span className="sm:hidden">New Project</span>
           </Button>
         </div>
+
+        {!canCreateProjects && (
+          <Card className="mb-6 border-amber-200 bg-amber-50">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3 text-amber-800">
+                <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium">Project creation is locked until admin approval.</p>
+                  <p className="text-sm text-amber-700">
+                    You can review your project list here, but creating, editing, duplicating, and submitting projects is disabled until your professional profile is approved.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50">
@@ -886,7 +919,16 @@ export default function ManageProjectsPage() {
                     }
                   </p>
                   {!searchTerm && statusFilter === 'all' && serviceFilter === 'all' && (
-                    <Button onClick={() => router.push('/projects/create')}>
+                    <Button
+                      onClick={() => {
+                        if (!canCreateProjects) {
+                          toast.error('Admin approval is required before creating projects')
+                          return
+                        }
+                        router.push('/projects/create')
+                      }}
+                      disabled={!canCreateProjects}
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Create Project
                     </Button>
@@ -946,7 +988,16 @@ export default function ManageProjectsPage() {
                   <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No draft projects</h3>
                   <p className="text-gray-600 mb-4">Create your first project to get started</p>
-                  <Button onClick={() => router.push('/projects/create')}>
+                  <Button
+                    onClick={() => {
+                      if (!canCreateProjects) {
+                        toast.error('Admin approval is required before creating projects')
+                        return
+                      }
+                      router.push('/projects/create')
+                    }}
+                    disabled={!canCreateProjects}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Create Project
                   </Button>
