@@ -38,7 +38,7 @@ function LoginPageContent() {
     e.preventDefault()
     setIsLoading(true)
 
-    const success = await login(email, password)
+    const success = await login(email, password, { skipRedirect: true })
     if (success) {
       setIsLoading(false)
       return

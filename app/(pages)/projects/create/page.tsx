@@ -227,7 +227,7 @@ export default function ProjectCreatePage() {
     if (loading) return
 
     if (!isAuthenticated) {
-      router.replace(`/login?redirect=${encodeURIComponent('/projects/create')}`)
+      router.replace(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`)
       return
     }
 
