@@ -13,6 +13,7 @@ import { Loader2, Shield, Building, Calendar as CalendarIcon, Users, CheckCircle
 import { Skeleton } from "@/components/ui/skeleton"
 import AddressAutocomplete, { PlaceData } from '@/components/professional/project-wizard/AddressAutocomplete'
 import EmployeeManagement from '@/components/TeamManagement'
+import DualVerificationComponent from '@/components/DualVerificationComponent'
 import { EU_COUNTRIES } from '@/lib/countries'
 import { getAuthToken, buildUsernameSuggestionParams } from '@/lib/utils'
 import { formatVATNumber, getVATCountryName, isEUVatNumber, validateVATFormat, validateVATWithAPI, updateProfessionalBusinessProfile, submitForVerification, COUNTRY_NAMES } from '@/lib/vatValidation'
@@ -318,7 +319,6 @@ function IdVerificationStep({
   handleIdStepContinue,
   uploading,
   idInfoSaving,
-  setCurrentStep,
 }: {
   gradient: string
   userHasIdProof: boolean
@@ -330,7 +330,6 @@ function IdVerificationStep({
   handleIdStepContinue: () => void
   uploading: boolean
   idInfoSaving: boolean
-  setCurrentStep: (step: number) => void
 }) {
   return (
     <GradientCard gradient={gradient}>
@@ -1384,16 +1383,6 @@ function ProfessionalOnboardingContent() {
     if (
       !loading &&
       user?.role === 'professional' &&
-      (!user.isEmailVerified || !user.isPhoneVerified)
-    ) {
-      router.push('/dashboard')
-    }
-  }, [loading, user, router])
-
-  useEffect(() => {
-    if (
-      !loading &&
-      user?.role === 'professional' &&
       (user.professionalOnboardingCompletedAt || (user.professionalStatus !== undefined && user.professionalStatus !== 'draft'))
     ) {
       router.push('/dashboard')
@@ -1463,7 +1452,15 @@ function ProfessionalOnboardingContent() {
         return next
       })
     }
-  }, [user])
+  }, [
+    user,
+    setAgreements,
+    setBusinessInfo,
+    setCompanyAvailability,
+    setIdCountryOfIssue,
+    setIdExpirationDate,
+    setVatNumber,
+  ])
 
   const headersWithAuth = () => {
     const token = getAuthToken()
@@ -1908,6 +1905,10 @@ function ProfessionalOnboardingContent() {
 
   const progress = useMemo(() => (currentStep / STEPS.length) * 100, [currentStep])
   const activeStep = STEPS.find(s => s.id === currentStep)!
+  const requiresVerification = Boolean(
+    user?.role === 'professional' &&
+    (!user.isEmailVerified || !user.isPhoneVerified)
+  )
 
   if (loading || !user) {
     return (
@@ -1950,6 +1951,19 @@ function ProfessionalOnboardingContent() {
           </div>
         </div>
       </div>
+    )
+  }
+
+  if (requiresVerification) {
+    return (
+      <DualVerificationComponent
+        email={user.email}
+        phone={user.phone}
+        onVerificationSuccess={() => {
+          void checkAuth()
+        }}
+        onBack={() => router.push('/login')}
+      />
     )
   }
 
@@ -2058,7 +2072,6 @@ function ProfessionalOnboardingContent() {
             handleIdStepContinue={handleIdStepContinue}
             uploading={uploading}
             idInfoSaving={idInfoSaving}
-            setCurrentStep={setCurrentStep}
           />
         )}
 

@@ -12,6 +12,7 @@ import Step6PostBookingQuestions from '@/components/professional/project-wizard/
 import Step7CustomMessage from '@/components/professional/project-wizard/Step7CustomMessage'
 import { toast } from 'sonner'
 import { getAuthToken } from '@/lib/utils'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface IIncludedItem {
   name: string
@@ -188,6 +189,7 @@ interface ProjectData {
 export default function ProjectCreatePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user, isAuthenticated, loading } = useAuth()
   const projectId = searchParams.get('id')
   const [currentStep, setCurrentStep] = useState(1)
   const step1Ref = useRef<Step1Ref>(null)
@@ -219,6 +221,27 @@ export default function ProjectCreatePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [canProceed, setCanProceed] = useState(false)
   const [stepValidation, setStepValidation] = useState<boolean[]>(new Array(8).fill(false))
+  const canCreateProjects = user?.professionalStatus === 'approved'
+
+  useEffect(() => {
+    if (loading) return
+
+    if (!isAuthenticated) {
+      router.replace(`/login?redirect=${encodeURIComponent('/projects/create')}`)
+      return
+    }
+
+    if (user?.role !== 'professional') {
+      toast.error('Only professionals can access project creation')
+      router.replace('/dashboard')
+      return
+    }
+
+    if (!canCreateProjects) {
+      toast.error('Admin approval is required before creating projects')
+      router.replace('/professional/projects/manage')
+    }
+  }, [loading, isAuthenticated, user?.role, canCreateProjects, router])
 
   const normalizePreparationDuration = (subprojects?: ISubproject[]) => {
     if (!Array.isArray(subprojects)) return subprojects
@@ -241,7 +264,7 @@ export default function ProjectCreatePage() {
 
   // Load existing project data if editing
   useEffect(() => {
-    if (projectId) {
+    if (projectId && canCreateProjects) {
       const loadProject = async () => {
         setIsLoading(true)
         try {
@@ -342,7 +365,7 @@ export default function ProjectCreatePage() {
     }
     // Next.js router is stable and we only want to run this effect when projectId changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId])
+  }, [projectId, canCreateProjects])
 
   // Manual save function for draft
   const saveProjectDraft = async (options?: { silent?: boolean }) => {
