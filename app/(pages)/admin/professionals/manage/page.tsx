@@ -32,6 +32,7 @@ export default function AdminProfessionalManagementPage() {
   const [level, setLevel] = useState("all")
   const [tag, setTag] = useState("")
   const [customerName, setCustomerName] = useState("")
+  const [deleting, setDeleting] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const loadRequestIdRef = useRef(0)
 
@@ -100,6 +101,28 @@ export default function AdminProfessionalManagementPage() {
       await load()
     } catch (error) {
       console.error("Failed to patch professional:", error)
+    }
+  }
+
+  const deleteProfessional = async (professionalId: string) => {
+    setDeleting(professionalId)
+    try {
+      const token = getAuthToken()
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/users/${professionalId}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.success) {
+        console.error("Failed to delete professional:", payload?.msg || response.status)
+        return
+      }
+      setRows((prev) => prev.filter((r) => r._id !== professionalId))
+    } catch (error) {
+      console.error("Failed to delete professional:", error)
+    } finally {
+      setDeleting(null)
     }
   }
 
@@ -184,6 +207,18 @@ export default function AdminProfessionalManagementPage() {
                   </Button>
                   <Button variant="outline" onClick={() => void patchProfessional(row._id, { action: row.accountStatus === "suspended" ? "reactivate" : "suspend" })}>
                     {row.accountStatus === "suspended" ? "Reactivate" : "Suspend"}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    disabled={deleting === row._id}
+                    onClick={() => {
+                      if (!window.confirm(`Permanently delete ${row.businessInfo?.companyName || row.name || row.email}? This will remove the user and ALL their data (bookings, messages, files, projects, etc). This cannot be undone.`)) {
+                        return
+                      }
+                      void deleteProfessional(row._id)
+                    }}
+                  >
+                    {deleting === row._id ? "Deleting..." : "Delete"}
                   </Button>
                 </div>
               </CardContent>
