@@ -17,8 +17,6 @@ import {
 import { useAuth } from "@/contexts/AuthContext"
 import { getAuthToken } from "@/lib/utils"
 import StartChatButton from "@/components/chat/StartChatButton"
-import ReferralCard from "@/components/dashboard/ReferralCard"
-import BenefitsProgramCard from "@/components/dashboard/BenefitsProgramCard"
 import {
   type BookingStatus,
   getBookingStatusMeta,
@@ -625,68 +623,91 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
-        {/* Summary cards */}
-        <div className="grid md:grid-cols-3 gap-4">
-          <Card className="bg-white/80 backdrop-blur border border-indigo-100 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-indigo-900">
-                <Package className="h-5 w-5 text-indigo-500" />
-                Total
-              </CardTitle>
-              <CardDescription>All quotes & bookings</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-semibold text-indigo-900">{totalBookings}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur border border-emerald-100 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-emerald-900">
-                <Clock className="h-5 w-5 text-emerald-500" />
-                Active
-              </CardTitle>
-              <CardDescription>In progress or awaiting action</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-semibold text-emerald-900">{totalActive}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur border border-teal-100 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-teal-900">
-                <CheckCircle className="h-5 w-5 text-teal-500" />
-                Completed
-              </CardTitle>
-              <CardDescription>Finished bookings</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-semibold text-teal-900">{totalCompleted}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <BenefitsProgramCard />
-
-        {/* Referral Card */}
-        <ReferralCard />
-
-        {/* Tabs: Action Needed / Quotes / Bookings */}
-        <Tabs defaultValue="action_needed" className="space-y-6">
+        <Tabs defaultValue="quick_actions" className="space-y-6">
           <div className="w-full overflow-x-auto">
             <TabsList className="inline-flex h-auto min-w-full w-max p-1 bg-muted rounded-md">
+              <TabsTrigger value="quick_actions" className="whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-1.5">
+                Quick Actions
+              </TabsTrigger>
               <TabsTrigger value="action_needed" className="whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-1.5">
                 Action Needed {(actionItems.length + warrantyActionItems.length) > 0 && `(${actionItems.length + warrantyActionItems.length})`}
               </TabsTrigger>
-              <TabsTrigger value="quotes" className="whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-1.5">
-                Quotes ({quoteBookings.length})
-              </TabsTrigger>
-              <TabsTrigger value="bookings" className="whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-1.5">
-                Bookings ({activeBookings.length})
-              </TabsTrigger>
             </TabsList>
           </div>
+
+          <TabsContent value="quick_actions" className="space-y-6">
+            <div className="grid md:grid-cols-3 gap-4">
+              <Card className="bg-white/80 backdrop-blur border border-indigo-100 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-indigo-900">
+                    <Package className="h-5 w-5 text-indigo-500" />
+                    Total
+                  </CardTitle>
+                  <CardDescription>All quotes & bookings</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-semibold text-indigo-900">{totalBookings}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/80 backdrop-blur border border-emerald-100 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-emerald-900">
+                    <Clock className="h-5 w-5 text-emerald-500" />
+                    Active
+                  </CardTitle>
+                  <CardDescription>In progress or awaiting action</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-semibold text-emerald-900">{totalActive}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/80 backdrop-blur border border-teal-100 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-teal-900">
+                    <CheckCircle className="h-5 w-5 text-teal-500" />
+                    Completed
+                  </CardTitle>
+                  <CardDescription>Finished bookings</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-semibold text-teal-900">{totalCompleted}</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+                <CardDescription>Open the pages you use most without cluttering the main dashboard.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                  <Button onClick={() => router.push("/")} className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    Book Another Project
+                  </Button>
+                  <Button variant="outline" onClick={() => router.push("/dashboard/quotes")} className="flex items-center gap-2">
+                    <GitCompareArrows className="h-4 w-4" />
+                    Quotes
+                  </Button>
+                  <Button variant="outline" onClick={() => router.push("/dashboard/bookings")} className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Bookings
+                  </Button>
+                  <Button variant="outline" onClick={() => router.push("/dashboard/benefits")} className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    Benefits Program
+                  </Button>
+                  <Button variant="outline" onClick={() => router.push("/profile")} className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4" />
+                    Profile
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Action Needed Tab */}
           <TabsContent value="action_needed" className="space-y-4">

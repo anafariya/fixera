@@ -176,7 +176,7 @@ export default function ReferralCard() {
           <p className="text-sm text-gray-600 mb-4">
             {isProfessional
               ? 'Refer professionals to Fixera and earn points that help you level up faster.'
-              : 'Refer customers to Fixera and earn points when they complete their first booking!'}
+              : 'Refer customers to Fixera and earn reward value in points for future bookings when they complete their first booking.'}
           </p>
           <Button onClick={generateCode} disabled={generating} className="bg-purple-600 hover:bg-purple-700">
             {generating ? (
@@ -216,7 +216,7 @@ export default function ReferralCard() {
         <p className="text-sm text-gray-600">
           {isProfessional
             ? 'Professional referrals help you build points and trust faster.'
-            : 'Customer referrals convert into points you can spend on future bookings.'}
+            : 'Customer referrals convert into booking value you can spend through your points balance.'}
         </p>
         {/* Referral Code Display */}
         <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">

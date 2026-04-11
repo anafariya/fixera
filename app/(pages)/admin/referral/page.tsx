@@ -201,7 +201,7 @@ export default function AdminReferralPage() {
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   const revokeReferral = async (referralId: string) => {
-    if (!window.confirm('Are you sure you want to revoke this referral? This will claw back any credits issued.')) {
+    if (!window.confirm('Are you sure you want to revoke this referral? This will claw back any points issued.')) {
       return;
     }
     if (revokingId) return; // prevent double-click
@@ -302,13 +302,13 @@ export default function AdminReferralPage() {
               <CardHeader>
                 <CardTitle>Referrer Rewards</CardTitle>
                 <CardDescription>
-                  Credits given to the person who refers
+                  Reward value for the person who refers. Customers use the value on bookings, professionals use it as points toward faster level growth.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Reward Amount (credits)</Label>
+                    <Label>Reward Amount (points / EUR value)</Label>
                     <Input
                       type="number"
                       min={0}
@@ -321,10 +321,10 @@ export default function AdminReferralPage() {
                         });
                       }}
                     />
-                    <p className="text-xs text-gray-500">1 credit = 1 EUR</p>
+                    <p className="text-xs text-gray-500">1 point currently equals 1 EUR of reward value.</p>
                   </div>
                   <div className="space-y-2">
-                    <Label>Credit Expiry (months)</Label>
+                    <Label>Reward Expiry (months)</Label>
                     <Input
                       type="number"
                       min={1}

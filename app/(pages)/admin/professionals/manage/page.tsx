@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { getAuthToken } from "@/lib/utils"
+import { toast } from "sonner"
 
 interface ProfessionalRow {
   _id: string
@@ -33,6 +34,8 @@ export default function AdminProfessionalManagementPage() {
   const [tag, setTag] = useState("")
   const [customerName, setCustomerName] = useState("")
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+  const [pointsToAward, setPointsToAward] = useState<Record<string, string>>({})
+  const [adjustingPointsId, setAdjustingPointsId] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const loadRequestIdRef = useRef(0)
 
@@ -96,11 +99,53 @@ export default function AdminProfessionalManagementPage() {
       }
       if (!response.ok || !payload?.success) {
         console.error("Failed to patch professional:", payload?.msg || `Request failed with status ${response.status}`)
+        toast.error(payload?.msg || "Failed to update professional")
         return
       }
+      toast.success("Professional updated")
       await load()
     } catch (error) {
       console.error("Failed to patch professional:", error)
+      toast.error("Failed to update professional")
+    }
+  }
+
+  const rewardProfessionalPoints = async (professionalId: string) => {
+    const amount = Number(pointsToAward[professionalId] || "")
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Enter a positive points amount")
+      return
+    }
+
+    setAdjustingPointsId(professionalId)
+    try {
+      const token = getAuthToken()
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/points/adjust`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          userId: professionalId,
+          amount,
+          reason: "Manual professional points reward",
+        }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.success) {
+        toast.error(payload?.msg || "Failed to reward points")
+        return
+      }
+      toast.success(`Added ${amount} points`)
+      setPointsToAward((prev) => ({ ...prev, [professionalId]: "" }))
+      await load()
+    } catch (error) {
+      console.error("Failed to reward professional points:", error)
+      toast.error("Failed to reward points")
+    } finally {
+      setAdjustingPointsId(null)
     }
   }
 
@@ -182,7 +227,17 @@ export default function AdminProfessionalManagementPage() {
                     <Badge variant="outline">EUR {(row.moneyEarned || 0).toLocaleString()}</Badge>
                     <Badge variant="outline">{row.accountStatus || "active"}</Badge>
                     <Badge variant="outline">{row.businessInfo?.country || "No country"}</Badge>
-                    {(row.adminTags || []).map((item) => <Badge key={item}>{item}</Badge>)}
+                    {(row.adminTags || []).map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => void patchProfessional(row._id, { tags: (row.adminTags || []).filter((tag) => tag !== item) })}
+                        className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                      >
+                        <span>{item}</span>
+                        <span aria-hidden="true">×</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -206,6 +261,23 @@ export default function AdminProfessionalManagementPage() {
                   >
                     Our Choice
                   </Button>
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1">
+                    <Input
+                      type="number"
+                      min="1"
+                      value={pointsToAward[row._id] || ""}
+                      onChange={(e) => setPointsToAward((prev) => ({ ...prev, [row._id]: e.target.value }))}
+                      placeholder="Reward points"
+                      className="h-8 w-28 border-0 bg-transparent px-1 shadow-none"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => void rewardProfessionalPoints(row._id)}
+                      disabled={adjustingPointsId === row._id}
+                    >
+                      {adjustingPointsId === row._id ? "Saving..." : "Reward"}
+                    </Button>
+                  </div>
                   <Button variant="outline" onClick={() => void patchProfessional(row._id, { action: row.accountStatus === "suspended" ? "reactivate" : "suspend" })}>
                     {row.accountStatus === "suspended" ? "Reactivate" : "Suspend"}
                   </Button>
