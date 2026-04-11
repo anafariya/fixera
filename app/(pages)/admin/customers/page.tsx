@@ -34,6 +34,7 @@ export default function AdminCustomersPage() {
   const abortRef = useRef<AbortController | null>(null)
   const loadRequestIdRef = useRef(0)
   const [patching, setPatching] = useState<string | null>(null)
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     abortRef.current?.abort()
@@ -102,6 +103,29 @@ export default function AdminCustomersPage() {
       console.error("Failed to patch customer:", e)
     } finally {
       setPatching(null)
+    }
+  }
+
+  const deleteCustomer = async (customerId: string) => {
+    if (deletingIds.has(customerId)) return
+    setDeletingIds((prev) => new Set(prev).add(customerId))
+    try {
+      const token = getAuthToken()
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/users/${customerId}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || (payload != null && !payload.success)) {
+        console.error("Failed to delete customer:", payload?.msg || response.status)
+        return
+      }
+      setRows((prev) => prev.filter((r) => r._id !== customerId))
+    } catch (e) {
+      console.error("Failed to delete customer:", e)
+    } finally {
+      setDeletingIds((prev) => { const next = new Set(prev); next.delete(customerId); return next })
     }
   }
 
@@ -176,15 +200,15 @@ export default function AdminCustomersPage() {
                   </Button>
                   <Button
                     variant="destructive"
-                    disabled={patching === row._id}
+                    disabled={deletingIds.has(row._id)}
                     onClick={() => {
-                      if (!window.confirm(`Delete customer ${row.name || row.email}? This can be reversed only through admin recovery tools.`)) {
+                      if (!window.confirm(`Permanently delete ${row.name || row.email}? This will remove the user and ALL their data (bookings, messages, files, etc). This cannot be undone.`)) {
                         return
                       }
-                      void patchCustomer(row._id, { action: "delete" })
+                      void deleteCustomer(row._id)
                     }}
                   >
-                    Delete
+                    {deletingIds.has(row._id) ? "Deleting..." : "Delete"}
                   </Button>
                 </div>
               </CardContent>
