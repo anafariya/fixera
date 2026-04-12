@@ -424,23 +424,24 @@ export default function ChatThread({ messages, currentUserId, currentUserRole, c
                 <p className="text-xs text-gray-700 mb-1"><strong>Scope:</strong> {meta.scope}</p>
                 <p className="text-xs text-gray-700 mb-1"><strong>Amount:</strong> {meta.currency} {Number(meta.totalAmount).toFixed(2)}</p>
                 <p className="text-xs text-gray-500 mb-3">Valid until {(() => {
-                  const raw = String(meta.validUntil);
-                  const parts = raw.split('-');
-                  if (parts.length === 3) {
-                    const [y, m, d] = parts.map(Number);
-                    if (y && m && d) {
-                      const parsedDate = new Date(y, m - 1, d);
-                      if (
-                        parsedDate.getFullYear() === y &&
-                        parsedDate.getMonth() + 1 === m &&
-                        parsedDate.getDate() === d
-                      ) {
-                        return parsedDate.toLocaleDateString();
-                      }
+                  const raw = meta.validUntil ? String(meta.validUntil).trim() : '';
+                  if (!raw) return 'N/A';
+                  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                  if (isoMatch) {
+                    const y = Number(isoMatch[1]);
+                    const m = Number(isoMatch[2]);
+                    const d = Number(isoMatch[3]);
+                    const parsedDate = new Date(y, m - 1, d);
+                    if (
+                      parsedDate.getFullYear() === y &&
+                      parsedDate.getMonth() + 1 === m &&
+                      parsedDate.getDate() === d
+                    ) {
+                      return parsedDate.toLocaleDateString();
                     }
                   }
                   const fallbackDate = new Date(raw);
-                  return isNaN(fallbackDate.getTime()) ? raw : fallbackDate.toLocaleDateString();
+                  return isNaN(fallbackDate.getTime()) ? 'N/A' : fallbackDate.toLocaleDateString();
                 })()}</p>
                 <a
                   href={`/bookings/${meta.bookingId}`}

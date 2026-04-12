@@ -426,7 +426,7 @@ const validateWarrantyFiles = (fileList: FileList | File[] | null | undefined) =
 
 export default function BookingDetailPage() {
   const { user, isAuthenticated, loading } = useAuth()
-  const { commissionPercent } = useCommissionRate()
+  const { commissionPercent, customerPrice } = useCommissionRate()
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
@@ -2265,7 +2265,7 @@ export default function BookingDetailPage() {
                             {currentVersion.milestones.map((ms, i) => (
                               <div key={i} className="flex justify-between items-center text-sm bg-gray-50 rounded px-2 py-1">
                                 <span className="text-gray-700">{ms.title}</span>
-                                <span className="font-medium">EUR {ms.amount.toFixed(2)}</span>
+                                <span className="font-medium">EUR {customerPrice(ms.amount).toFixed(2)}</span>
                               </div>
                             ))}
                           </div>
@@ -2273,7 +2273,7 @@ export default function BookingDetailPage() {
                       )}
                       <div className="flex justify-between items-center pt-2 border-t">
                         <span className="text-sm font-semibold text-gray-900">Total</span>
-                        <span className="text-2xl font-bold text-green-600">EUR {currentVersion.totalAmount.toFixed(2)}</span>
+                        <span className="text-2xl font-bold text-green-600">EUR {customerPrice(currentVersion.totalAmount).toFixed(2)}</span>
                       </div>
                       <p className="text-xs text-gray-500">
                         Valid until: {formatValidUntilLabel(currentVersion?.validUntil)}
@@ -2424,8 +2424,8 @@ export default function BookingDetailPage() {
                             </div>
                           </div>
                           <div className="flex justify-between text-xs text-gray-600">
-                            <span>EUR {completed.toFixed(2)} completed</span>
-                            <span>EUR {paid.toFixed(2)} paid</span>
+                            <span>EUR {customerPrice(completed).toFixed(2)} completed</span>
+                            <span>EUR {customerPrice(paid).toFixed(2)} paid</span>
                           </div>
                         </div>
                       )
@@ -2460,7 +2460,7 @@ export default function BookingDetailPage() {
                                 )}
                                 <div>
                                   <p className="text-sm font-medium">{ms.title}</p>
-                                  <p className="text-xs text-gray-500">EUR {ms.amount.toFixed(2)}</p>
+                                  <p className="text-xs text-gray-500">EUR {customerPrice(ms.amount).toFixed(2)}</p>
                                   {ms.startedAt && (
                                     <p className="text-[11px] text-gray-500">Started: {new Date(ms.startedAt).toLocaleDateString()}</p>
                                   )}
@@ -2748,7 +2748,7 @@ export default function BookingDetailPage() {
                 )}
 
                 {/* Professional: Start Work (when status is booked) */}
-                {user?.role === "professional" && booking.status === "booked" && (
+                {user?.role === "professional" && booking.status === "booked" && !(booking.milestonePayments && booking.milestonePayments.length > 0) && (
                   <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -2782,7 +2782,7 @@ export default function BookingDetailPage() {
                 )}
 
                 {/* Professional: Confirm Completion (when status is in_progress) */}
-                {user?.role === "professional" && booking.status === "in_progress" && allMilestonesCompleted && (
+                {user?.role === "professional" && booking.status === "in_progress" && allMilestonesCompleted && !(booking.milestonePayments && booking.milestonePayments.length > 0) && (
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>

@@ -11,6 +11,7 @@ import { StripeProvider } from '@/components/stripe/StripeProvider';
 import { PaymentForm } from '@/components/stripe/PaymentForm';
 import { FileText, Loader2 } from 'lucide-react';
 import type { ProjectAttachmentRef, ProjectDto } from '@/types/project';
+import { useCommissionRate } from '@/hooks/useCommissionRate';
 
 interface BookingPayment {
   stripeClientSecret?: string;
@@ -41,6 +42,10 @@ interface BookingQuote {
 
 interface BookingProfessional {
   name?: string;
+  username?: string;
+  businessInfo?: {
+    companyName?: string;
+  };
 }
 
 type BookingProject = Partial<
@@ -71,6 +76,8 @@ interface Booking {
   milestonePayments?: BookingMilestone[];
   quotationNumber?: string;
   selectedSubprojectIndex?: number;
+  executionDuration?: { value: number; unit: 'hours' | 'days' };
+  preparationDuration?: { value: number; unit: 'hours' | 'days' };
   selectedExtraOptions?: Array<{ extraOptionId: string; bookedPrice: number } | number>;
   postBookingData?: Array<{
     questionId: string;
@@ -125,6 +132,7 @@ export default function BookingPaymentPage() {
   const router = useRouter();
   const params = useParams();
   const bookingId = params.id as string;
+  const { customerPrice } = useCommissionRate();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -226,6 +234,18 @@ export default function BookingPaymentPage() {
       if (typeof currentBooking?.selectedSubprojectIndex === 'number') {
         params.set('subprojectIndex', String(currentBooking.selectedSubprojectIndex));
       }
+      if (currentBooking?.executionDuration?.value) {
+        params.set('executionValue', String(currentBooking.executionDuration.value));
+        if (currentBooking.executionDuration.unit) {
+          params.set('executionUnit', currentBooking.executionDuration.unit);
+        }
+      }
+      if (currentBooking?.preparationDuration?.value) {
+        params.set('preparationValue', String(currentBooking.preparationDuration.value));
+        if (currentBooking.preparationDuration.unit) {
+          params.set('preparationUnit', currentBooking.preparationDuration.unit);
+        }
+      }
 
       const response = await fetch(
         `${API_URL}/api/public/projects/${encodeURIComponent(projectId)}/schedule-proposals${params.toString() ? `?${params}` : ''}`
@@ -321,6 +341,18 @@ export default function BookingPaymentPage() {
         }
         if (scheduleMode === 'hours' && selectedStartTime) {
           params.set('startTime', selectedStartTime);
+        }
+        if (booking?.executionDuration?.value) {
+          params.set('executionValue', String(booking.executionDuration.value));
+          if (booking.executionDuration.unit) {
+            params.set('executionUnit', booking.executionDuration.unit);
+          }
+        }
+        if (booking?.preparationDuration?.value) {
+          params.set('preparationValue', String(booking.preparationDuration.value));
+          if (booking.preparationDuration.unit) {
+            params.set('preparationUnit', booking.preparationDuration.unit);
+          }
         }
 
         const response = await fetch(
@@ -767,12 +799,17 @@ export default function BookingPaymentPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Professional:</span>
-                  <span className="font-medium text-gray-900">{booking?.professional?.name || 'N/A'}</span>
+                  <span className="font-medium text-gray-900">
+                    {booking?.professional?.businessInfo?.companyName
+                      || booking?.professional?.name
+                      || booking?.professional?.username
+                      || 'N/A'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Quote Amount:</span>
                   <span className="font-medium text-gray-900">
-                    {formatMoney(booking?.quote?.amount ?? 0, booking?.quote?.currency?.toUpperCase() || 'EUR')}
+                    {formatMoney(customerPrice(booking?.quote?.amount ?? 0), booking?.quote?.currency?.toUpperCase() || 'EUR')}
                   </span>
                 </div>
                 {booking?.milestonePayments && booking.milestonePayments.length > 0 && (
@@ -782,12 +819,17 @@ export default function BookingPaymentPage() {
                       {booking.milestonePayments.map((m, i) => (
                         <div key={i} className="flex justify-between text-sm">
                           <span className="text-gray-600">{m.title || `Milestone ${i + 1}`}</span>
-                          <span className="text-gray-900">{formatMoney(m.amount ?? 0, booking?.quote?.currency?.toUpperCase() || 'EUR')}</span>
+                          <span className="text-gray-900">{formatMoney(customerPrice(m.amount ?? 0), booking?.quote?.currency?.toUpperCase() || 'EUR')}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
+                <div className="mt-3 pt-3 border-t rounded-md bg-amber-50 border border-amber-200 px-3 py-2">
+                  <p className="text-xs text-amber-800">
+                    <span className="font-semibold">Member Savings:</span> Your loyalty tier discount and any returning-customer savings are applied automatically before payment.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -1096,7 +1138,10 @@ export default function BookingPaymentPage() {
               <div className="flex justify-between">
                 <span className="text-gray-600">Professional:</span>
                 <span className="font-medium text-gray-900">
-                  {booking?.professional?.name || 'N/A'}
+                  {booking?.professional?.businessInfo?.companyName
+                    || booking?.professional?.name
+                    || booking?.professional?.username
+                    || 'N/A'}
                 </span>
               </div>
               {booking?.scheduledStartDate && (
