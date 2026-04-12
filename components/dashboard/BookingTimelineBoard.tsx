@@ -60,6 +60,12 @@ export interface TimelineBooking {
     _id: string
     title?: string
   }
+  milestonePayments?: Array<{
+    title?: string
+    status?: string
+    workStatus?: string
+    amount?: number
+  }>
   rescheduleRequest?: {
     status?: "pending" | "accepted" | "declined"
     reason?: string
@@ -355,6 +361,38 @@ export default function BookingTimelineBoard({
     )
   }
 
+  const handleMilestoneAction = async (
+    bookingId: string,
+    index: number,
+    action: "start" | "complete"
+  ) => {
+    await runMutation(
+      bookingId,
+      () =>
+        fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/quotations/${bookingId}/milestones/${index}/work-status`,
+          {
+            method: "PATCH",
+            credentials: "include",
+            headers: withAuthHeaders(),
+            body: JSON.stringify({ action }),
+          }
+        ),
+      action === "start" ? "Milestone started." : "Milestone completed."
+    )
+  }
+
+  const getNextMilestone = (booking: TimelineBooking) => {
+    const milestones = booking.milestonePayments
+    if (!milestones || milestones.length === 0) return null
+    for (let i = 0; i < milestones.length; i++) {
+      const ws = milestones[i].workStatus || "pending"
+      if (ws === "in_progress") return { index: i, action: "complete" as const, title: milestones[i].title }
+      if (ws === "pending") return { index: i, action: "start" as const, title: milestones[i].title }
+    }
+    return null
+  }
+
   const handleConfirmCompletion = async (bookingId: string) => {
     const formData = new FormData()
     await runMutation(
@@ -503,10 +541,52 @@ export default function BookingTimelineBoard({
                             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
                             Request Rescheduling
                           </Button>
+                          {(() => {
+                            const next = getNextMilestone(booking)
+                            if (next) {
+                              return (
+                                <Button
+                                  size="sm"
+                                  className="text-xs bg-blue-600 text-white hover:bg-blue-700"
+                                  onClick={() => handleMilestoneAction(booking._id, next.index, next.action)}
+                                  disabled={submittingBookingId === booking._id}
+                                >
+                                  {submittingBookingId === booking._id ? (
+                                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Play className="mr-1.5 h-3.5 w-3.5" />
+                                  )}
+                                  {next.action === "start" ? "Start milestone" : "Complete milestone"}
+                                </Button>
+                              )
+                            }
+                            return (
+                              <Button
+                                size="sm"
+                                className="text-xs bg-blue-600 text-white hover:bg-blue-700"
+                                onClick={() => handleStartExecution(booking._id)}
+                                disabled={submittingBookingId === booking._id}
+                              >
+                                {submittingBookingId === booking._id ? (
+                                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Play className="mr-1.5 h-3.5 w-3.5" />
+                                )}
+                                Start Execution
+                              </Button>
+                            )
+                          })()}
+                        </>
+                      )}
+
+                      {viewerRole === "professional" && booking.status === "in_progress" && (() => {
+                        const next = getNextMilestone(booking)
+                        if (!next) return null
+                        return (
                           <Button
                             size="sm"
                             className="text-xs bg-blue-600 text-white hover:bg-blue-700"
-                            onClick={() => handleStartExecution(booking._id)}
+                            onClick={() => handleMilestoneAction(booking._id, next.index, next.action)}
                             disabled={submittingBookingId === booking._id}
                           >
                             {submittingBookingId === booking._id ? (
@@ -514,10 +594,10 @@ export default function BookingTimelineBoard({
                             ) : (
                               <Play className="mr-1.5 h-3.5 w-3.5" />
                             )}
-                            Start Execution
+                            {next.action === "start" ? "Start milestone" : "Complete milestone"}
                           </Button>
-                        </>
-                      )}
+                        )
+                      })()}
 
                       {viewerRole === "customer" && booking.status === "rescheduling_requested" && (
                         <>
@@ -551,6 +631,7 @@ export default function BookingTimelineBoard({
                           >
                             Extend Execution
                           </Button>
+                          {getNextMilestone(booking) === null && (
                           <Button
                             size="sm"
                             className="text-xs bg-emerald-600 text-white hover:bg-emerald-700"
@@ -564,6 +645,7 @@ export default function BookingTimelineBoard({
                             )}
                             Confirm Completion
                           </Button>
+                          )}
                         </>
                       )}
 
