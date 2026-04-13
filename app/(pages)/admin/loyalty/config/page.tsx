@@ -37,6 +37,30 @@ interface PointsConfig {
   customerEarningPerBooking: number;
 }
 
+type LoyaltyConfigResponse = Partial<LoyaltyConfig> & {
+  globalSettings?: Partial<LoyaltyConfig['globalSettings']> & {
+    enabled?: boolean;
+  };
+};
+
+const normalizeLoyaltyConfig = (
+  config: LoyaltyConfigResponse | null | undefined,
+  fallback: LoyaltyConfig
+): LoyaltyConfig => {
+  const globalSettings = config?.globalSettings;
+
+  return {
+    ...fallback,
+    ...config,
+    globalSettings: {
+      ...fallback.globalSettings,
+      ...globalSettings,
+      isEnabled: globalSettings?.isEnabled ?? globalSettings?.enabled ?? false,
+    },
+    tiers: Array.isArray(config?.tiers) ? config.tiers : fallback.tiers,
+  };
+};
+
 export default function LoyaltyConfigPage() {
   const { user, isAuthenticated, loading } = useAuth()
   const router = useRouter()
@@ -119,7 +143,7 @@ export default function LoyaltyConfigPage() {
 
       if (loyaltyResponse.ok) {
         const data = await loyaltyResponse.json()
-        setConfig(data.data.config)
+        setConfig((prev) => normalizeLoyaltyConfig(data?.data?.config, prev))
       }
 
       if (pointsResponse.ok) {

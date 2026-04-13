@@ -37,10 +37,22 @@ const FIRST_MILESTONE: QuotationMilestone = {
   dueCondition: 'on_start',
 }
 
+const toLocalDayTimestamp = (value: string): number => {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return Number.NaN
+
+  const [, year, month, day] = match
+  return new Date(Number(year), Number(month) - 1, Number(day)).getTime()
+}
+
 const isImmediatelyPayableMilestone = (m: Pick<QuotationMilestone, 'dueCondition' | 'customDueDate'>): boolean => {
   if (m.dueCondition === 'on_start' || m.dueCondition === 'on_milestone_start') return true
   if (m.dueCondition === 'custom_date' && m.customDueDate) {
-    return new Date(m.customDueDate).getTime() <= Date.now()
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const dueTimestamp = toLocalDayTimestamp(m.customDueDate)
+    return Number.isFinite(dueTimestamp) && dueTimestamp <= today.getTime()
   }
   return false
 }
@@ -167,7 +179,8 @@ export default function QuotationWizard({ bookingId, existingVersion, isEditing,
         toast.error('Please set a date for all milestones with custom date condition')
         return
       }
-      if (!validMilestones.some(isImmediatelyPayableMilestone)) {
+      const earliestMilestone = validMilestones[0]
+      if (!earliestMilestone || !isImmediatelyPayableMilestone(earliestMilestone)) {
         toast.error('At least one milestone must be payable up front. Set its due condition to "On Project Start" (typical deposit) so the customer can pay to kick off the work.')
         return
       }

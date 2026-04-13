@@ -6,9 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, ArrowRight, Clock, ChevronLeft, ChevronRight, Calendar, Star } from 'lucide-react';
 import { isQualityCertificate, getCertificateGradient, formatPriceModelLabel } from '@/lib/projectHighlights';
 import { formatUtcViewerLabel, formatWindowUtcViewer, getViewerTimezone } from '@/lib/timezoneDisplay';
-import { useCommissionRate } from '@/hooks/useCommissionRate';
 
 interface ProjectCardProps {
+  customerPrice: (value: number) => number;
   project: {
     _id: string;
     title: string;
@@ -93,10 +93,9 @@ interface ProjectCardProps {
   };
 }
 
-const ProjectCard = ({ project }: ProjectCardProps) => {
+const ProjectCard = ({ customerPrice, project }: ProjectCardProps) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [viewerTimeZone, setViewerTimeZone] = useState('UTC');
-  const { customerPrice } = useCommissionRate();
   const formatAmount = (value: number) => `€${customerPrice(value).toLocaleString()}`;
   const professional = project.professionalId;
   const professionalName = professional?.username || professional?.name || 'Professional';
@@ -126,15 +125,21 @@ const ProjectCard = ({ project }: ProjectCardProps) => {
   };
 
   const formatSubprojectPrice = (pricing: { type: string; amount?: number; priceRange?: { min: number; max: number } }) => {
-    if (pricing.type === 'fixed' && pricing.amount) {
-      return formatAmount(pricing.amount);
+    const amount = pricing.amount;
+
+    if (pricing.type === 'fixed' && amount != null && Number.isFinite(amount)) {
+      return formatAmount(amount);
     }
     if (pricing.type === 'unit') {
-      if (pricing.priceRange && (pricing.priceRange.min || pricing.priceRange.max)) {
+      if (
+        pricing.priceRange &&
+        Number.isFinite(pricing.priceRange.min) &&
+        Number.isFinite(pricing.priceRange.max)
+      ) {
         return `${formatAmount(pricing.priceRange.min)}-${formatAmount(pricing.priceRange.max)}/unit`;
       }
-      if (pricing.amount) {
-        return `${formatAmount(pricing.amount)}/unit`;
+      if (amount != null && Number.isFinite(amount)) {
+        return `${formatAmount(amount)}/unit`;
       }
     }
     if (pricing.type === 'rfq') {
