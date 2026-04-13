@@ -57,6 +57,17 @@ const isImmediatelyPayableMilestone = (m: Pick<QuotationMilestone, 'dueCondition
   return false
 }
 
+const getEarliestSubmittedMilestone = (
+  milestones: QuotationMilestone[]
+): QuotationMilestone | undefined =>
+  milestones
+    .filter((milestone) => milestone.title.trim())
+    .reduce<QuotationMilestone | undefined>(
+      (earliest, milestone) =>
+        !earliest || milestone.order < earliest.order ? milestone : earliest,
+      undefined
+    )
+
 const getDefaultFormData = (existing?: QuoteVersion): QuotationWizardFormData => {
   if (existing) {
     return {
@@ -116,6 +127,7 @@ const getDefaultFormData = (existing?: QuoteVersion): QuotationWizardFormData =>
 export default function QuotationWizard({ bookingId, existingVersion, isEditing, commissionPercent, onSuccess, onCancel }: QuotationWizardProps) {
   const [form, setForm] = useState<QuotationWizardFormData>(getDefaultFormData(existingVersion))
   const [submitting, setSubmitting] = useState(false)
+  const earliestSubmittedMilestone = getEarliestSubmittedMilestone(form.milestones)
 
   const updateForm = <K extends keyof QuotationWizardFormData>(key: K, value: QuotationWizardFormData[K]) => {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -179,7 +191,7 @@ export default function QuotationWizard({ bookingId, existingVersion, isEditing,
         toast.error('Please set a date for all milestones with custom date condition')
         return
       }
-      const earliestMilestone = validMilestones[0]
+      const earliestMilestone = getEarliestSubmittedMilestone(validMilestones)
       if (!earliestMilestone || !isImmediatelyPayableMilestone(earliestMilestone)) {
         toast.error('At least one milestone must be payable up front. Set its due condition to "On Project Start" (typical deposit) so the customer can pay to kick off the work.')
         return
@@ -428,7 +440,7 @@ export default function QuotationWizard({ bookingId, existingVersion, isEditing,
                         </SelectContent>
                       </Select>
                     </div>
-                    {i === 0 && !isImmediatelyPayableMilestone(ms) && (
+                    {earliestSubmittedMilestone?.order === ms.order && !isImmediatelyPayableMilestone(ms) && (
                       <p className="text-xs text-amber-600">
                         Tip: the first milestone is typically an upfront deposit. Pick &quot;On Project Start&quot; so the customer can pay to kick off the work.
                       </p>
