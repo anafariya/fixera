@@ -153,8 +153,16 @@ export default function LoyaltyConfigPage() {
 
       if (loyaltyResponse.ok) {
         const data = await loyaltyResponse.json()
-        setConfig((prev) => normalizeLoyaltyConfig(data?.data?.config, prev))
-        setLoyaltyConfigLoaded(true)
+        const cfg = data?.data?.config
+
+        if (cfg !== undefined) {
+          setConfig((prev) => normalizeLoyaltyConfig(cfg, prev))
+          setLoyaltyConfigLoaded(true)
+        } else {
+          console.error('Malformed loyalty config response:', data)
+          toast.error('Loyalty configuration response was malformed. Save remains disabled until the real config loads.')
+          setLoyaltyConfigLoaded(false)
+        }
       } else {
         setLoyaltyConfigLoaded(false)
       }
