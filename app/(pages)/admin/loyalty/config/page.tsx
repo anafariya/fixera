@@ -23,7 +23,7 @@ interface LoyaltyTier {
 
 interface LoyaltyConfig {
   globalSettings: {
-    enabled: boolean;
+    isEnabled: boolean;
   };
   tiers: LoyaltyTier[];
 }
@@ -43,7 +43,7 @@ export default function LoyaltyConfigPage() {
   
   const [config, setConfig] = useState<LoyaltyConfig>({
     globalSettings: {
-      enabled: true,
+      isEnabled: true,
     },
     tiers: [
       {
@@ -391,10 +391,10 @@ export default function LoyaltyConfigPage() {
                   <Label>
                     <input
                       type="checkbox"
-                      checked={config.globalSettings.enabled}
+                      checked={config.globalSettings.isEnabled}
                       onChange={(e) => setConfig(prev => ({
                         ...prev,
-                        globalSettings: { ...prev.globalSettings, enabled: e.target.checked }
+                        globalSettings: { ...prev.globalSettings, isEnabled: e.target.checked }
                       }))}
                       className="mr-2"
                     />

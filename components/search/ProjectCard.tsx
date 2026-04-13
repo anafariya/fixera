@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, ArrowRight, Clock, ChevronLeft, ChevronRight, Calendar, Star } from 'lucide-react';
 import { isQualityCertificate, getCertificateGradient, formatPriceModelLabel } from '@/lib/projectHighlights';
 import { formatUtcViewerLabel, formatWindowUtcViewer, getViewerTimezone } from '@/lib/timezoneDisplay';
+import { useCommissionRate } from '@/hooks/useCommissionRate';
 
 interface ProjectCardProps {
   project: {
@@ -95,6 +96,8 @@ interface ProjectCardProps {
 const ProjectCard = ({ project }: ProjectCardProps) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [viewerTimeZone, setViewerTimeZone] = useState('UTC');
+  const { customerPrice } = useCommissionRate();
+  const formatAmount = (value: number) => `€${customerPrice(value).toLocaleString()}`;
   const professional = project.professionalId;
   const professionalName = professional?.username || professional?.name || 'Professional';
   const location = [professional?.businessInfo?.city, professional?.businessInfo?.country]
@@ -124,10 +127,17 @@ const ProjectCard = ({ project }: ProjectCardProps) => {
 
   const formatSubprojectPrice = (pricing: { type: string; amount?: number; priceRange?: { min: number; max: number } }) => {
     if (pricing.type === 'fixed' && pricing.amount) {
-      return `€${pricing.amount.toLocaleString()}`;
-    } else if (pricing.type === 'unit' && pricing.priceRange) {
-      return `€${pricing.priceRange.min}-€${pricing.priceRange.max}`;
-    } else if (pricing.type === 'rfq') {
+      return formatAmount(pricing.amount);
+    }
+    if (pricing.type === 'unit') {
+      if (pricing.priceRange && (pricing.priceRange.min || pricing.priceRange.max)) {
+        return `${formatAmount(pricing.priceRange.min)}-${formatAmount(pricing.priceRange.max)}`;
+      }
+      if (pricing.amount) {
+        return `${formatAmount(pricing.amount)}/unit`;
+      }
+    }
+    if (pricing.type === 'rfq') {
       return 'RFQ';
     }
     return 'Contact';
