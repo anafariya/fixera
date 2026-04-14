@@ -435,6 +435,7 @@ export default function BookingPaymentPage() {
         return;
       }
       const postBookingQuestions = booking?.project?.postBookingQuestions || [];
+      const alreadySubmitted = Array.isArray(booking?.postBookingData) && booking.postBookingData.length > 0;
       if (postBookingQuestions.length > 0) {
         const missingRequired = postBookingQuestions.some((question, index) => {
           if (!question.isRequired) return false;
@@ -446,27 +447,29 @@ export default function BookingPaymentPage() {
           return;
         }
 
-        const answers = postBookingQuestions
-          .map((question, index) => ({
-            questionId: question._id || question.id || `post-booking-${index}`,
-            question: question.question,
-            answer: postBookingAnswers[index] || '',
-          }))
-          .filter((answer) => answer.answer.trim());
+        if (!alreadySubmitted) {
+          const answers = postBookingQuestions
+            .map((question, index) => ({
+              questionId: question._id || question.id || `post-booking-${index}`,
+              question: question.question,
+              answer: postBookingAnswers[index] || '',
+            }))
+            .filter((answer) => answer.answer.trim());
 
-        if (answers.length > 0) {
-          const answersResponse = await fetch(`${API_URL}/api/bookings/${encodeURIComponent(bookingId)}/post-booking-answers`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ answers }),
-          });
-          const answersData = await answersResponse.json();
-          if (!answersResponse.ok || !answersData?.success) {
-            setError(answersData?.msg || 'Failed to save post-booking answers');
-            return;
+          if (answers.length > 0) {
+            const answersResponse = await fetch(`${API_URL}/api/bookings/${encodeURIComponent(bookingId)}/post-booking-answers`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ answers }),
+            });
+            const answersData = await answersResponse.json();
+            if (!answersResponse.ok || !answersData?.success) {
+              setError(answersData?.msg || 'Failed to save post-booking answers');
+              return;
+            }
+            setBooking((prev) => prev ? { ...prev, postBookingData: answersData.postBookingData || answers } : prev);
           }
-          setBooking((prev) => prev ? { ...prev, postBookingData: answersData.postBookingData || answers } : prev);
         }
       }
 
