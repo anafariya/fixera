@@ -70,7 +70,7 @@ export default function SubprojectComparisonTable({
   const formatProfessionalInputValue = (
     value: string | number | { min: number; max: number } | undefined
   ): string => {
-    if (value == null || value === '') return 'Not provided'
+    if (value == null || value === '') return ''
     if (typeof value === 'object' && 'min' in value && 'max' in value) {
       return `${value.min} - ${value.max}`
     }
@@ -354,8 +354,10 @@ export default function SubprojectComparisonTable({
                       <span className="text-sm font-medium text-gray-900">{mat.name}</span>
                       {mat.description && (
                         <span className="relative group">
-                          <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
-                          <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-48 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg shadow-lg z-10">
+                          <button type="button" aria-label={`Info: ${mat.description}`} className="inline-flex focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-400 rounded">
+                            <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                          </button>
+                          <span role="tooltip" className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block group-focus-within:block w-48 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg shadow-lg z-10">
                             {mat.description}
                           </span>
                         </span>

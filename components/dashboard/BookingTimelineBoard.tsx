@@ -109,6 +109,7 @@ const ACTIVE_TIMELINE_STATUSES = new Set<BookingStatus>([
 ])
 
 const VISIBLE_DAYS = 30
+const MAX_SPAN_DAYS = 365
 const DAY_WIDTH = 40
 const ROW_LABEL_WIDTH = 200
 
@@ -202,7 +203,6 @@ const getBookingPrice = (booking: TimelineBooking): string | null => {
   const amount =
     booking.pricingSnapshot?.totalAmount
     ?? booking.rfqData?.totalAmount
-    ?? booking.rfqData?.budget?.min
     ?? booking.payment?.amount
   if (amount == null) return null
   const currency = booking.rfqData?.budget?.currency || booking.payment?.currency || "EUR"
@@ -271,7 +271,7 @@ export default function BookingTimelineBoard({
     }
 
     const totalDays = differenceInCalendarDays(furthest, earliest) + 1
-    const span = Math.max(totalDays, VISIBLE_DAYS)
+    const span = Math.min(Math.max(totalDays, VISIBLE_DAYS), MAX_SPAN_DAYS)
     const s = startOfDay(earliest)
     const e = new Date(s.getTime() + (span - 1) * 86400000)
     const daysArr = eachDayOfInterval({ start: s, end: e })

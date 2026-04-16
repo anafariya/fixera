@@ -450,7 +450,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
       if (token) headers.Authorization = `Bearer ${token}`
 
       const activeStatuses = statusFilter !== "all"
-        ? statusFilter
+        ? (statusFilter === "awaiting_payment" ? "quote_accepted,payment_pending" : statusFilter)
         : ["booked", "rescheduling_requested", "in_progress", "professional_completed", "payment_pending", "quote_accepted", "dispute"].join(",")
       const allTimelineBookings: Booking[] = []
       let page = 1
@@ -755,7 +755,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
             onBookingUpdated={async () => {
               await Promise.all([refreshBookings(), fetchTimelineBookings()])
             }}
-            emptyLabel="No active professional bookings fall inside the centered two-month timeline."
+            emptyLabel="No active professional bookings in the selected timeline."
           />
         )}
 

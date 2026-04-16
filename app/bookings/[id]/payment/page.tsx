@@ -73,6 +73,7 @@ interface QuoteVersionDuration {
 }
 
 interface QuoteVersion {
+  version?: number;
   preparationDuration?: QuoteVersionDuration;
   executionDuration?: QuoteVersionDuration;
   bufferDuration?: QuoteVersionDuration;
@@ -216,7 +217,9 @@ export default function BookingPaymentPage() {
 
   const getQuotedDurations = (b: Booking | null) => {
     if (!b?.quoteVersions?.length) return { execution: null, preparation: null, buffer: null };
-    const version = b.quoteVersions[(b.currentQuoteVersion || 1) - 1];
+    const version = b.currentQuoteVersion != null
+      ? b.quoteVersions.find(v => v.version === b.currentQuoteVersion)
+      : b.quoteVersions[b.quoteVersions.length - 1];
     if (!version) return { execution: null, preparation: null, buffer: null };
     return {
       execution: version.executionDuration ?? null,
@@ -227,26 +230,20 @@ export default function BookingPaymentPage() {
 
   const isProfessionalWorkingDay = useCallback((date: Date): boolean => {
     if (!professionalAvailability) return true;
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const weekday = dayNames[date.getDay()];
+    const weekday = formatInTimeZone(date, professionalTimezone, 'EEEE').toLowerCase();
     const dayConfig = professionalAvailability[weekday];
     if (!dayConfig) return true;
     if (typeof dayConfig.available === 'boolean') return dayConfig.available;
     return true;
-  }, [professionalAvailability]);
+  }, [professionalAvailability, professionalTimezone]);
+
+  const toLocalDateKey = useCallback((date: Date) => formatInTimeZone(date, professionalTimezone, 'yyyy-MM-dd'), [professionalTimezone]);
 
   const isDateBlocked = useCallback((dateStr: string): boolean => {
     if (!availabilityData) return false;
     if (availabilityData.blockedDates.includes(dateStr)) return true;
-    const dateMs = new Date(dateStr).getTime();
-    return availabilityData.blockedRanges.some(r => {
-      const start = new Date(r.startDate).getTime();
-      const end = new Date(r.endDate).getTime();
-      return dateMs >= start && dateMs <= end;
-    });
+    return availabilityData.blockedRanges.some(r => dateStr >= r.startDate && dateStr <= r.endDate);
   }, [availabilityData]);
-
-  const toLocalDateKey = useCallback((date: Date) => format(date, 'yyyy-MM-dd'), []);
 
   const shortestThroughputDetails = useMemo(() => {
     if (!scheduleProposals?.shortestThroughputProposal?.start ||
@@ -401,9 +398,14 @@ export default function BookingPaymentPage() {
         const normalizedDates = (data.blockedDates || []).map((d: string) => {
           try { return formatInTimeZone(parseISO(d), tz, 'yyyy-MM-dd'); } catch { return d; }
         });
+        const normalizedRanges = (data.blockedRanges || []).map((r: BlockedRange) => ({
+          ...r,
+          startDate: (() => { try { return formatInTimeZone(parseISO(r.startDate), tz, 'yyyy-MM-dd'); } catch { return r.startDate; } })(),
+          endDate: (() => { try { return formatInTimeZone(parseISO(r.endDate), tz, 'yyyy-MM-dd'); } catch { return r.endDate; } })(),
+        }));
         setAvailabilityData({
           blockedDates: normalizedDates,
-          blockedRanges: data.blockedRanges || [],
+          blockedRanges: normalizedRanges,
           resourcePolicy: data.resourcePolicy,
           timezone: tz,
         });
@@ -444,9 +446,8 @@ export default function BookingPaymentPage() {
     const proposalDate = scheduleProposals.earliestProposal?.start?.slice(0, 10) || fallbackDate;
     const proposalTime = scheduleProposals.earliestProposal?.start?.slice(11, 16) || '';
 
-    setSelectedStartDate((prev) => prev || proposalDate);
-
     if (scheduleProposals.mode === 'hours') {
+      setSelectedStartDate((prev) => prev || proposalDate);
       setSelectedStartTime((prev) => prev || proposalTime);
     } else {
       setSelectedStartTime('');
@@ -1039,7 +1040,7 @@ export default function BookingPaymentPage() {
                   </div>
                 )}
 
-                {!loadingScheduleProposals && !loadingAvailability && !loadingWorkingHours && scheduleProposals && (
+                {!loadingScheduleProposals && !loadingAvailability && !loadingWorkingHours && (scheduleProposals || !requiresProjectSchedule) && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       {requiresProjectSchedule ? 'Available Start Date *' : 'Preferred Start Date *'}

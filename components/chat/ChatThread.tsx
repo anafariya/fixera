@@ -424,14 +424,20 @@ export default function ChatThread({ messages, currentUserId, currentUserRole, c
                   )}
                 </div>
                 <p className="text-xs text-gray-700 mb-1"><strong>Scope:</strong> {meta.scope}</p>
-                <p className="text-xs text-gray-700 mb-1"><strong>Amount:</strong> {meta.currency} {customerPrice(Number(meta.totalAmount)).toFixed(2)}</p>
+                <p className="text-xs text-gray-700 mb-1"><strong>Amount:</strong> {meta.currency} {(currentUserRole === 'customer' ? customerPrice(Number(meta.totalAmount)) : Number(meta.totalAmount)).toFixed(2)}</p>
                 {meta.validUntil && (() => {
                   const raw = String(meta.validUntil).trim();
                   if (!raw) return null;
                   const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
                   let parsed: Date | null = null;
                   if (isoMatch) {
-                    parsed = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+                    const year = Number(isoMatch[1]);
+                    const month = Number(isoMatch[2]);
+                    const day = Number(isoMatch[3]);
+                    const candidate = new Date(year, month - 1, day);
+                    if (candidate.getFullYear() === year && candidate.getMonth() + 1 === month && candidate.getDate() === day) {
+                      parsed = candidate;
+                    }
                   } else {
                     const fallback = new Date(raw);
                     if (!isNaN(fallback.getTime())) parsed = fallback;

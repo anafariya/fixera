@@ -2063,7 +2063,7 @@ export default function ProfilePage() {
                         </div>
                       ) : (
                         <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                          No services available for your country. Please make sure your country is set correctly above, then save your business info to refresh the list.
+                          No services available for your country. Please make sure your country is set correctly above; the list will update when you change the country.
                         </p>
                       )
                     )}

@@ -44,8 +44,14 @@ const formatValidUntilLabel = (value?: string) => {
   const raw = String(value).trim()
   const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (isoMatch) {
-    const parsed = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]))
-    if (!isNaN(parsed.getTime())) return parsed.toLocaleDateString()
+    const year = Number(isoMatch[1])
+    const month = Number(isoMatch[2])
+    const day = Number(isoMatch[3])
+    const parsed = new Date(year, month - 1, day)
+    if (parsed.getFullYear() === year && parsed.getMonth() + 1 === month && parsed.getDate() === day) {
+      return parsed.toLocaleDateString()
+    }
+    return "N/A"
   }
   const fallback = new Date(raw)
   if (!isNaN(fallback.getTime())) return fallback.toLocaleDateString()
