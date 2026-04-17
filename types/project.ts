@@ -64,9 +64,15 @@ export interface ProjectProfessionalDto {
   _id: string
   name: string
   username?: string
+  profileImage?: string
+  professionalLevel?: "New" | "Level 1" | "Level 2" | "Level 3" | "Expert"
+  adminTags?: string[]
+  createdAt?: string
   businessInfo?: {
     companyName?: string
     timezone?: string
+    city?: string
+    country?: string
   }
   email: string
   phone: string
@@ -177,6 +183,14 @@ export interface ProjectDto {
     answer: string
   }>
   professionalId: ProjectProfessionalDto
+  professionalStats?: {
+    avgRating: number
+    totalReviews: number
+    avgCommunication: number
+    avgValueOfDelivery: number
+    avgQualityOfService: number
+    avgResponseTimeMs: number
+  }
 }
 
 export type PublicProjectDto = Omit<ProjectDto, 'professionalId'> & {

@@ -114,7 +114,10 @@ export interface ConversationInfoStats {
   avgValueOfDelivery: number;
   avgQualityOfService: number;
   avgProfessionalRating: number;
+  totalCustomerReviews: number;
+  totalProfessionalReviews: number;
   professionalLevel: string;
+  adminTags: string[];
   avgResponseTimeMs: number;
   pendingBookings: PendingBooking[];
   absence: { from: string; to: string } | null;

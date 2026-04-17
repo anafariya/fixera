@@ -197,6 +197,9 @@ function SearchPageContent() {
     areasOfWork: [],
     startDateFrom: undefined,
     startDateTo: undefined,
+    professionalLevels: [],
+    adminTags: [],
+    minProjectRating: 0,
   });
 
   // Store location coordinates separately
@@ -309,6 +312,9 @@ function SearchPageContent() {
     filters.areasOfWork,
     filters.startDateFrom,
     filters.startDateTo,
+    filters.professionalLevels,
+    filters.adminTags,
+    filters.minProjectRating,
     pagination.page,
     locationCoordinates
   ]);
@@ -357,6 +363,11 @@ function SearchPageContent() {
       if (filters.areasOfWork.length > 0) params.append('areaOfWork', filters.areasOfWork.join(','));
       if (filters.startDateFrom) params.append('startDateFrom', filters.startDateFrom.toISOString());
       if (filters.startDateTo) params.append('startDateTo', filters.startDateTo.toISOString());
+      if (filters.professionalLevels.length > 0) params.append('professionalLevels', filters.professionalLevels.join(','));
+      if (filters.adminTags.length > 0) params.append('adminTags', filters.adminTags.join(','));
+      if (searchType === 'projects' && filters.minProjectRating > 0) {
+        params.append('minRating', filters.minProjectRating.toString());
+      }
 
       if (searchType === 'projects' && (filters.location || filters.geographicArea)) {
         const locationDetails = extractLocationDetails(filters.location || filters.geographicArea);
@@ -468,6 +479,9 @@ function SearchPageContent() {
       areasOfWork: [],
       startDateFrom: undefined,
       startDateTo: undefined,
+      professionalLevels: [],
+      adminTags: [],
+      minProjectRating: 0,
     });
     setPagination((prev) => ({ ...prev, page: 1 }));
     setLocationCoordinates(null);

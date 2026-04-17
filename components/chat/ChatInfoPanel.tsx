@@ -9,6 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { fetchConversationInfo } from "@/lib/chatApi";
 import type { ChatConversation, ConversationInfoStats } from "@/types/chat";
+import {
+  LEVEL_COLORS,
+  ADMIN_TAG_STYLES,
+  formatAdminTagLabel,
+  formatResponseTime,
+} from "@/lib/professionalLevel";
 
 interface ChatInfoPanelProps {
   conversationId: string;
@@ -19,31 +25,6 @@ interface ChatInfoPanelProps {
 const getOtherParticipant = (conversation: ChatConversation, role?: string) => {
   if (role === "professional") return conversation.customerId;
   return conversation.professionalId;
-};
-
-const maskEmail = (email: string): string => {
-  const [local, domain] = email.split("@");
-  if (!domain) return "***";
-  const visiblePrefix = local.length > 0 ? local.charAt(0) : "";
-  return `${visiblePrefix}***@${domain}`;
-};
-
-const formatResponseTime = (ms: number): string => {
-  if (ms <= 0) return "N/A";
-  const minutes = Math.floor(ms / 60000);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ${minutes % 60}m`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ${hours % 24}h`;
-};
-
-const LEVEL_COLORS: Record<string, string> = {
-  "New": "bg-gray-100 text-gray-600",
-  "Level 1": "bg-blue-100 text-blue-700",
-  "Level 2": "bg-green-100 text-green-700",
-  "Level 3": "bg-purple-100 text-purple-700",
-  "Expert": "bg-amber-100 text-amber-700",
 };
 
 const StarRating = ({ rating, label }: { rating: number; label?: string }) => {
@@ -142,11 +123,6 @@ export default function ChatInfoPanel({ conversationId, conversation, currentUse
           )}
         </Avatar>
         <p className="text-sm font-semibold text-gray-900">{name}</p>
-        {other?.email && (
-          <p className="text-xs text-gray-500 mt-0.5" title={other.email}>
-            {maskEmail(other.email)}
-          </p>
-        )}
 
         {location && (
           <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
@@ -199,6 +175,26 @@ export default function ChatInfoPanel({ conversationId, conversation, currentUse
               </Badge>
             </div>
 
+            {stats.adminTags && stats.adminTags.length > 0 && (
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-xs text-gray-600 shrink-0">
+                  <Award className="h-3.5 w-3.5 text-indigo-500" />
+                  <span>Tags</span>
+                </div>
+                <div className="flex flex-wrap gap-1 justify-end">
+                  {stats.adminTags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      className={`text-[10px] ${ADMIN_TAG_STYLES[tag] || ""}`}
+                    >
+                      {formatAdminTagLabel(tag)}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs text-gray-600">
                 <Clock className="h-3.5 w-3.5 text-indigo-500" />
@@ -235,6 +231,7 @@ export default function ChatInfoPanel({ conversationId, conversation, currentUse
                     ))}
                   </div>
                   <span className="text-sm font-semibold text-gray-700">{stats.avgCustomerRating.toFixed(1)}</span>
+                  <span className="text-xs text-gray-400">({stats.totalCustomerReviews})</span>
                 </div>
                 <StarRating rating={stats.avgCommunication} label="Communication" />
                 <StarRating rating={stats.avgValueOfDelivery} label="Value of Delivery" />
@@ -264,6 +261,7 @@ export default function ChatInfoPanel({ conversationId, conversation, currentUse
                     ))}
                   </div>
                   <span className="text-sm font-semibold text-gray-700">{stats.avgProfessionalRating.toFixed(1)}</span>
+                  <span className="text-xs text-gray-400">({stats.totalProfessionalReviews})</span>
                 </div>
               </div>
             </>
