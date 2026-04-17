@@ -10,9 +10,16 @@ import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import Calendar from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Filter, X, ChevronDown, ChevronUp, CalendarIcon } from 'lucide-react';
+import { Filter, X, ChevronDown, ChevronUp, CalendarIcon, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import LocationAutocomplete, { type LocationData } from '@/components/search/LocationAutocomplete';
+import {
+  PROFESSIONAL_LEVELS,
+  ADMIN_TAG_PRESETS,
+  getLevelColor,
+  getAdminTagStyle,
+  formatAdminTagLabel,
+} from '@/lib/professionalLevel';
 
 export type SortOption = 'relevant' | 'price_low' | 'price_high' | 'newest' | 'availability' | 'popularity';
 
@@ -32,6 +39,9 @@ export interface SearchFiltersState {
   areasOfWork: string[];
   startDateFrom: Date | undefined;
   startDateTo: Date | undefined;
+  professionalLevels: string[];
+  adminTags: string[];
+  minProjectRating: number;
 }
 
 export type SearchFilterKey = keyof SearchFiltersState;
@@ -111,6 +121,9 @@ const SearchFilters = ({
     areaOfWork: false,
     startDate: false,
     price: false,
+    professionalLevel: false,
+    adminTags: false,
+    minRating: false,
   });
 
   const priceRange = [
@@ -182,11 +195,14 @@ const SearchFilters = ({
     filters.priceMin !== '' || filters.priceMax !== '',
     filters.category.trim() !== '',
     filters.availability,
+    filters.professionalLevels.length > 0,
+    filters.adminTags.length > 0,
+    filters.minProjectRating > 0,
   ].filter(Boolean).length;
 
   // Helper to toggle array values
   const toggleArrayValue = (
-    key: 'services' | 'priceModel' | 'projectTypes' | 'includedItems' | 'areasOfWork',
+    key: 'services' | 'priceModel' | 'projectTypes' | 'includedItems' | 'areasOfWork' | 'professionalLevels' | 'adminTags',
     value: string
   ) => {
     const currentArray = filters[key] as string[];
@@ -238,9 +254,7 @@ const SearchFilters = ({
             {searchType === 'projects' && (
               <SelectItem value="availability">Availability</SelectItem>
             )}
-            <SelectItem value="popularity" disabled>
-              Popularity (Coming Soon)
-            </SelectItem>
+            <SelectItem value="popularity">Most Popular</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -316,6 +330,116 @@ const SearchFilters = ({
                     </span>
                   </Label>
                 </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Professional Level Filter */}
+      <div className="space-y-2 border-b pb-4">
+        <button
+          type="button"
+          onClick={() => toggleSection('professionalLevel')}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <Label className="text-sm font-semibold text-gray-900 cursor-pointer">
+            Professional Level {filters.professionalLevels.length > 0 && `(${filters.professionalLevels.length})`}
+          </Label>
+          {expandedSections.professionalLevel ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+        {expandedSections.professionalLevel && (
+          <div className="space-y-2 mt-2">
+            {PROFESSIONAL_LEVELS.map((level) => (
+              <div key={level} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`level-${level}`}
+                  checked={filters.professionalLevels.includes(level)}
+                  onCheckedChange={() => toggleArrayValue('professionalLevels', level)}
+                />
+                <Label
+                  htmlFor={`level-${level}`}
+                  className="text-sm font-normal text-gray-700 cursor-pointer w-full"
+                >
+                  <Badge variant="secondary" className={`font-medium ${getLevelColor(level)}`}>{level}</Badge>
+                </Label>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Admin Tags Filter */}
+      <div className="space-y-2 border-b pb-4">
+        <button
+          type="button"
+          onClick={() => toggleSection('adminTags')}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <Label className="text-sm font-semibold text-gray-900 cursor-pointer">
+            Professional Tags {filters.adminTags.length > 0 && `(${filters.adminTags.length})`}
+          </Label>
+          {expandedSections.adminTags ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+        {expandedSections.adminTags && (
+          <div className="space-y-2 mt-2">
+            {ADMIN_TAG_PRESETS.map((tag) => (
+              <div key={tag} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`tag-${tag}`}
+                  checked={filters.adminTags.includes(tag)}
+                  onCheckedChange={() => toggleArrayValue('adminTags', tag)}
+                />
+                <Label
+                  htmlFor={`tag-${tag}`}
+                  className="text-sm font-normal text-gray-700 cursor-pointer w-full"
+                >
+                  <Badge variant="outline" className={`font-medium ${getAdminTagStyle(tag)}`}>
+                    {formatAdminTagLabel(tag)}
+                  </Badge>
+                </Label>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Minimum Project Rating Filter - Only for projects */}
+      {searchType === 'projects' && (
+        <div className="space-y-2 border-b pb-4">
+          <button
+            type="button"
+            onClick={() => toggleSection('minRating')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <Label className="text-sm font-semibold text-gray-900 cursor-pointer">
+              Min Rating {filters.minProjectRating > 0 && `(${filters.minProjectRating}+)`}
+            </Label>
+            {expandedSections.minRating ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+          {expandedSections.minRating && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {[0, 1, 2, 3, 4, 5].map((n) => (
+                <Button
+                  key={n}
+                  type="button"
+                  variant={filters.minProjectRating === n ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() =>
+                    onFilterChange(
+                      'minProjectRating',
+                      filters.minProjectRating === n && n !== 0 ? 0 : n
+                    )
+                  }
+                  className="flex items-center gap-1"
+                >
+                  {n === 0 ? 'Any' : (
+                    <>
+                      {n}
+                      <Star className="w-3 h-3 fill-current" />
+                    </>
+                  )}
+                </Button>
               ))}
             </div>
           )}

@@ -1,3 +1,5 @@
+import type { ProfessionalLevel } from '@/lib/professionalLevel'
+
 export interface ProjectProfessionalInput {
   fieldName: string
   value: string | number | { min: number; max: number } | undefined
@@ -64,9 +66,15 @@ export interface ProjectProfessionalDto {
   _id: string
   name: string
   username?: string
+  profileImage?: string
+  professionalLevel?: ProfessionalLevel
+  adminTags?: string[]
+  createdAt?: string
   businessInfo?: {
     companyName?: string
     timezone?: string
+    city?: string
+    country?: string
   }
   email: string
   phone: string
@@ -177,6 +185,16 @@ export interface ProjectDto {
     answer: string
   }>
   professionalId: ProjectProfessionalDto
+  projectAvgRating?: number
+  projectTotalReviews?: number
+  professionalStats?: {
+    avgRating: number
+    totalReviews: number
+    avgCommunication: number
+    avgValueOfDelivery: number
+    avgQualityOfService: number
+    avgResponseTimeMs: number
+  }
 }
 
 export type PublicProjectDto = Omit<ProjectDto, 'professionalId'> & {

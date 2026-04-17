@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, ArrowRight, Clock, ChevronLeft, ChevronRight, Calendar, Star } from 'lucide-react';
 import { isQualityCertificate, getCertificateGradient, formatPriceModelLabel } from '@/lib/projectHighlights';
 import { formatUtcViewerLabel, formatWindowUtcViewer, getViewerTimezone } from '@/lib/timezoneDisplay';
+import { getLevelColor, getAdminTagStyle, formatAdminTagLabel } from '@/lib/professionalLevel';
+import type { PublicProfessionalDto } from '@/types/project';
 
 interface ProjectCardProps {
   customerPrice: (value: number) => number;
@@ -43,21 +45,9 @@ interface ProjectCardProps {
       images?: string[];
       video?: string;
     };
-    professionalId?: {
-      _id: string;
-      name: string;
-      username?: string;
-      email: string;
-      businessInfo?: {
-        city?: string;
-        country?: string;
-      };
-      hourlyRate?: number;
-      currency?: string;
-      profileImage?: string;
-      avgRating?: number;
-      totalReviews?: number;
-    };
+    professionalId?: PublicProfessionalDto;
+    projectAvgRating?: number;
+    projectTotalReviews?: number;
     subprojects?: Array<{
       name: string;
       description: string;
@@ -102,6 +92,7 @@ const ProjectCard = ({ customerPrice, project }: ProjectCardProps) => {
   const location = [professional?.businessInfo?.city, professional?.businessInfo?.country]
     .filter(Boolean)
     .join(', ');
+  const extraTagCount = Math.max(0, (professional?.adminTags?.length ?? 0) - 2);
   const qualityCertificates = (project.certifications || []).filter((cert) => isQualityCertificate(cert.name));
 
   const images = project.media?.images || [];
@@ -245,6 +236,27 @@ const ProjectCard = ({ customerPrice, project }: ProjectCardProps) => {
             {project.title}
           </h3>
 
+          {project.projectAvgRating != null && project.projectAvgRating > 0 && (
+            <div className="flex items-center gap-1 mb-3">
+              <div className="flex gap-0.5">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`h-4 w-4 ${
+                      star <= Math.round(project.projectAvgRating!)
+                        ? 'fill-yellow-400 text-yellow-400'
+                        : 'text-gray-200'
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="text-sm font-semibold text-gray-700">{project.projectAvgRating.toFixed(1)}</span>
+              {project.projectTotalReviews != null && (
+                <span className="text-xs text-gray-400">({project.projectTotalReviews})</span>
+              )}
+            </div>
+          )}
+
           <p className="text-sm text-gray-600 mb-4 line-clamp-3">
             {project.description}
           </p>
@@ -348,33 +360,32 @@ const ProjectCard = ({ customerPrice, project }: ProjectCardProps) => {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-gray-900 truncate">
-                  {professionalName}
-                </p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-xs font-semibold text-gray-900 truncate">
+                    {professionalName}
+                  </p>
+                  {professional?.professionalLevel && (
+                    <Badge variant="secondary" className={`text-[9px] px-1.5 py-0 ${getLevelColor(professional.professionalLevel)}`}>
+                      {professional.professionalLevel}
+                    </Badge>
+                  )}
+                  {(professional?.adminTags || []).slice(0, 2).map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      className={`text-[9px] px-1.5 py-0 ${getAdminTagStyle(tag)}`}
+                    >
+                      {formatAdminTagLabel(tag)}
+                    </Badge>
+                  ))}
+                  {extraTagCount > 0 && (
+                    <span className="text-[9px] text-gray-400">+{extraTagCount}</span>
+                  )}
+                </div>
                 {location && (
                   <div className="flex items-center gap-1 text-[10px] text-gray-500">
                     <MapPin className="w-3 h-3" />
                     <span className="truncate">{location}</span>
-                  </div>
-                )}
-                {professional?.avgRating != null && professional.avgRating > 0 && (
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`h-2.5 w-2.5 ${
-                            star <= Math.round(professional.avgRating!)
-                              ? 'fill-yellow-400 text-yellow-400'
-                              : 'text-gray-200'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-[10px] font-medium text-gray-600">{professional.avgRating.toFixed(1)}</span>
-                    {professional.totalReviews != null && (
-                      <span className="text-[10px] text-gray-400">({professional.totalReviews})</span>
-                    )}
                   </div>
                 )}
               </div>

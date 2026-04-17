@@ -54,6 +54,12 @@ import {
 } from '@/lib/timezoneDisplay';
 import { useCommissionRate } from '@/hooks/useCommissionRate';
 import type { PublicProjectDto as Project } from '@/types/project';
+import {
+  getLevelColor,
+  getAdminTagStyle,
+  formatAdminTagLabel,
+  formatResponseTime,
+} from '@/lib/professionalLevel';
 
 interface ScheduleProposalsResponse {
   success: boolean;
@@ -102,6 +108,157 @@ const filterQualityCertificates = (
 ) => {
   if (!certifications) return [];
   return certifications.filter((cert) => isQualityCertificate(cert.name));
+};
+
+type RatingSummaryProps = {
+  ratingsSummary: { overallAverage: number; totalReviews: number };
+  size?: 'sm' | 'md';
+};
+
+const RatingSummary = ({ ratingsSummary, size = 'md' }: RatingSummaryProps) => {
+  const starClass = size === 'md' ? 'h-5 w-5' : 'h-4 w-4';
+  const avgClass = size === 'md' ? 'text-base font-semibold text-gray-800' : 'text-sm font-semibold';
+  const countClass = size === 'md' ? 'text-sm text-gray-500' : 'text-xs text-gray-500';
+  return (
+    <div className={`flex items-center gap-2 ${size === 'md' ? 'mb-2' : 'mt-1'}`}>
+      <div className='flex gap-0.5'>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star
+            key={star}
+            className={`${starClass} ${
+              star <= Math.round(ratingsSummary.overallAverage)
+                ? 'fill-yellow-400 text-yellow-400'
+                : 'text-gray-200'
+            }`}
+          />
+        ))}
+      </div>
+      <span className={avgClass}>{ratingsSummary.overallAverage.toFixed(1)}</span>
+      <span className={countClass}>
+        ({ratingsSummary.totalReviews} review{ratingsSummary.totalReviews !== 1 ? 's' : ''})
+      </span>
+    </div>
+  );
+};
+
+type ProvidedByCardProps = {
+  pro: Project['professionalId'];
+  stats?: Project['professionalStats'];
+};
+
+const ProvidedByCard = ({ pro, stats }: ProvidedByCardProps) => {
+  const proName =
+    pro.businessInfo?.companyName || pro.name || pro.username || 'Professional';
+  const proLocation = [pro.businessInfo?.city, pro.businessInfo?.country]
+    .filter(Boolean)
+    .join(', ');
+  const memberSince = pro.createdAt
+    ? new Date(pro.createdAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+    : null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Provided By</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className='space-y-4'>
+          <div className='flex items-center gap-3'>
+            {pro.profileImage ? (
+              <img
+                src={pro.profileImage}
+                alt={proName}
+                className='h-12 w-12 rounded-full object-cover'
+              />
+            ) : (
+              <div className='h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg'>
+                {proName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className='flex-1 min-w-0'>
+              <p className='font-semibold text-gray-900 truncate'>{proName}</p>
+              {proLocation && (
+                <div className='flex items-center gap-1 text-xs text-gray-500'>
+                  <MapPin className='w-3 h-3' />
+                  <span className='truncate'>{proLocation}</span>
+                </div>
+              )}
+              {memberSince && (
+                <p className='text-xs text-gray-400'>Member since {memberSince}</p>
+              )}
+            </div>
+          </div>
+
+          <div className='flex flex-wrap gap-1.5'>
+            {pro.professionalLevel && (
+              <Badge variant='secondary' className={`text-xs ${getLevelColor(pro.professionalLevel)}`}>
+                {pro.professionalLevel}
+              </Badge>
+            )}
+            {(pro.adminTags || []).map((tag) => (
+              <Badge
+                key={tag}
+                variant='outline'
+                className={`text-xs ${getAdminTagStyle(tag)}`}
+              >
+                {formatAdminTagLabel(tag)}
+              </Badge>
+            ))}
+          </div>
+
+          {stats && stats.totalReviews > 0 && (
+            <div className='space-y-2 pt-2 border-t border-gray-100'>
+              <div className='flex items-center gap-2'>
+                <div className='flex gap-0.5'>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`h-4 w-4 ${
+                        star <= Math.round(stats.avgRating)
+                          ? 'fill-yellow-400 text-yellow-400'
+                          : 'text-gray-200'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className='text-sm font-semibold text-gray-800'>{stats.avgRating.toFixed(1)}</span>
+                <span className='text-xs text-gray-500'>({stats.totalReviews})</span>
+              </div>
+              <div className='space-y-1 text-xs text-gray-600'>
+                <div className='flex justify-between'>
+                  <span>Communication</span>
+                  <span className='font-medium'>{stats.avgCommunication.toFixed(1)}</span>
+                </div>
+                <div className='flex justify-between'>
+                  <span>Value of Delivery</span>
+                  <span className='font-medium'>{stats.avgValueOfDelivery.toFixed(1)}</span>
+                </div>
+                <div className='flex justify-between'>
+                  <span>Quality of Service</span>
+                  <span className='font-medium'>{stats.avgQualityOfService.toFixed(1)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {stats && stats.avgResponseTimeMs > 0 && (
+            <div className='flex items-center justify-between text-xs text-gray-600 pt-2 border-t border-gray-100'>
+              <span className='flex items-center gap-1'>
+                <Clock className='h-3 w-3' />
+                Avg Response
+              </span>
+              <span className='font-medium'>{formatResponseTime(stats.avgResponseTimeMs)}</span>
+            </div>
+          )}
+
+          <p className='text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded p-3'>
+            <strong>Note:</strong> Contact details will be revealed
+            after you complete your booking and payment.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
 };
 
 const CUSTOMER_PRESENCE_LABELS: Record<string, string> = {
@@ -541,6 +698,9 @@ export default function ProjectDetailPage() {
                     <CardTitle className='text-3xl mb-2'>
                       {project.title}
                     </CardTitle>
+                    {ratingsSummary && ratingsSummary.totalReviews > 0 && (
+                      <RatingSummary ratingsSummary={ratingsSummary} size='md' />
+                    )}
                     <CardDescription className='text-base flex flex-wrap gap-2'>
                       <Badge className='mb-2'>{project.category}</Badge>
                       <Badge className='mb-2' variant='outline'>
@@ -842,22 +1002,7 @@ export default function ProjectDetailPage() {
                   )}
                 </div>
                 {ratingsSummary && ratingsSummary.totalReviews > 0 && (
-                  <div className='flex items-center gap-2 mt-1'>
-                    <div className='flex gap-0.5'>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`h-4 w-4 ${
-                            star <= Math.round(ratingsSummary.overallAverage)
-                              ? 'fill-yellow-400 text-yellow-400'
-                              : 'text-gray-200'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className='text-sm font-semibold'>{ratingsSummary.overallAverage.toFixed(1)}</span>
-                    <span className='text-xs text-gray-500'>({ratingsSummary.totalReviews} review{ratingsSummary.totalReviews !== 1 ? 's' : ''})</span>
-                  </div>
+                  <RatingSummary ratingsSummary={ratingsSummary} size='sm' />
                 )}
 
                 {/* Search and filter controls */}
@@ -1006,35 +1151,8 @@ export default function ProjectDetailPage() {
               </div>
             )}
 
-            {/* Professional Info - Hidden until after booking */}
             {project.professionalId && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Provided By</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className='space-y-3'>
-                    <div className='flex items-center space-x-2'>
-                      <div className='h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg'>
-                        P
-                      </div>
-                      <div>
-                        <p className='font-semibold text-lg text-gray-900'>
-                          Verified Professional
-                        </p>
-                        <Badge variant='secondary' className='text-xs'>
-                          <CheckCircle className='w-3 h-3 mr-1' />
-                          Verified
-                        </Badge>
-                      </div>
-                    </div>
-                    <p className='text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded p-3'>
-                      <strong>Note:</strong> Contact details will be revealed
-                      after you complete your booking and payment.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              <ProvidedByCard pro={project.professionalId} stats={project.professionalStats} />
             )}
 
             {/* Extra Options */}
