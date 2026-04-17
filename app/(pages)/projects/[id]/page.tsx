@@ -160,7 +160,7 @@ const ProvidedByCard = ({ pro, stats }: ProvidedByCardProps) => {
 
           <div className='flex flex-wrap gap-1.5'>
             {pro.professionalLevel && (
-              <Badge variant='secondary' className={`text-xs ${LEVEL_COLORS[pro.professionalLevel] || ''}`}>
+              <Badge variant='secondary' className={`text-xs ${getLevelColor(pro.professionalLevel)}`}>
                 {pro.professionalLevel}
               </Badge>
             )}
@@ -168,7 +168,7 @@ const ProvidedByCard = ({ pro, stats }: ProvidedByCardProps) => {
               <Badge
                 key={tag}
                 variant='outline'
-                className={`text-xs ${ADMIN_TAG_STYLES[tag] || ''}`}
+                className={`text-xs ${getAdminTagStyle(tag)}`}
               >
                 {formatAdminTagLabel(tag)}
               </Badge>
