@@ -545,6 +545,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user, isInitialized, loading])
 
+  // Replay pending favorite once a customer logs in
+  useEffect(() => {
+    if (!user || user.role !== 'customer' || typeof window === 'undefined') return
+    const raw = window.sessionStorage.getItem('fixera_pending_favorite')
+    if (!raw) return
+    window.sessionStorage.removeItem('fixera_pending_favorite')
+    try {
+      const parsed = JSON.parse(raw) as { targetType: string; targetId: string }
+      if (!parsed?.targetType || !parsed?.targetId) return
+      const token = getAuthToken()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/favorites/toggle`, {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify(parsed),
+      })
+        .then((r) => r.json())
+        .then((json) => {
+          if (json?.success && json.data?.favorited) {
+            toast.success('Added to your favorites')
+          }
+        })
+        .catch(() => {
+          // silent — user can retry manually
+        })
+    } catch {
+      // bad JSON; ignore
+    }
+  }, [user?._id, user?.role])
+
   useEffect(() => {
     if (!user || user.role !== 'professional' || !user.idExpirationDate) {
       if (idExpiryToastRef.current !== null) {
