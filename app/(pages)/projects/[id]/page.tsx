@@ -110,6 +110,37 @@ const filterQualityCertificates = (
   return certifications.filter((cert) => isQualityCertificate(cert.name));
 };
 
+type RatingSummaryProps = {
+  ratingsSummary: { overallAverage: number; totalReviews: number };
+  size?: 'sm' | 'md';
+};
+
+const RatingSummary = ({ ratingsSummary, size = 'md' }: RatingSummaryProps) => {
+  const starClass = size === 'md' ? 'h-5 w-5' : 'h-4 w-4';
+  const avgClass = size === 'md' ? 'text-base font-semibold text-gray-800' : 'text-sm font-semibold';
+  const countClass = size === 'md' ? 'text-sm text-gray-500' : 'text-xs text-gray-500';
+  return (
+    <div className={`flex items-center gap-2 ${size === 'md' ? 'mb-2' : 'mt-1'}`}>
+      <div className='flex gap-0.5'>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star
+            key={star}
+            className={`${starClass} ${
+              star <= Math.round(ratingsSummary.overallAverage)
+                ? 'fill-yellow-400 text-yellow-400'
+                : 'text-gray-200'
+            }`}
+          />
+        ))}
+      </div>
+      <span className={avgClass}>{ratingsSummary.overallAverage.toFixed(1)}</span>
+      <span className={countClass}>
+        ({ratingsSummary.totalReviews} review{ratingsSummary.totalReviews !== 1 ? 's' : ''})
+      </span>
+    </div>
+  );
+};
+
 type ProvidedByCardProps = {
   pro: Project['professionalId'];
   stats?: Project['professionalStats'];
@@ -122,7 +153,7 @@ const ProvidedByCard = ({ pro, stats }: ProvidedByCardProps) => {
     .filter(Boolean)
     .join(', ');
   const memberSince = pro.createdAt
-    ? new Date(pro.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    ? new Date(pro.createdAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
     : null;
 
   return (
@@ -668,26 +699,7 @@ export default function ProjectDetailPage() {
                       {project.title}
                     </CardTitle>
                     {ratingsSummary && ratingsSummary.totalReviews > 0 && (
-                      <div className='flex items-center gap-2 mb-2'>
-                        <div className='flex gap-0.5'>
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`h-5 w-5 ${
-                                star <= Math.round(ratingsSummary.overallAverage)
-                                  ? 'fill-yellow-400 text-yellow-400'
-                                  : 'text-gray-200'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <span className='text-base font-semibold text-gray-800'>
-                          {ratingsSummary.overallAverage.toFixed(1)}
-                        </span>
-                        <span className='text-sm text-gray-500'>
-                          ({ratingsSummary.totalReviews} review{ratingsSummary.totalReviews !== 1 ? 's' : ''})
-                        </span>
-                      </div>
+                      <RatingSummary ratingsSummary={ratingsSummary} size='md' />
                     )}
                     <CardDescription className='text-base flex flex-wrap gap-2'>
                       <Badge className='mb-2'>{project.category}</Badge>
@@ -990,22 +1002,7 @@ export default function ProjectDetailPage() {
                   )}
                 </div>
                 {ratingsSummary && ratingsSummary.totalReviews > 0 && (
-                  <div className='flex items-center gap-2 mt-1'>
-                    <div className='flex gap-0.5'>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`h-4 w-4 ${
-                            star <= Math.round(ratingsSummary.overallAverage)
-                              ? 'fill-yellow-400 text-yellow-400'
-                              : 'text-gray-200'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className='text-sm font-semibold'>{ratingsSummary.overallAverage.toFixed(1)}</span>
-                    <span className='text-xs text-gray-500'>({ratingsSummary.totalReviews} review{ratingsSummary.totalReviews !== 1 ? 's' : ''})</span>
-                  </div>
+                  <RatingSummary ratingsSummary={ratingsSummary} size='sm' />
                 )}
 
                 {/* Search and filter controls */}
