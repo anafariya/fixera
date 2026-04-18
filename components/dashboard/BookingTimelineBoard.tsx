@@ -185,9 +185,14 @@ const hasPayableMilestone = (milestones: TimelineBooking["milestonePayments"]): 
       if (ms.customDueDate && new Date(ms.customDueDate) <= new Date()) return true
       return false
     }
-    return false
+    return true
   }
   return false
+}
+
+const hasOutstandingMilestones = (milestones: TimelineBooking["milestonePayments"]): boolean => {
+  if (!Array.isArray(milestones) || milestones.length === 0) return false
+  return milestones.some((m) => m.status !== "paid" && (Number(m.amount) || 0) > 0)
 }
 
 const getDisplaySchedule = (booking: TimelineBooking) => {
@@ -615,13 +620,14 @@ export default function BookingTimelineBoard({
     }
 
     if (viewerRole === "customer" && booking.status === "professional_completed") {
-      const hasUnpaidMilestones = hasPayableMilestone(booking.milestonePayments)
+      const hasPayableMilestoneNow = hasPayableMilestone(booking.milestonePayments)
+      const hasOutstanding = hasOutstandingMilestones(booking.milestonePayments)
       const hasUnpaidExtras =
         typeof booking.extraCostTotal === "number" &&
         booking.extraCostTotal > 0 &&
         booking.extraCostStatus !== "confirmed" &&
         booking.extraCostStatus !== "disputed"
-      if (hasUnpaidMilestones) {
+      if (hasPayableMilestoneNow) {
         btns.push(
           <Button key="pay-milestone" size="sm" className="h-6 text-[10px] px-1.5 bg-sky-600 text-white hover:bg-sky-700" onClick={() => router.push(`/bookings/${booking._id}`)}>
             <CreditCard className="mr-1 h-3 w-3" />Pay milestone
@@ -635,7 +641,7 @@ export default function BookingTimelineBoard({
           </Button>
         )
       }
-      if (!hasUnpaidMilestones && !hasUnpaidExtras) {
+      if (!hasOutstanding && !hasUnpaidExtras) {
         btns.push(
           <Button key="confirm-complete" size="sm" className="h-6 text-[10px] px-1.5 bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => handleCustomerConfirmCompletion(booking._id)} disabled={busy}>
             {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <CheckCheck className="mr-1 h-3 w-3" />}
