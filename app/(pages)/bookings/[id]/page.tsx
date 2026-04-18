@@ -1681,8 +1681,24 @@ export default function BookingDetailPage() {
         const name = (p.fieldName || '').toLowerCase()
         return name.includes('quantity') || name.includes('units') || name.includes('amount') || name.includes('size') || name.includes('area')
       })
-      const estimatedUnits = Number(quantityInput?.value) || 0
-      const unitPrice = sub?.pricing?.type === 'unit' ? Number(sub?.pricing?.amount) || 0 : 0
+      if (!quantityInput || quantityInput.value == null) {
+        toast.error('Cannot add a unit adjustment: this booking has no quantity input.')
+        return
+      }
+      const estimatedUnits = Number(quantityInput.value)
+      if (!Number.isFinite(estimatedUnits)) {
+        toast.error('Cannot add a unit adjustment: the quantity input is not a valid number.')
+        return
+      }
+      if (sub?.pricing?.type !== 'unit') {
+        toast.error('Cannot add a unit adjustment: this subproject is not priced per unit.')
+        return
+      }
+      const unitPrice = Number(sub?.pricing?.amount)
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+        toast.error('Cannot add a unit adjustment: the unit price is not set.')
+        return
+      }
       unitDefaults = { estimatedUnits, actualUnits: estimatedUnits, unitPrice }
     }
     setCompletionExtraCosts(prev => [...prev, {
@@ -1778,9 +1794,9 @@ export default function BookingDetailPage() {
     }
     return false
   })
-  const projectConditions = (booking?.project?.termsConditions || []).filter(
-    (c) => !c.type || c.type === 'condition'
-  )
+  const projectConditions = (booking?.project?.termsConditions || [])
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .filter(({ item }) => !item.type || item.type === 'condition')
   const projectOptions = booking?.project?.extraOptions || []
 
   return (
@@ -3999,12 +4015,12 @@ export default function BookingDetailPage() {
                             <SelectValue placeholder={projectConditions.length > 0 ? "Select a condition" : "No project conditions available"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {projectConditions.map((condition, conditionIndex) => {
+                            {projectConditions.map(({ item: condition, originalIndex }) => {
                               const cost = Number(condition.additionalCost) || 0
                               const label = cost > 0 ? `(+€${cost.toFixed(2)})` : '(no extra cost)'
                               return (
-                                <SelectItem key={`condition-${conditionIndex}`} value={String(conditionIndex)}>
-                                  {(condition.name || `Condition ${conditionIndex + 1}`)} {label}
+                                <SelectItem key={`condition-${originalIndex}`} value={String(originalIndex)}>
+                                  {(condition.name || `Condition ${originalIndex + 1}`)} {label}
                                 </SelectItem>
                               )
                             })}

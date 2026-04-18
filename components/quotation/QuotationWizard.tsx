@@ -37,6 +37,19 @@ const FIRST_MILESTONE: QuotationMilestone = {
   dueCondition: 'on_start',
 }
 
+const VALID_NON_FIRST_DUE_CONDITIONS = [
+  'on_milestone_start',
+  'on_milestone_completion',
+  'custom_date',
+] as const satisfies ReadonlyArray<QuotationMilestone['dueCondition']>
+
+const coerceNonFirstDueCondition = (
+  value: unknown
+): QuotationMilestone['dueCondition'] =>
+  (VALID_NON_FIRST_DUE_CONDITIONS as readonly string[]).includes(value as string)
+    ? (value as QuotationMilestone['dueCondition'])
+    : 'on_milestone_completion'
+
 const toLocalDayTimestamp = (value: string): number => {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (!match) return Number.NaN
@@ -90,9 +103,11 @@ const getDefaultFormData = (existing?: QuoteVersion): QuotationWizardFormData =>
               title: m.title,
               amount: m.amount,
               description: m.description || '',
-              dueCondition: i === 0 ? ('on_start' as const) : m.dueCondition,
+              dueCondition: i === 0
+                ? ('on_start' as const)
+                : coerceNonFirstDueCondition(m.dueCondition),
               customDueDate: m.customDueDate,
-              order: m.order,
+              order: i,
               status: 'pending' as const,
             }))
         : [{ ...FIRST_MILESTONE }],
