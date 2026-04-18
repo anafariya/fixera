@@ -430,6 +430,11 @@ export default function BookingDetailPage() {
   const searchParams = useSearchParams()
   const disputeAutoOpenedRef = useRef(false)
   const bookingId = (params?.id || params?.bookingId) as string | undefined
+
+  useEffect(() => {
+    disputeAutoOpenedRef.current = false
+  }, [bookingId])
+
   const showPostBookingQuestions = searchParams?.get("postBookingQuestions") === "true"
   const autoOpenWarrantyClaim = searchParams?.get("openWarrantyClaim") === "true"
 
@@ -2491,7 +2496,6 @@ export default function BookingDetailPage() {
                           if (dueCondition === 'on_milestone_start') return workStatus === 'in_progress' || workStatus === 'completed'
                           if (dueCondition === 'on_milestone_completion') return workStatus === 'completed'
                           if (dueCondition === 'custom_date') {
-                            if (workStatus === 'completed') return true
                             return !!ms.customDueDate && new Date(ms.customDueDate) <= new Date()
                           }
                           return true

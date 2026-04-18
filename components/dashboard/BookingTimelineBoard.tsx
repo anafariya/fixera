@@ -76,6 +76,8 @@ export interface TimelineBooking {
     status?: string
     workStatus?: string
     amount?: number
+    dueCondition?: 'on_start' | 'on_milestone_start' | 'on_milestone_completion' | 'custom_date'
+    customDueDate?: string | Date
   }>
   extraCostTotal?: number
   extraCostStatus?: "pending" | "confirmed" | "disputed"
@@ -159,6 +161,33 @@ const formatDateLabel = (value?: string | Date | null) => {
   const parsed = value instanceof Date ? value : toDate(value)
   if (!parsed) return "Unscheduled"
   return format(parsed, "dd MMM yyyy")
+}
+
+const hasPayableMilestone = (milestones: TimelineBooking["milestonePayments"]): boolean => {
+  if (!Array.isArray(milestones) || milestones.length === 0) return false
+  for (let i = 0; i < milestones.length; i++) {
+    const ms = milestones[i]
+    if (ms.status === "paid") continue
+    const prevAllPaid = milestones.slice(0, i).every((m) => m.status === "paid")
+    if (!prevAllPaid) return false
+    const dueCondition = ms.dueCondition
+    const workStatus = ms.workStatus || "pending"
+    if (dueCondition === "on_start") return true
+    if (dueCondition === "on_milestone_start") {
+      if (workStatus === "in_progress" || workStatus === "completed") return true
+      return false
+    }
+    if (dueCondition === "on_milestone_completion") {
+      if (workStatus === "completed") return true
+      return false
+    }
+    if (dueCondition === "custom_date") {
+      if (ms.customDueDate && new Date(ms.customDueDate) <= new Date()) return true
+      return false
+    }
+    return false
+  }
+  return false
 }
 
 const getDisplaySchedule = (booking: TimelineBooking) => {
@@ -586,9 +615,7 @@ export default function BookingTimelineBoard({
     }
 
     if (viewerRole === "customer" && booking.status === "professional_completed") {
-      const hasUnpaidMilestones = Array.isArray(booking.milestonePayments)
-        && booking.milestonePayments.length > 0
-        && booking.milestonePayments.some((m) => m.status !== "paid")
+      const hasUnpaidMilestones = hasPayableMilestone(booking.milestonePayments)
       const hasUnpaidExtras =
         typeof booking.extraCostTotal === "number" &&
         booking.extraCostTotal > 0 &&
