@@ -4033,7 +4033,7 @@ export default function BookingDetailPage() {
                           <SelectContent>
                             {projectConditions.map(({ item: condition, originalIndex }) => {
                               const cost = Number(condition.additionalCost) || 0
-                              const currency = booking?.quote?.currency || 'EUR'
+                              const currency = booking?.quote?.currency || booking?.payment?.currency || 'EUR'
                               const label = cost > 0 ? `(+${currency} ${cost.toFixed(2)})` : '(no extra cost)'
                               return (
                                 <SelectItem key={`condition-${originalIndex}`} value={String(originalIndex)}>

@@ -192,7 +192,7 @@ const hasPayableMilestone = (milestones: TimelineBooking["milestonePayments"]): 
 
 const hasOutstandingMilestones = (milestones: TimelineBooking["milestonePayments"]): boolean => {
   if (!Array.isArray(milestones) || milestones.length === 0) return false
-  return milestones.some((m) => m.status !== "paid" && (Number(m.amount) || 0) > 0)
+  return milestones.some((m) => m.status !== "paid")
 }
 
 const getDisplaySchedule = (booking: TimelineBooking) => {
