@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -428,7 +428,13 @@ export default function BookingDetailPage() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
+  const disputeAutoOpenedRef = useRef(false)
   const bookingId = (params?.id || params?.bookingId) as string | undefined
+
+  useEffect(() => {
+    disputeAutoOpenedRef.current = false
+  }, [bookingId])
+
   const showPostBookingQuestions = searchParams?.get("postBookingQuestions") === "true"
   const autoOpenWarrantyClaim = searchParams?.get("openWarrantyClaim") === "true"
 
@@ -648,12 +654,14 @@ export default function BookingDetailPage() {
     ) {
       setShowQuotationWizard(true)
     }
-    // Auto-open dispute modal when navigated with ?dispute=1
+    // Auto-open dispute modal when navigated with ?dispute=1 (one-shot)
     if (
       booking?.status === "professional_completed" &&
       searchParams?.get("dispute") === "1" &&
-      user?.role === "customer"
+      user?.role === "customer" &&
+      !disputeAutoOpenedRef.current
     ) {
+      disputeAutoOpenedRef.current = true
       setShowDisputeModal(true)
     }
   }, [booking, searchParams, user?.role])
@@ -1674,15 +1682,40 @@ export default function BookingDetailPage() {
   const addExtraCost = (type: 'unit_adjustment' | 'condition' | 'option' | 'other') => {
     let unitDefaults: { estimatedUnits: number; actualUnits: number; unitPrice: number } | null = null
     if (type === 'unit_adjustment') {
-      const subIdx = booking?.selectedSubprojectIndex ?? 0
-      const sub = booking?.project?.subprojects?.[subIdx]
+      const subprojects = booking?.project?.subprojects || []
+      let subIdx: number
+      if (typeof booking?.selectedSubprojectIndex === 'number') {
+        subIdx = booking.selectedSubprojectIndex
+      } else if (subprojects.length === 1) {
+        subIdx = 0
+      } else {
+        toast.error('Cannot add a unit adjustment: no subproject is selected for this booking.')
+        return
+      }
+      const sub = subprojects[subIdx]
       const inputs = sub?.professionalInputs || []
       const quantityInput = inputs.find((p) => {
         const name = (p.fieldName || '').toLowerCase()
         return name.includes('quantity') || name.includes('units') || name.includes('amount') || name.includes('size') || name.includes('area')
       })
-      const estimatedUnits = Number(quantityInput?.value) || 0
-      const unitPrice = sub?.pricing?.type === 'unit' ? Number(sub?.pricing?.amount) || 0 : 0
+      if (!quantityInput || quantityInput.value == null) {
+        toast.error('Cannot add a unit adjustment: this booking has no quantity input.')
+        return
+      }
+      const estimatedUnits = Number(quantityInput.value)
+      if (!Number.isFinite(estimatedUnits) || estimatedUnits <= 0) {
+        toast.error('Cannot add a unit adjustment: the quantity input is not a valid number.')
+        return
+      }
+      if (sub?.pricing?.type !== 'unit') {
+        toast.error('Cannot add a unit adjustment: this subproject is not priced per unit.')
+        return
+      }
+      const unitPrice = Number(sub?.pricing?.amount)
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+        toast.error('Cannot add a unit adjustment: the unit price is not set.')
+        return
+      }
       unitDefaults = { estimatedUnits, actualUnits: estimatedUnits, unitPrice }
     }
     setCompletionExtraCosts(prev => [...prev, {
@@ -1778,9 +1811,9 @@ export default function BookingDetailPage() {
     }
     return false
   })
-  const projectConditions = (booking?.project?.termsConditions || []).filter(
-    (c) => !c.type || c.type === 'condition'
-  )
+  const projectConditions = (booking?.project?.termsConditions || [])
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .filter(({ item }) => !item.type || item.type === 'condition')
   const projectOptions = booking?.project?.extraOptions || []
 
   return (
@@ -2463,7 +2496,6 @@ export default function BookingDetailPage() {
                           if (dueCondition === 'on_milestone_start') return workStatus === 'in_progress' || workStatus === 'completed'
                           if (dueCondition === 'on_milestone_completion') return workStatus === 'completed'
                           if (dueCondition === 'custom_date') {
-                            if (workStatus === 'completed') return true
                             return !!ms.customDueDate && new Date(ms.customDueDate) <= new Date()
                           }
                           return true
@@ -3999,12 +4031,13 @@ export default function BookingDetailPage() {
                             <SelectValue placeholder={projectConditions.length > 0 ? "Select a condition" : "No project conditions available"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {projectConditions.map((condition, conditionIndex) => {
+                            {projectConditions.map(({ item: condition, originalIndex }) => {
                               const cost = Number(condition.additionalCost) || 0
-                              const label = cost > 0 ? `(+€${cost.toFixed(2)})` : '(no extra cost)'
+                              const currency = booking?.quote?.currency || booking?.payment?.currency || 'EUR'
+                              const label = cost > 0 ? `(+${currency} ${cost.toFixed(2)})` : '(no extra cost)'
                               return (
-                                <SelectItem key={`condition-${conditionIndex}`} value={String(conditionIndex)}>
-                                  {(condition.name || `Condition ${conditionIndex + 1}`)} {label}
+                                <SelectItem key={`condition-${originalIndex}`} value={String(originalIndex)}>
+                                  {(condition.name || `Condition ${originalIndex + 1}`)} {label}
                                 </SelectItem>
                               )
                             })}
