@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -161,6 +161,7 @@ interface BookingDetail {
   rfqDeadline?: string
   customerRejectionReason?: string
   milestonePayments?: BookingMilestone[]
+  selectedSubprojectIndex?: number
   scheduledStartDate?: string
   scheduledExecutionEndDate?: string
   scheduledEndDate?: string
@@ -182,7 +183,12 @@ interface BookingDetail {
     rfqQuestions?: PostBookingQuestion[]
     postBookingQuestions?: PostBookingQuestion[]
     extraOptions?: Array<{ name?: string; price?: number }>
-    termsConditions?: Array<{ name?: string; additionalCost?: number }>
+    termsConditions?: Array<{ name?: string; additionalCost?: number; type?: 'condition' | 'warning' }>
+    subprojects?: Array<{
+      name?: string
+      pricing?: { type?: 'fixed' | 'unit' | 'rfq'; amount?: number }
+      professionalInputs?: Array<{ fieldName?: string; value?: string | number }>
+    }>
   }
   professional?: {
     _id: string
@@ -422,7 +428,13 @@ export default function BookingDetailPage() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
+  const disputeAutoOpenedRef = useRef(false)
   const bookingId = (params?.id || params?.bookingId) as string | undefined
+
+  useEffect(() => {
+    disputeAutoOpenedRef.current = false
+  }, [bookingId])
+
   const showPostBookingQuestions = searchParams?.get("postBookingQuestions") === "true"
   const autoOpenWarrantyClaim = searchParams?.get("openWarrantyClaim") === "true"
 
@@ -641,6 +653,16 @@ export default function BookingDetailPage() {
       user?.role === "professional"
     ) {
       setShowQuotationWizard(true)
+    }
+    // Auto-open dispute modal when navigated with ?dispute=1 (one-shot)
+    if (
+      booking?.status === "professional_completed" &&
+      searchParams?.get("dispute") === "1" &&
+      user?.role === "customer" &&
+      !disputeAutoOpenedRef.current
+    ) {
+      disputeAutoOpenedRef.current = true
+      setShowDisputeModal(true)
     }
   }, [booking, searchParams, user?.role])
 
@@ -1658,12 +1680,50 @@ export default function BookingDetailPage() {
   }
 
   const addExtraCost = (type: 'unit_adjustment' | 'condition' | 'option' | 'other') => {
+    let unitDefaults: { estimatedUnits: number; actualUnits: number; unitPrice: number } | null = null
+    if (type === 'unit_adjustment') {
+      const subprojects = booking?.project?.subprojects || []
+      let subIdx: number
+      if (typeof booking?.selectedSubprojectIndex === 'number') {
+        subIdx = booking.selectedSubprojectIndex
+      } else if (subprojects.length === 1) {
+        subIdx = 0
+      } else {
+        toast.error('Cannot add a unit adjustment: no subproject is selected for this booking.')
+        return
+      }
+      const sub = subprojects[subIdx]
+      const inputs = sub?.professionalInputs || []
+      const quantityInput = inputs.find((p) => {
+        const name = (p.fieldName || '').toLowerCase()
+        return name.includes('quantity') || name.includes('units') || name.includes('amount') || name.includes('size') || name.includes('area')
+      })
+      if (!quantityInput || quantityInput.value == null) {
+        toast.error('Cannot add a unit adjustment: this booking has no quantity input.')
+        return
+      }
+      const estimatedUnits = Number(quantityInput.value)
+      if (!Number.isFinite(estimatedUnits) || estimatedUnits <= 0) {
+        toast.error('Cannot add a unit adjustment: the quantity input is not a valid number.')
+        return
+      }
+      if (sub?.pricing?.type !== 'unit') {
+        toast.error('Cannot add a unit adjustment: this subproject is not priced per unit.')
+        return
+      }
+      const unitPrice = Number(sub?.pricing?.amount)
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+        toast.error('Cannot add a unit adjustment: the unit price is not set.')
+        return
+      }
+      unitDefaults = { estimatedUnits, actualUnits: estimatedUnits, unitPrice }
+    }
     setCompletionExtraCosts(prev => [...prev, {
       type,
       name: type === 'unit_adjustment' ? 'Unit-based adjustment' : '',
       justification: '',
       amount: 0,
-      ...(type === 'unit_adjustment' ? { estimatedUnits: 0, actualUnits: 0, unitPrice: 0 } : {}),
+      ...(unitDefaults || {}),
       ...(type === 'condition' || type === 'option' ? { referenceIndex: UNSELECTED_REFERENCE_INDEX } : {}),
     }])
   }
@@ -1751,7 +1811,9 @@ export default function BookingDetailPage() {
     }
     return false
   })
-  const projectConditions = booking?.project?.termsConditions || []
+  const projectConditions = (booking?.project?.termsConditions || [])
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .filter(({ item }) => !item.type || item.type === 'condition')
   const projectOptions = booking?.project?.extraOptions || []
 
   return (
@@ -2428,7 +2490,24 @@ export default function BookingDetailPage() {
                         const workStatus = ms.workStatus || 'pending'
                         const prevPaid = booking.milestonePayments!.slice(0, i).every(m => m.status === 'paid')
                         const prevCompleted = booking.milestonePayments!.slice(0, i).every(m => (m.workStatus || 'pending') === 'completed')
-                        const canPay = !isPaid && prevPaid && user?.role === 'customer'
+                        const dueCondition = ms.dueCondition
+                        const isDueNow = (() => {
+                          if (dueCondition === 'on_start') return true
+                          if (dueCondition === 'on_milestone_start') return workStatus === 'in_progress' || workStatus === 'completed'
+                          if (dueCondition === 'on_milestone_completion') return workStatus === 'completed'
+                          if (dueCondition === 'custom_date') {
+                            return !!ms.customDueDate && new Date(ms.customDueDate) <= new Date()
+                          }
+                          return true
+                        })()
+                        const dueLabel = (() => {
+                          if (dueCondition === 'on_start') return 'Due on project start'
+                          if (dueCondition === 'on_milestone_start') return 'Due when milestone starts'
+                          if (dueCondition === 'on_milestone_completion') return 'Due on milestone completion'
+                          if (dueCondition === 'custom_date' && ms.customDueDate) return `Due ${new Date(ms.customDueDate).toLocaleDateString()}`
+                          return null
+                        })()
+                        const canPay = !isPaid && prevPaid && isDueNow && user?.role === 'customer'
                         const canStart = user?.role === 'professional'
                           && workStatus === 'pending'
                           && prevCompleted
@@ -2453,6 +2532,9 @@ export default function BookingDetailPage() {
                                 <div>
                                   <p className="text-sm font-medium">{ms.title}</p>
                                   <p className="text-xs text-gray-500">{booking.quote?.currency || 'EUR'} {customerPrice(ms.amount).toFixed(2)}</p>
+                                  {dueLabel && !isPaid && (
+                                    <p className="text-[11px] text-sky-700">{dueLabel}</p>
+                                  )}
                                   {ms.startedAt && (
                                     <p className="text-[11px] text-gray-500">Started: {new Date(ms.startedAt).toLocaleDateString()}</p>
                                   )}
@@ -2891,10 +2973,19 @@ export default function BookingDetailPage() {
                       </div>
                     )}
 
+                    {Array.isArray(booking.milestonePayments) && booking.milestonePayments.length > 0 && booking.milestonePayments.some(m => m.status !== 'paid') && (
+                      <div className="bg-amber-50 border border-amber-200 rounded p-2 text-xs text-amber-800">
+                        One or more milestone payments are still outstanding. Pay the remaining milestones above before confirming completion.
+                      </div>
+                    )}
                     <div className="flex gap-2 pt-1">
                       <Button
                         onClick={handleCustomerConfirmCompletion}
-                        disabled={confirmingCompletion || loadingExtraCostPayment}
+                        disabled={
+                          confirmingCompletion
+                          || loadingExtraCostPayment
+                          || (Array.isArray(booking.milestonePayments) && booking.milestonePayments.some(m => m.status !== 'paid'))
+                        }
                         className="bg-teal-600 hover:bg-teal-700 text-white"
                         size="sm"
                       >
@@ -3906,7 +3997,12 @@ export default function BookingDetailPage() {
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <Label className="text-xs">Estimated Units</Label>
-                          <Input type="number" value={cost.estimatedUnits || ''} onChange={(e) => updateExtraCost(i, 'estimatedUnits', parseFloat(e.target.value) || 0)} className="h-8 text-sm" />
+                          <Input
+                            type="number"
+                            value={cost.estimatedUnits || ''}
+                            disabled
+                            className="h-8 text-sm bg-gray-100"
+                          />
                         </div>
                         <div>
                           <Label className="text-xs">Actual Units</Label>
@@ -3914,7 +4010,12 @@ export default function BookingDetailPage() {
                         </div>
                         <div>
                           <Label className="text-xs">Unit Price</Label>
-                          <Input type="number" value={cost.unitPrice || ''} onChange={(e) => updateExtraCost(i, 'unitPrice', parseFloat(e.target.value) || 0)} className="h-8 text-sm" />
+                          <Input
+                            type="number"
+                            value={cost.unitPrice || ''}
+                            disabled
+                            className="h-8 text-sm bg-gray-100"
+                          />
                         </div>
                       </div>
                     )}
@@ -3930,12 +4031,16 @@ export default function BookingDetailPage() {
                             <SelectValue placeholder={projectConditions.length > 0 ? "Select a condition" : "No project conditions available"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {projectConditions.map((condition, conditionIndex) => (
-                              <SelectItem key={`condition-${conditionIndex}`} value={String(conditionIndex)}>
-                                {(condition.name || `Condition ${conditionIndex + 1}`)}
-                                {typeof condition.additionalCost === 'number' ? ` (+${condition.additionalCost.toFixed(2)})` : ''}
-                              </SelectItem>
-                            ))}
+                            {projectConditions.map(({ item: condition, originalIndex }) => {
+                              const cost = Number(condition.additionalCost) || 0
+                              const currency = booking?.quote?.currency || booking?.payment?.currency || 'EUR'
+                              const label = cost > 0 ? `(+${currency} ${cost.toFixed(2)})` : '(no extra cost)'
+                              return (
+                                <SelectItem key={`condition-${originalIndex}`} value={String(originalIndex)}>
+                                  {(condition.name || `Condition ${originalIndex + 1}`)} {label}
+                                </SelectItem>
+                              )
+                            })}
                           </SelectContent>
                         </Select>
                       </div>

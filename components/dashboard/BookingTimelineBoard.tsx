@@ -76,7 +76,11 @@ export interface TimelineBooking {
     status?: string
     workStatus?: string
     amount?: number
+    dueCondition?: 'on_start' | 'on_milestone_start' | 'on_milestone_completion' | 'custom_date'
+    customDueDate?: string | Date
   }>
+  extraCostTotal?: number
+  extraCostStatus?: "pending" | "confirmed" | "disputed"
   rescheduleRequest?: {
     status?: "pending" | "accepted" | "declined"
     reason?: string
@@ -157,6 +161,38 @@ const formatDateLabel = (value?: string | Date | null) => {
   const parsed = value instanceof Date ? value : toDate(value)
   if (!parsed) return "Unscheduled"
   return format(parsed, "dd MMM yyyy")
+}
+
+const hasPayableMilestone = (milestones: TimelineBooking["milestonePayments"]): boolean => {
+  if (!Array.isArray(milestones) || milestones.length === 0) return false
+  for (let i = 0; i < milestones.length; i++) {
+    const ms = milestones[i]
+    if (ms.status === "paid") continue
+    const prevAllPaid = milestones.slice(0, i).every((m) => m.status === "paid")
+    if (!prevAllPaid) return false
+    const dueCondition = ms.dueCondition
+    const workStatus = ms.workStatus || "pending"
+    if (dueCondition === "on_start") return true
+    if (dueCondition === "on_milestone_start") {
+      if (workStatus === "in_progress" || workStatus === "completed") return true
+      return false
+    }
+    if (dueCondition === "on_milestone_completion") {
+      if (workStatus === "completed") return true
+      return false
+    }
+    if (dueCondition === "custom_date") {
+      if (ms.customDueDate && new Date(ms.customDueDate) <= new Date()) return true
+      return false
+    }
+    return true
+  }
+  return false
+}
+
+const hasOutstandingMilestones = (milestones: TimelineBooking["milestonePayments"]): boolean => {
+  if (!Array.isArray(milestones) || milestones.length === 0) return false
+  return milestones.some((m) => m.status !== "paid")
 }
 
 const getDisplaySchedule = (booking: TimelineBooking) => {
@@ -462,6 +498,21 @@ export default function BookingTimelineBoard({
     )
   }
 
+  const handleCustomerConfirmCompletion = async (bookingId: string) => {
+    const confirmed = window.confirm("Confirm that the work is complete? Funds will be released to the professional.")
+    if (!confirmed) return
+    await runMutation(
+      bookingId,
+      () =>
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/${bookingId}/customer-confirm-completion`, {
+          method: "POST",
+          credentials: "include",
+          headers: withAuthHeaders(),
+        }),
+      "Completion confirmed. Funds released."
+    )
+  }
+
   const handleRespondReschedule = async (bookingId: string, action: "accept" | "decline") => {
     const confirmed = window.confirm(
       action === "accept"
@@ -564,6 +615,43 @@ export default function BookingTimelineBoard({
         </Button>,
         <Button key="decline" variant="outline" size="sm" className="h-6 text-[10px] px-1.5 border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => handleRespondReschedule(booking._id, "decline")} disabled={busy}>
           Decline
+        </Button>
+      )
+    }
+
+    if (viewerRole === "customer" && booking.status === "professional_completed") {
+      const hasPayableMilestoneNow = hasPayableMilestone(booking.milestonePayments)
+      const hasOutstanding = hasOutstandingMilestones(booking.milestonePayments)
+      const hasUnpaidExtras =
+        typeof booking.extraCostTotal === "number" &&
+        booking.extraCostTotal > 0 &&
+        booking.extraCostStatus !== "confirmed" &&
+        booking.extraCostStatus !== "disputed"
+      if (hasPayableMilestoneNow) {
+        btns.push(
+          <Button key="pay-milestone" size="sm" className="h-6 text-[10px] px-1.5 bg-sky-600 text-white hover:bg-sky-700" onClick={() => router.push(`/bookings/${booking._id}`)}>
+            <CreditCard className="mr-1 h-3 w-3" />Pay milestone
+          </Button>
+        )
+      }
+      if (hasUnpaidExtras) {
+        btns.push(
+          <Button key="pay-extras" size="sm" className="h-6 text-[10px] px-1.5 bg-amber-600 text-white hover:bg-amber-700" onClick={() => router.push(`/bookings/${booking._id}/payment?openExtras=1`)}>
+            <CreditCard className="mr-1 h-3 w-3" />Pay extras
+          </Button>
+        )
+      }
+      if (!hasOutstanding && !hasUnpaidExtras) {
+        btns.push(
+          <Button key="confirm-complete" size="sm" className="h-6 text-[10px] px-1.5 bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => handleCustomerConfirmCompletion(booking._id)} disabled={busy}>
+            {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <CheckCheck className="mr-1 h-3 w-3" />}
+            Confirm
+          </Button>
+        )
+      }
+      btns.push(
+        <Button key="dispute" variant="outline" size="sm" className="h-6 text-[10px] px-1.5 border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => router.push(`/bookings/${booking._id}?dispute=1`)}>
+          <XCircle className="mr-1 h-3 w-3" />Dispute
         </Button>
       )
     }

@@ -11,6 +11,7 @@ import type { PublicProfessionalDto } from '@/types/project';
 
 interface ProjectCardProps {
   customerPrice: (value: number) => number;
+  originalPrice?: (value: number) => number;
   project: {
     _id: string;
     title: string;
@@ -83,10 +84,17 @@ interface ProjectCardProps {
   };
 }
 
-const ProjectCard = ({ customerPrice, project }: ProjectCardProps) => {
+const ProjectCard = ({ customerPrice, originalPrice, project }: ProjectCardProps) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [viewerTimeZone, setViewerTimeZone] = useState('UTC');
   const formatAmount = (value: number) => `€${customerPrice(value).toLocaleString()}`;
+  const formatOriginalAmount = (value: number) =>
+    originalPrice ? `€${originalPrice(value).toLocaleString()}` : null;
+  const hasDiscount = (value: number) =>
+    !!originalPrice && originalPrice(value) - customerPrice(value) >= 0.01;
+  const unitSuffix = project.priceModel
+    ? formatPriceModelLabel(project.priceModel)
+    : 'unit';
   const professional = project.professionalId;
   const professionalName = professional?.username || professional?.name || 'Professional';
   const location = [professional?.businessInfo?.city, professional?.businessInfo?.country]
@@ -115,10 +123,18 @@ const ProjectCard = ({ customerPrice, project }: ProjectCardProps) => {
     return null;
   };
 
-  const formatSubprojectPrice = (pricing: { type: string; amount?: number; priceRange?: { min: number; max: number } }) => {
+  const renderSubprojectPrice = (pricing: { type: string; amount?: number; priceRange?: { min: number; max: number } }) => {
     const amount = pricing.amount;
 
     if (pricing.type === 'fixed' && amount != null && Number.isFinite(amount)) {
+      if (hasDiscount(amount)) {
+        return (
+          <span className="flex items-baseline gap-1">
+            <span className="text-gray-400 line-through text-[9px]">{formatOriginalAmount(amount)}</span>
+            <span>{formatAmount(amount)}</span>
+          </span>
+        );
+      }
       return formatAmount(amount);
     }
     if (pricing.type === 'unit') {
@@ -127,10 +143,18 @@ const ProjectCard = ({ customerPrice, project }: ProjectCardProps) => {
         Number.isFinite(pricing.priceRange.min) &&
         Number.isFinite(pricing.priceRange.max)
       ) {
-        return `${formatAmount(pricing.priceRange.min)}-${formatAmount(pricing.priceRange.max)}/unit`;
+        return `${formatAmount(pricing.priceRange.min)}-${formatAmount(pricing.priceRange.max)}/${unitSuffix}`;
       }
       if (amount != null && Number.isFinite(amount)) {
-        return `${formatAmount(amount)}/unit`;
+        if (hasDiscount(amount)) {
+          return (
+            <span className="flex items-baseline gap-1">
+              <span className="text-gray-400 line-through text-[9px]">{formatOriginalAmount(amount)}</span>
+              <span>{formatAmount(amount)}/{unitSuffix}</span>
+            </span>
+          );
+        }
+        return `${formatAmount(amount)}/${unitSuffix}`;
       }
     }
     if (pricing.type === 'rfq') {
@@ -331,7 +355,7 @@ const ProjectCard = ({ customerPrice, project }: ProjectCardProps) => {
                     )}
                   </div>
                   <Badge variant={subproject.pricing.type === 'rfq' ? 'outline' : 'default'} className="text-[10px] px-2 py-0.5 shrink-0">
-                    {formatSubprojectPrice(subproject.pricing)}
+                    {renderSubprojectPrice(subproject.pricing)}
                   </Badge>
                 </div>
               ))}
