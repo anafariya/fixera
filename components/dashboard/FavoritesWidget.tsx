@@ -49,11 +49,13 @@ export default function FavoritesWidget() {
     if (dismissing) return;
     setDismissing(true);
     try {
-      await authFetch(
+      const res = await authFetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/professional/favorites-notifications/seen`,
         { method: "POST" }
       );
-      setStats((prev) => (prev ? { ...prev, newSinceLastSeen: 0 } : prev));
+      if (res.ok) {
+        setStats((prev) => (prev ? { ...prev, newSinceLastSeen: 0 } : prev));
+      }
     } catch {
       // silent
     } finally {

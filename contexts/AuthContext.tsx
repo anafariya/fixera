@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { getAuthToken, setAuthToken } from '@/lib/utils'
 import { ONBOARDING_STEPS } from '@/lib/constants/onboardingSteps'
+import { PENDING_FAVORITE_KEY } from '@/lib/constants/favorites'
 
 interface User {
   _id: string
@@ -548,9 +549,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Replay pending favorite once a customer logs in
   useEffect(() => {
     if (!user || user.role !== 'customer' || typeof window === 'undefined') return
-    const raw = window.sessionStorage.getItem('fixera_pending_favorite')
+    const raw = window.sessionStorage.getItem(PENDING_FAVORITE_KEY)
     if (!raw) return
-    window.sessionStorage.removeItem('fixera_pending_favorite')
+    window.sessionStorage.removeItem(PENDING_FAVORITE_KEY)
     try {
       const parsed = JSON.parse(raw) as { targetType: string; targetId: string }
       if (!parsed?.targetType || !parsed?.targetId) return

@@ -118,11 +118,13 @@ export default function FavoritesPage() {
                 </Button>
               </CardContent>
             </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {items
-                .filter((item): item is FavoriteItem & { professional: ProfessionalPayload } => !!item.professional)
-                .map((item) => (
+          ) : (() => {
+            const professionalItems = items.filter(
+              (item): item is FavoriteItem & { professional: ProfessionalPayload } => !!item.professional
+            );
+            return professionalItems.length ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {professionalItems.map((item) => (
                   <ProfessionalCard
                     key={item._id}
                     professional={item.professional}
@@ -130,8 +132,13 @@ export default function FavoritesPage() {
                     onFavoriteToggled={(fav) => handleToggle(item.targetId, fav)}
                   />
                 ))}
-            </div>
-          )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-8">
+                No professionals found for your favorites — they may have been removed.
+              </p>
+            );
+          })()}
         </TabsContent>
 
         <TabsContent value="project" className="mt-6">
@@ -152,11 +159,13 @@ export default function FavoritesPage() {
                 </Button>
               </CardContent>
             </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {items
-                .filter((item): item is FavoriteItem & { project: ProjectPayload } => !!item.project)
-                .map((item) => (
+          ) : (() => {
+            const projectItems = items.filter(
+              (item): item is FavoriteItem & { project: ProjectPayload } => !!item.project
+            );
+            return projectItems.length ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {projectItems.map((item) => (
                   <ProjectCard
                     key={item._id}
                     project={{
@@ -168,8 +177,13 @@ export default function FavoritesPage() {
                     onFavoriteToggled={(fav) => handleToggle(item.targetId, fav)}
                   />
                 ))}
-            </div>
-          )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-8">
+                No projects found for your favorites — they may have been removed.
+              </p>
+            );
+          })()}
         </TabsContent>
       </Tabs>
     </div>

@@ -40,11 +40,14 @@ export function useFavoriteStatus(
           }
         );
         const json = await res.json();
-        if (!cancelled && res.ok && json?.success) {
+        if (cancelled) return;
+        if (res.ok && json?.success) {
           setFavorited(json.data.favorited || {});
+        } else {
+          setFavorited({});
         }
       } catch {
-        // silent
+        if (!cancelled) setFavorited({});
       }
     })();
     return () => {

@@ -6,8 +6,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { authFetch } from "@/lib/utils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { PENDING_FAVORITE_KEY, HEART_PATH } from "@/lib/constants/favorites";
 
-export const PENDING_FAVORITE_KEY = "fixera_pending_favorite";
+export { PENDING_FAVORITE_KEY };
 
 export type FavoriteTargetType = "professional" | "project";
 
@@ -183,7 +184,7 @@ export default function FavoriteButton({
             </linearGradient>
           </defs>
           <path
-            d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+            d={HEART_PATH}
             fill={favorited ? `url(#${gradientId})` : "none"}
             stroke={favorited ? `url(#${gradientId})` : "#d1d5db"}
           />

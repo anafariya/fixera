@@ -10,8 +10,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { HEART_PATH } from "@/lib/constants/favorites";
 
 interface OverviewTotals {
   professionals: number;
@@ -68,7 +77,7 @@ const PastelHeart = ({ size = 16 }: { size?: number }) => (
       </linearGradient>
     </defs>
     <path
-      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+      d={HEART_PATH}
       fill="url(#favAdminGrad)"
       stroke="url(#favAdminGrad)"
       strokeWidth="2"
@@ -89,6 +98,8 @@ export default function AdminFavoritesPage() {
   const [filterType, setFilterType] = useState<"" | "professional" | "project">("");
   const [filterUserId, setFilterUserId] = useState("");
   const [filterTargetId, setFilterTargetId] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -161,7 +172,7 @@ export default function AdminFavoritesPage() {
 
   const handleDelete = useCallback(
     async (id: string) => {
-      if (!confirm("Remove this favorite entry? The customer will no longer see it in their list.")) return;
+      setDeleteBusy(true);
       try {
         const res = await authFetch(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/favorites/${id}`,
@@ -178,6 +189,9 @@ export default function AdminFavoritesPage() {
         }
       } catch {
         toast.error("Failed to remove favorite");
+      } finally {
+        setDeleteBusy(false);
+        setDeleteId(null);
       }
     },
     [loadOverview]
@@ -429,7 +443,7 @@ export default function AdminFavoritesPage() {
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => handleDelete(r._id)}
+                              onClick={() => setDeleteId(r._id)}
                             >
                               <Trash2 className="h-3 w-3 mr-1" /> Remove
                             </Button>
@@ -468,6 +482,30 @@ export default function AdminFavoritesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!deleteId} onOpenChange={(open) => !open && !deleteBusy && setDeleteId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove favorite?</DialogTitle>
+            <DialogDescription>
+              The customer will no longer see this entry in their list.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteId(null)} disabled={deleteBusy}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteId && handleDelete(deleteId)}
+              disabled={deleteBusy}
+            >
+              {deleteBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
