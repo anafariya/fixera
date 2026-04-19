@@ -57,6 +57,16 @@ export interface CmsListResponse {
 const API = () => process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
 async function parseJson<T>(res: Response): Promise<T> {
+  if (res.status === 204) return undefined as T;
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      text
+        ? `Request failed (${res.status}): ${text.slice(0, 200)}`
+        : `Request failed (${res.status})`
+    );
+  }
   const data = await res.json();
   if (!res.ok || data?.success === false) {
     throw new Error(data?.msg || `Request failed (${res.status})`);

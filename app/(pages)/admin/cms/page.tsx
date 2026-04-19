@@ -53,6 +53,7 @@ export default function CmsAdminListPage() {
 
   useEffect(() => {
     if (!isAuthenticated || user?.role !== "admin") return;
+    let cancelled = false;
     setLoadingList(true);
     adminListCms({
       type: activeType,
@@ -60,9 +61,21 @@ export default function CmsAdminListPage() {
       search: debounced || undefined,
       limit: 100,
     })
-      .then((res) => setItems(res.items))
-      .catch(() => setItems([]))
-      .finally(() => setLoadingList(false));
+      .then((res) => {
+        if (cancelled) return;
+        setItems(res.items);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setItems([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoadingList(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [activeType, status, debounced, isAuthenticated, user]);
 
   useEffect(() => {

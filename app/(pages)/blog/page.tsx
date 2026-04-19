@@ -95,7 +95,11 @@ function EmptyBlog() {
 }
 
 function Pagination({ page, totalPages, basePath, tag }: { page: number; totalPages: number; basePath: string; tag?: string }) {
-  const link = (p: number) => `${basePath}?page=${p}${tag ? `&tag=${tag}` : ""}`;
+  const link = (p: number) => {
+    const qs = new URLSearchParams({ page: String(p) });
+    if (tag) qs.set("tag", tag);
+    return `${basePath}?${qs.toString()}`;
+  };
   return (
     <div className="mt-10 flex items-center justify-center gap-2">
       {page > 1 && (

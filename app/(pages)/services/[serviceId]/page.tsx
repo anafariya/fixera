@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -35,12 +36,12 @@ function findServiceMeta(serviceId: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { serviceId } = await params;
   const meta = findServiceMeta(serviceId);
-  const title = meta?.name || 'Service';
-  const description = meta?.description || `Find verified professionals for ${title.toLowerCase()} on Fixera.`;
+  if (!meta) notFound();
+  const description = meta.description || `Find verified professionals for ${meta.name.toLowerCase()} on Fixera.`;
   return buildMetadata({
-    title,
+    title: meta.name,
     description,
-    path: `/services/${serviceId}`,
+    path: `/services/${encodeURIComponent(serviceId)}`,
   });
 }
 
@@ -92,7 +93,9 @@ export default async function Page({ params }: Props) {
   const { serviceId } = await params;
 
   const meta = findServiceMeta(serviceId);
-  const serviceName = meta?.name || 'Services';
+  if (!meta) notFound();
+  const serviceName = meta.name;
+  const safePath = `/services/${encodeURIComponent(serviceId)}`;
 
   return (
     <div className="bg-white">
@@ -100,14 +103,14 @@ export default async function Page({ params }: Props) {
         data={[
           serviceSchema({
             name: serviceName,
-            description: meta?.description,
-            path: `/services/${serviceId}`,
-            category: meta?.category,
+            description: meta.description,
+            path: safePath,
+            category: meta.category,
           }),
           breadcrumbSchema([
             { name: 'Home', path: '/' },
             { name: 'Services', path: '/services' },
-            { name: serviceName, path: `/services/${serviceId}` },
+            { name: serviceName, path: safePath },
           ]),
         ]}
       />

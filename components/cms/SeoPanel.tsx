@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, Search } from "lucide-react";
-import { useState } from "react";
+import { cloneElement, isValidElement, ReactElement, useId, useState } from "react";
 import { CmsSeo } from "@/lib/cms";
 import { cn } from "@/lib/utils";
 
@@ -109,13 +109,17 @@ export default function SeoPanel({ value, onChange, fallbackTitle, fallbackDescr
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  const controlId = useId();
+  const labelled = isValidElement(children)
+    ? cloneElement(children as ReactElement<{ id?: string }>, { id: controlId })
+    : children;
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <label className="text-xs font-semibold uppercase tracking-wide text-rose-700">{label}</label>
+        <label htmlFor={controlId} className="text-xs font-semibold uppercase tracking-wide text-rose-700">{label}</label>
         {hint && <span className="text-[11px] text-rose-400">{hint}</span>}
       </div>
-      {children}
+      {labelled}
     </div>
   );
 }

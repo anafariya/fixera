@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { siteUrl } from "@/lib/seo/site";
-import { publicListSitemapEntries } from "@/lib/cms";
+import { publicListSitemapEntries, type CmsContentType } from "@/lib/cms";
 import { serviceCategories } from "@/data/content";
 
 export const dynamic = "force-dynamic";
@@ -25,12 +25,12 @@ const RESERVED_POLICY_SLUGS: Record<string, string> = {
   "privacy-policy": "/privacy-policy",
 };
 
-const CMS_PATH_PREFIX: Record<string, (slug: string) => string> = {
-  blog: (slug) => `/blog/${slug}`,
-  news: (slug) => `/news/${slug}`,
-  landing: (slug) => `/pages/${slug}`,
-  policy: (slug) => RESERVED_POLICY_SLUGS[slug] || `/pages/${slug}`,
-};
+const CMS_PATH_PREFIX = {
+  blog: (slug: string) => `/blog/${slug}`,
+  news: (slug: string) => `/news/${slug}`,
+  landing: (slug: string) => `/pages/${slug}`,
+  policy: (slug: string) => RESERVED_POLICY_SLUGS[slug] || `/pages/${slug}`,
+} satisfies Partial<Record<CmsContentType, (slug: string) => string>>;
 
 const STATIC_ROUTE_PATHS = new Set<string>();
 
@@ -69,7 +69,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const cms = await publicListSitemapEntries();
     for (const item of cms) {
-      const pathBuilder = CMS_PATH_PREFIX[item.type];
+      const pathBuilder = CMS_PATH_PREFIX[item.type as keyof typeof CMS_PATH_PREFIX];
       if (!pathBuilder) continue;
       const path = pathBuilder(item.slug);
       if (STATIC_ROUTE_PATHS.has(path)) continue;

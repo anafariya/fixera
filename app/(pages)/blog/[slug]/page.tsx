@@ -81,7 +81,7 @@ export default async function BlogDetailPage({ params }: Props) {
             {post.tags.map((t) => (
               <Link
                 key={t}
-                href={`/blog?tag=${t}`}
+                href={`/blog?tag=${encodeURIComponent(t)}`}
                 className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-rose-100 to-pink-100 px-3 py-1 text-xs font-medium text-rose-700 transition hover:from-rose-200 hover:to-pink-200"
               >
                 <Tag size={10} /> {t}
