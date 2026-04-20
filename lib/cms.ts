@@ -74,8 +74,8 @@ export interface CmsListResponse {
 
 const API = () => process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
-async function parseJson<T>(res: Response): Promise<T> {
-  if (res.status === 204) return undefined as T;
+async function parseJson<T>(res: Response): Promise<T | undefined> {
+  if (res.status === 204) return undefined;
   const contentType = res.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
     const text = await res.text().catch(() => "");
@@ -90,6 +90,14 @@ async function parseJson<T>(res: Response): Promise<T> {
     throw new Error(data?.msg || `Request failed (${res.status})`);
   }
   return data.data as T;
+}
+
+async function parseJsonRequired<T>(res: Response): Promise<T> {
+  const data = await parseJson<T>(res);
+  if (data === undefined) {
+    throw new Error(`Request returned no body (${res.status}) but a response was expected`);
+  }
+  return data;
 }
 
 // ---------- Admin ----------
@@ -111,12 +119,12 @@ export async function adminListCms(params: {
   if (params.limit) qs.set("limit", String(params.limit));
 
   const res = await authFetch(`${API()}/api/admin/cms?${qs.toString()}`);
-  return parseJson<CmsListResponse>(res);
+  return parseJsonRequired<CmsListResponse>(res);
 }
 
 export async function adminGetCms(id: string): Promise<CmsContent> {
   const res = await authFetch(`${API()}/api/admin/cms/${id}`);
-  return parseJson<CmsContent>(res);
+  return parseJsonRequired<CmsContent>(res);
 }
 
 export async function adminCreateCms(payload: CmsUpsertPayload): Promise<CmsContent> {
@@ -125,7 +133,7 @@ export async function adminCreateCms(payload: CmsUpsertPayload): Promise<CmsCont
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return parseJson<CmsContent>(res);
+  return parseJsonRequired<CmsContent>(res);
 }
 
 export async function adminUpdateCms(id: string, payload: CmsUpsertPayload): Promise<CmsContent> {
@@ -134,12 +142,12 @@ export async function adminUpdateCms(id: string, payload: CmsUpsertPayload): Pro
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return parseJson<CmsContent>(res);
+  return parseJsonRequired<CmsContent>(res);
 }
 
 export async function adminDeleteCms(id: string): Promise<void> {
   const res = await authFetch(`${API()}/api/admin/cms/${id}`, { method: "DELETE" });
-  await parseJson(res);
+  await parseJson<void>(res);
 }
 
 export async function adminUploadCmsImage(file: File): Promise<{ url: string; key: string }> {
@@ -149,12 +157,12 @@ export async function adminUploadCmsImage(file: File): Promise<{ url: string; ke
     method: "POST",
     body: form,
   });
-  return parseJson<{ url: string; key: string }>(res);
+  return parseJsonRequired<{ url: string; key: string }>(res);
 }
 
 export async function adminListFaqCategories(): Promise<FaqCategory[]> {
   const res = await authFetch(`${API()}/api/admin/cms/faq-categories`);
-  return parseJson<FaqCategory[]>(res);
+  return parseJsonRequired<FaqCategory[]>(res);
 }
 
 // ---------- Public ----------
@@ -168,7 +176,7 @@ export async function publicListCms(
   if (params.limit) qs.set("limit", String(params.limit));
   if (params.tag) qs.set("tag", params.tag);
   const res = await fetch(`${API()}/api/public/cms/${type}?${qs.toString()}`, { cache: "no-store" });
-  return parseJson<CmsListResponse>(res);
+  return parseJsonRequired<CmsListResponse>(res);
 }
 
 export async function publicGetCms(
@@ -177,7 +185,7 @@ export async function publicGetCms(
 ): Promise<CmsContent | null> {
   const res = await fetch(`${API()}/api/public/cms/${type}/${encodeURIComponent(slug)}`, { cache: "no-store" });
   if (res.status === 404) return null;
-  return parseJson<CmsContent>(res);
+  return parseJsonRequired<CmsContent>(res);
 }
 
 export interface FaqGroup {
@@ -188,14 +196,31 @@ export interface FaqGroup {
 
 export async function publicGetFaq(): Promise<{ groups: FaqGroup[]; categories: FaqCategory[] }> {
   const res = await fetch(`${API()}/api/public/cms/faq`, { cache: "no-store" });
-  return parseJson<{ groups: FaqGroup[]; categories: FaqCategory[] }>(res);
+  return parseJsonRequired<{ groups: FaqGroup[]; categories: FaqCategory[] }>(res);
 }
 
-export async function publicListSitemapEntries(): Promise<
-  Array<{ type: CmsContentType; slug: string; locale: string; updatedAt: string; publishedAt?: string }>
-> {
-  const res = await fetch(`${API()}/api/public/cms/sitemap`, { cache: "no-store" });
-  return parseJson(res);
+export interface SitemapEntry {
+  type: CmsContentType;
+  slug: string;
+  locale: string;
+  updatedAt: string;
+  publishedAt?: string;
+}
+
+export interface SitemapPage {
+  items: SitemapEntry[];
+  pagination: { page: number; limit: number; total: number; totalPages: number; hasMore: boolean };
+}
+
+export async function publicListSitemapEntries(
+  params: { page?: number; limit?: number } = {}
+): Promise<SitemapPage> {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set("page", String(params.page));
+  if (params.limit) qs.set("limit", String(params.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const res = await fetch(`${API()}/api/public/cms/sitemap${suffix}`, { cache: "no-store" });
+  return parseJsonRequired<SitemapPage>(res);
 }
 
 // ---------- Utils ----------

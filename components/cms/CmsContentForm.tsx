@@ -380,25 +380,24 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
           <GradientCard>
             <div className="p-6 space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-rose-700">Status</h3>
-              <div className="flex gap-2">
-                {(["draft", "published"] as CmsContentStatus[]).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => update({ status: s })}
-                    className={cn(
-                      "flex-1 rounded-xl border px-4 py-2 text-sm font-medium capitalize transition",
-                      form.status === s
-                        ? "border-transparent bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow-sm"
-                        : "border-pink-200 bg-white text-rose-700 hover:bg-rose-50"
-                    )}
-                  >
-                    {s}
-                  </button>
-                ))}
+              <div
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium capitalize",
+                  form.status === "published"
+                    ? "bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow-sm"
+                    : "border border-pink-200 bg-white text-rose-700"
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-2 w-2 rounded-full",
+                    form.status === "published" ? "bg-white" : "bg-rose-400"
+                  )}
+                />
+                {form.status || "draft"}
               </div>
               <p className="text-[11px] text-rose-400">
-                Use Publish / Save draft at the top to apply the selected status.
+                Use Save draft or Publish at the top to change the status.
               </p>
             </div>
           </GradientCard>
