@@ -16,6 +16,8 @@ import {
   CMS_TYPE_LABELS,
   CMS_TYPE_ORDER,
   FaqCategory,
+  getPublicPathForCms,
+  getPublicSlugPrefixForCms,
   slugify,
 } from "@/lib/cms";
 import { cn } from "@/lib/utils";
@@ -59,12 +61,21 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
   const [tagInput, setTagInput] = useState("");
   const [faqCategories, setFaqCategories] = useState<FaqCategory[]>([]);
+  const [faqCategoriesError, setFaqCategoriesError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
-    adminListFaqCategories().then(setFaqCategories).catch(() => setFaqCategories([]));
+    adminListFaqCategories()
+      .then((cats) => {
+        setFaqCategories(cats);
+        setFaqCategoriesError(null);
+      })
+      .catch((err: unknown) => {
+        setFaqCategories([]);
+        setFaqCategoriesError(err instanceof Error ? err.message : "Failed to load FAQ categories");
+      });
   }, []);
 
   useEffect(() => {
@@ -82,6 +93,8 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
   const requiresCover = type === "blog" || type === "news";
   const hasTags = type === "blog" || type === "news";
   const isFaq = type === "faq";
+  const slugPrefix = getPublicSlugPrefixForCms(type);
+  const publicPreviewPath = form.slug ? getPublicPathForCms(type, form.slug) : null;
 
   const update = (patch: Partial<CmsContent>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -99,9 +112,10 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
     if (!form.title?.trim()) return false;
     if (!form.slug?.trim()) return false;
     if (requiresCover && !form.coverImage) return false;
+    if (isFaq && faqCategoriesError) return false;
     if (isFaq && !form.category) return false;
     return true;
-  }, [form, requiresCover, isFaq]);
+  }, [form, requiresCover, isFaq, faqCategoriesError]);
 
   const save = async (status: CmsContentStatus) => {
     if (!canSubmit) {
@@ -129,7 +143,11 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
         router.push(`/admin/cms/${created._id}/edit`);
       } else if (initial?._id) {
         const updated = await adminUpdateCms(initial._id, payload);
-        update(updated);
+        setForm({
+          ...updated,
+          tags: Array.isArray(updated.tags) ? updated.tags : [],
+          seo: updated.seo || {},
+        });
         toast.success(status === "published" ? "Published!" : "Draft saved");
       }
     } catch (err) {
@@ -254,7 +272,7 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wide text-rose-700">Slug</label>
                 <div className="flex items-center gap-2 rounded-xl border border-pink-200 bg-white/60 px-3 focus-within:border-rose-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-rose-200">
-                  <span className="text-sm text-rose-400">/{type}/</span>
+                  {slugPrefix && <span className="text-sm text-rose-400">{slugPrefix}</span>}
                   <input
                     value={form.slug || ""}
                     onChange={(e) => {
@@ -265,6 +283,11 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
                     className="flex-1 bg-transparent py-3 text-sm outline-none"
                   />
                 </div>
+                {!slugPrefix && (
+                  <p className="text-[11px] text-rose-400">
+                    FAQ items don&apos;t have individual URLs — the slug is used as an identifier only.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -298,7 +321,7 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
             onChange={(seo) => update({ seo })}
             fallbackTitle={form.title}
             fallbackDescription={form.excerpt}
-            pathPreview={form.slug ? `fixera.com/${type}/${form.slug}` : undefined}
+            pathPreview={publicPreviewPath ? `fixera.com${publicPreviewPath}` : undefined}
           />
         </div>
 
@@ -319,23 +342,33 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
             <GradientCard>
               <div className="p-6 space-y-3">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-rose-700">FAQ Category</h3>
-                <div className="grid grid-cols-1 gap-2">
-                  {faqCategories.map((c) => (
-                    <button
-                      key={c.slug}
-                      type="button"
-                      onClick={() => update({ category: c.slug })}
-                      className={cn(
-                        "rounded-xl border px-4 py-2 text-left text-sm transition",
-                        form.category === c.slug
-                          ? "border-transparent bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow-sm"
-                          : "border-pink-200 bg-white text-rose-700 hover:bg-rose-50"
-                      )}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
+                {faqCategoriesError ? (
+                  <div className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+                    <div className="font-semibold">Couldn&apos;t load categories</div>
+                    <div className="mt-0.5 text-rose-600">{faqCategoriesError}</div>
+                    <div className="mt-1 text-rose-500">
+                      Saving is disabled until categories load. Refresh the page to retry.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2">
+                    {faqCategories.map((c) => (
+                      <button
+                        key={c.slug}
+                        type="button"
+                        onClick={() => update({ category: c.slug })}
+                        className={cn(
+                          "rounded-xl border px-4 py-2 text-left text-sm transition",
+                          form.category === c.slug
+                            ? "border-transparent bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow-sm"
+                            : "border-pink-200 bg-white text-rose-700 hover:bg-rose-50"
+                        )}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </GradientCard>
           )}

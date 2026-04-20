@@ -86,8 +86,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       if (!pagination.hasMore) break;
       page += 1;
     }
-  } catch {
-    // CMS unreachable — skip dynamic entries
+  } catch (err) {
+    console.error(
+      "[sitemap] CMS fetch failed — dynamic CMS entries skipped. event=sitemap.cms.fetch_failure",
+      err
+    );
   }
 
   return entries;

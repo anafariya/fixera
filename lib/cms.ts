@@ -225,6 +225,43 @@ export async function publicListSitemapEntries(
 
 // ---------- Utils ----------
 
+const RESERVED_POLICY_PATHS: Record<string, string> = {
+  about: "/about",
+  "privacy-policy": "/privacy-policy",
+};
+
+export function getPublicPathForCms(type: CmsContentType, slug: string): string | null {
+  if (!slug) return null;
+  switch (type) {
+    case "blog":
+      return `/blog/${slug}`;
+    case "news":
+      return `/news/${slug}`;
+    case "landing":
+      return `/pages/${slug}`;
+    case "policy":
+      return RESERVED_POLICY_PATHS[slug] || `/pages/${slug}`;
+    case "faq":
+    default:
+      return null;
+  }
+}
+
+export function getPublicSlugPrefixForCms(type: CmsContentType): string | null {
+  switch (type) {
+    case "blog":
+      return "/blog/";
+    case "news":
+      return "/news/";
+    case "landing":
+    case "policy":
+      return "/pages/";
+    case "faq":
+    default:
+      return null;
+  }
+}
+
 export function slugify(input: string): string {
   const normalized = (input || "")
     .normalize("NFKD")

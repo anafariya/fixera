@@ -33,6 +33,7 @@ export default function CmsAdminListPage() {
   const [items, setItems] = useState<CmsContent[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [counts, setCounts] = useState<Record<CmsContentType, number>>({
     blog: 0,
     news: 0,
@@ -81,7 +82,7 @@ export default function CmsAdminListPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeType, status, debounced, isAuthenticated, user]);
+  }, [activeType, status, debounced, isAuthenticated, user, refreshKey]);
 
   useEffect(() => {
     if (!isAuthenticated || user?.role !== "admin") return;
@@ -210,7 +211,7 @@ export default function CmsAdminListPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setDebounced((v) => v)}
+                onClick={() => setRefreshKey((k) => k + 1)}
                 className="rounded-lg border border-rose-300 bg-white px-3 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
               >
                 Retry
