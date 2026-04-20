@@ -19,6 +19,7 @@ import {
   slugify,
 } from "@/lib/cms";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import RichTextEditor from "./RichTextEditor";
 import CoverImageUpload from "./CoverImageUpload";
 import SeoPanel from "./SeoPanel";
@@ -60,6 +61,7 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
   const [faqCategories, setFaqCategories] = useState<FaqCategory[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     adminListFaqCategories().then(setFaqCategories).catch(() => setFaqCategories([]));
@@ -67,7 +69,11 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
 
   useEffect(() => {
     if (!slugTouched && form.title) {
-      setForm((f) => ({ ...f, slug: slugify(f.title || "") }));
+      setForm((f) => {
+        const generated = slugify(f.title || "");
+        const next = generated.trim() ? generated : `untitled-${Date.now().toString(36)}`;
+        return { ...f, slug: next };
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.title]);
@@ -133,9 +139,14 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
     }
   };
 
-  const remove = async () => {
+  const remove = () => {
     if (!initial?._id) return;
-    if (!window.confirm("Delete this content? This cannot be undone.")) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!initial?._id) return;
+    setShowDeleteConfirm(false);
     setDeleting(true);
     try {
       await adminDeleteCms(initial._id);
@@ -393,6 +404,33 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
           </GradientCard>
         </div>
       </div>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete this content?</DialogTitle>
+            <DialogDescription>
+              This cannot be undone. The item will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(false)}
+              className="inline-flex items-center justify-center rounded-xl border border-pink-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmDelete}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-rose-200 transition hover:shadow-lg hover:shadow-rose-300"
+            >
+              <Trash2 size={14} /> Delete
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

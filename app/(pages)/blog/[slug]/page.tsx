@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Calendar, Tag } from "lucide-react";
 import type { Metadata } from "next";
@@ -80,7 +81,16 @@ export default async function BlogDetailPage({ params }: Props) {
       {post.coverImage && (
         <div className="mx-auto mt-4 max-w-5xl px-6">
           <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-rose-200 via-pink-200 to-orange-200 p-[1.5px] shadow-xl shadow-rose-100">
-            <img src={post.coverImage} alt={post.title} className="aspect-[16/7] w-full rounded-[calc(1.5rem-1.5px)] object-cover" />
+            <div className="relative aspect-[16/7] w-full overflow-hidden rounded-[calc(1.5rem-1.5px)]">
+              <Image
+                src={post.coverImage}
+                alt={post.title}
+                fill
+                sizes="(max-width: 1024px) 100vw, 80rem"
+                className="object-cover"
+                priority
+              />
+            </div>
           </div>
         </div>
       )}

@@ -1,15 +1,9 @@
 export const siteUrl = (): string => {
   const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (!raw) {
-    const isBuild = process.env.NEXT_PHASE === "phase-production-build";
-    if (process.env.NODE_ENV === "production" && !isBuild) {
+    if (process.env.NODE_ENV === "production") {
       throw new Error(
-        "siteUrl: NEXT_PUBLIC_SITE_URL must be set in production — unset would emit localhost URLs in sitemap, canonical, and OG tags."
-      );
-    }
-    if (isBuild) {
-      console.warn(
-        "siteUrl: NEXT_PUBLIC_SITE_URL is not set during build — falling back to localhost. Ensure the env is configured in the deployment environment before serving traffic."
+        "siteUrl: NEXT_PUBLIC_SITE_URL must be set in production and at build time — unset would bake localhost URLs into sitemap, canonical, and OG tags."
       );
     }
     return "http://localhost:3000";

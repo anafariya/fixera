@@ -1,4 +1,4 @@
-import { authFetch, getAuthFetchOptions } from "@/lib/utils";
+import { authFetch } from "@/lib/utils";
 
 export type CmsContentType = "blog" | "news" | "faq" | "policy" | "landing";
 export type CmsContentStatus = "draft" | "published";
@@ -201,12 +201,19 @@ export async function publicListSitemapEntries(): Promise<
 // ---------- Utils ----------
 
 export function slugify(input: string): string {
-  return input
+  const normalized = (input || "")
+    .normalize("NFKD")
+    .replace(/\p{Diacritic}+/gu, "")
     .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
+    .trim();
+
+  const ascii = normalized
+    .replace(/[^\p{L}\p{N}\s-]+/gu, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 200);
+
+  if (ascii) return ascii;
+  return `untitled-${Math.random().toString(36).slice(2, 8)}`;
 }
