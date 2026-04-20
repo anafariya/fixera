@@ -366,15 +366,15 @@ export default function AdminDiscountCodesPage() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-200 shrink-0">
             <DialogTitle>{editingId ? "Edit discount code" : "Create discount code"}</DialogTitle>
             <DialogDescription>
               Codes are absorbed by the platform — professional payout is unaffected.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-4 py-4">
+          <div className="grid grid-cols-2 gap-4 px-6 py-4 overflow-y-auto flex-1 min-h-0">
             <div className="col-span-2">
               <Label>Code</Label>
               <Input
@@ -495,7 +495,7 @@ export default function AdminDiscountCodesPage() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="px-6 py-4 border-t border-slate-200 shrink-0">
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving} className="bg-rose-500 hover:bg-rose-600 text-white">
               {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
