@@ -271,18 +271,18 @@ export default function ProfessionalEarningsDashboard() {
   const monthlyRevenue = data?.monthlyRevenue ?? [];
 
   const kpiCards = [
-    { label: 'Net Revenue', value: formatEuro(kpis?.revenueNet ?? 0), icon: Wallet, accent: 'text-green-700' },
-    { label: 'Completed Bookings', value: kpis?.completedBookings ?? 0, icon: TrendingUp, accent: 'text-gray-900' },
-    { label: 'Profile Views', value: kpis?.views ?? 0, icon: Eye, accent: 'text-blue-700' },
-    { label: 'Favorites', value: kpis?.favorites ?? 0, icon: Heart, accent: 'text-pink-600' },
-    { label: 'Quote Conversion', value: `${kpis?.conversionRate ?? 0}%`, icon: Users, accent: 'text-blue-700' },
-    { label: 'View → Booking', value: `${kpis?.bookingRate ?? 0}%`, icon: TrendingUp, accent: 'text-blue-700' },
-    { label: 'Overdue Rate', value: `${kpis?.overdueRate ?? 0}%`, icon: Clock, accent: 'text-amber-700' },
-    { label: 'Avg Overdue Days', value: `${kpis?.avgOverdueDays ?? 0}`, icon: Clock, accent: 'text-amber-700' },
-    { label: 'Warranty Claims', value: kpis?.warrantyClaims ?? 0, icon: ShieldAlert, accent: 'text-amber-700' },
-    { label: 'Cancellations', value: kpis?.cancelledBookings ?? 0, icon: Calendar, accent: 'text-red-600' },
-    { label: 'Avg Booking Value', value: formatEuro(kpis?.avgBookingValue ?? 0), icon: TrendingUp, accent: 'text-gray-900' },
-    { label: 'Refunds Issued', value: formatEuro(kpis?.refundTotal ?? 0), icon: RefreshCcw, accent: 'text-red-600' },
+    { label: 'Net Revenue', value: formatEuro(kpis?.revenueNet ?? 0), icon: Wallet, accent: 'text-emerald-700', gradient: 'from-emerald-200 via-teal-200 to-green-200' },
+    { label: 'Completed Bookings', value: kpis?.completedBookings ?? 0, icon: TrendingUp, accent: 'text-sky-700', gradient: 'from-sky-200 via-blue-200 to-cyan-200' },
+    { label: 'Profile Views', value: kpis?.views ?? 0, icon: Eye, accent: 'text-indigo-700', gradient: 'from-indigo-200 via-violet-200 to-purple-200' },
+    { label: 'Favorites', value: kpis?.favorites ?? 0, icon: Heart, accent: 'text-pink-600', gradient: 'from-pink-200 via-rose-200 to-fuchsia-200' },
+    { label: 'Quote Conversion', value: `${kpis?.conversionRate ?? 0}%`, icon: Users, accent: 'text-blue-700', gradient: 'from-blue-200 via-sky-200 to-indigo-200' },
+    { label: 'View → Booking', value: `${kpis?.bookingRate ?? 0}%`, icon: TrendingUp, accent: 'text-teal-700', gradient: 'from-teal-200 via-emerald-200 to-cyan-200' },
+    { label: 'Overdue Rate', value: `${kpis?.overdueRate ?? 0}%`, icon: Clock, accent: 'text-amber-700', gradient: 'from-amber-200 via-yellow-200 to-orange-200' },
+    { label: 'Avg Overdue Days', value: `${kpis?.avgOverdueDays ?? 0}`, icon: Clock, accent: 'text-orange-700', gradient: 'from-orange-200 via-amber-200 to-yellow-200' },
+    { label: 'Warranty Claims', value: kpis?.warrantyClaims ?? 0, icon: ShieldAlert, accent: 'text-orange-700', gradient: 'from-orange-200 via-red-200 to-rose-200' },
+    { label: 'Cancellations', value: kpis?.cancelledBookings ?? 0, icon: Calendar, accent: 'text-rose-600', gradient: 'from-rose-200 via-red-200 to-pink-200' },
+    { label: 'Avg Booking Value', value: formatEuro(kpis?.avgBookingValue ?? 0), icon: TrendingUp, accent: 'text-lime-700', gradient: 'from-lime-200 via-green-200 to-emerald-200' },
+    { label: 'Refunds Issued', value: formatEuro(kpis?.refundTotal ?? 0), icon: RefreshCcw, accent: 'text-red-600', gradient: 'from-red-200 via-rose-200 to-pink-200' },
   ];
 
   const sortedBookings = [...bookings].sort((a, b) => {
@@ -383,22 +383,28 @@ export default function ProfessionalEarningsDashboard() {
           {kpiCards.map((kpi) => {
             const Icon = kpi.icon;
             return (
-              <Card key={kpi.label}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                      {kpi.label}
-                    </span>
-                    <Icon className={`w-4 h-4 ${kpi.accent}`} />
-                  </div>
-                  <p className={`text-2xl font-bold mt-2 ${kpi.accent}`}>{kpi.value}</p>
-                </CardContent>
-              </Card>
+              <div
+                key={kpi.label}
+                className={`rounded-xl p-[1.5px] bg-gradient-to-br ${kpi.gradient} shadow-sm hover:shadow-md transition-shadow`}
+              >
+                <Card className="rounded-[11px] border-0 bg-white h-full shadow-none">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        {kpi.label}
+                      </span>
+                      <Icon className={`w-4 h-4 ${kpi.accent}`} />
+                    </div>
+                    <p className={`text-2xl font-bold mt-2 ${kpi.accent}`}>{kpi.value}</p>
+                  </CardContent>
+                </Card>
+              </div>
             );
           })}
         </div>
 
-        <Card>
+        <div className="rounded-xl p-[1.5px] bg-gradient-to-br from-emerald-200 via-teal-200 to-cyan-200 shadow-sm">
+        <Card className="rounded-[11px] border-0 bg-white shadow-none">
           <CardHeader>
             <CardTitle className="text-lg">Monthly Revenue</CardTitle>
           </CardHeader>
@@ -435,8 +441,10 @@ export default function ProfessionalEarningsDashboard() {
             )}
           </CardContent>
         </Card>
+        </div>
 
-        <Card>
+        <div className="rounded-xl p-[1.5px] bg-gradient-to-br from-blue-200 via-indigo-200 to-sky-200 shadow-sm">
+        <Card className="rounded-[11px] border-0 bg-white shadow-none">
           <CardHeader>
             <CardTitle className="text-lg">Booking Funnel</CardTitle>
           </CardHeader>
@@ -459,9 +467,11 @@ export default function ProfessionalEarningsDashboard() {
             )}
           </CardContent>
         </Card>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
+          <div className="rounded-xl p-[1.5px] bg-gradient-to-br from-purple-200 via-violet-200 to-fuchsia-200 shadow-sm">
+          <Card className="rounded-[11px] border-0 bg-white shadow-none h-full">
             <CardHeader>
               <CardTitle className="text-lg">Top Services</CardTitle>
             </CardHeader>
@@ -490,8 +500,10 @@ export default function ProfessionalEarningsDashboard() {
               )}
             </CardContent>
           </Card>
+          </div>
 
-          <Card>
+          <div className="rounded-xl p-[1.5px] bg-gradient-to-br from-sky-200 via-blue-200 to-indigo-200 shadow-sm">
+          <Card className="rounded-[11px] border-0 bg-white shadow-none h-full">
             <CardHeader>
               <CardTitle className="text-lg">Top Projects</CardTitle>
             </CardHeader>
@@ -520,9 +532,11 @@ export default function ProfessionalEarningsDashboard() {
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
 
-        <Card>
+        <div className="rounded-xl p-[1.5px] bg-gradient-to-br from-rose-200 via-pink-200 to-orange-200 shadow-sm">
+        <Card className="rounded-[11px] border-0 bg-white shadow-none">
           <CardHeader>
             <CardTitle className="text-lg">Bookings</CardTitle>
           </CardHeader>
@@ -598,6 +612,7 @@ export default function ProfessionalEarningsDashboard() {
             )}
           </CardContent>
         </Card>
+        </div>
         </div>
       </div>
     </div>
