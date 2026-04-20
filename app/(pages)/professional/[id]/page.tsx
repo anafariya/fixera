@@ -187,6 +187,15 @@ export default function ProfessionalProfilePage() {
 
   useEffect(() => {
     if (!professionalId) return
+    if (isOwner) return
+    fetch(
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/public/professionals/${professionalId}/view`,
+      { method: 'POST', credentials: 'include' }
+    ).catch(() => { /* best-effort, silent */ })
+  }, [professionalId, isOwner])
+
+  useEffect(() => {
+    if (!professionalId) return
     let cancelled = false
     ;(async () => {
       try {

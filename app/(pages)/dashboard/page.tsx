@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { User, Mail, Phone, Shield, Calendar, Crown, Settings, TrendingUp, Users, Award, CheckCircle, XCircle, Clock, AlertTriangle, Plus, Briefcase, Package, CreditCard, FileText, Star, Gift, Play, Loader2, Info, MessageSquareWarning, EyeOff, Heart } from "lucide-react"
+import { User, Mail, Phone, Shield, Calendar, Crown, Settings, TrendingUp, Users, Award, CheckCircle, XCircle, Clock, AlertTriangle, Plus, Briefcase, Package, CreditCard, FileText, Star, Gift, Play, Loader2, Info, MessageSquareWarning, EyeOff, Heart, Ticket } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -707,6 +707,25 @@ export default function DashboardPage() {
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     Manage Content
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-rose-100 bg-gradient-to-br from-white via-rose-50 to-orange-100 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Ticket className="h-5 w-5 text-rose-500" />
+                    Discount Codes
+                  </CardTitle>
+                  <CardDescription>Create promotional codes for customers to use at checkout</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={() => window.open('/admin/discount-codes', '_blank')}
+                    className="w-full bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600"
+                  >
+                    <Ticket className="h-4 w-4 mr-2" />
+                    Manage Discount Codes
                   </Button>
                 </CardContent>
               </Card>
