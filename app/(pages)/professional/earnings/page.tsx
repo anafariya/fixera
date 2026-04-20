@@ -259,6 +259,20 @@ export default function ProfessionalEarningsDashboard() {
     }
   }, [isAuthenticated, user, range, loadStats, loadBookings]);
 
+  const sortedBookings = useMemo(() => {
+    return [...bookings].sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === 'createdAt') {
+        cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      } else if (sortKey === 'net') {
+        cmp = (a.net || 0) - (b.net || 0);
+      } else {
+        cmp = String(a[sortKey] || '').localeCompare(String(b[sortKey] || ''));
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [bookings, sortKey, sortDir]);
+
   if (authLoading || (loading && !data)) {
     return (
       <div className="min-h-screen bg-gray-50 p-6 mt-16">
@@ -294,20 +308,6 @@ export default function ProfessionalEarningsDashboard() {
     { label: 'Avg Booking Value', value: formatEuro(kpis?.avgBookingValue ?? 0), icon: TrendingUp, accent: 'text-lime-700', gradient: 'from-lime-200 via-green-200 to-emerald-200' },
     { label: 'Refunds Issued', value: formatEuro(kpis?.refundTotal ?? 0), icon: RefreshCcw, accent: 'text-red-600', gradient: 'from-red-200 via-rose-200 to-pink-200' },
   ];
-
-  const sortedBookings = useMemo(() => {
-    return [...bookings].sort((a, b) => {
-      let cmp = 0;
-      if (sortKey === 'createdAt') {
-        cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      } else if (sortKey === 'net') {
-        cmp = (a.net || 0) - (b.net || 0);
-      } else {
-        cmp = String(a[sortKey] || '').localeCompare(String(b[sortKey] || ''));
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-  }, [bookings, sortKey, sortDir]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
