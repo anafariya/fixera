@@ -50,8 +50,12 @@ export default function AdminSupportPage() {
         <h1 className="text-3xl font-bold text-indigo-900">Support — Admin</h1>
         <p className="mt-1 text-sm text-indigo-600/80">Tickets and meeting requests from professionals.</p>
 
-        <div className="mt-6 flex gap-2">
+        <div role="tablist" aria-label="Support sections" className="mt-6 flex gap-2">
           <button
+            id="tickets-tab"
+            role="tab"
+            aria-selected={tab === "tickets"}
+            aria-controls="tickets-panel"
             onClick={() => setTab("tickets")}
             className={cn(
               "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition",
@@ -63,6 +67,10 @@ export default function AdminSupportPage() {
             <LifeBuoy size={14} /> Tickets
           </button>
           <button
+            id="meetings-tab"
+            role="tab"
+            aria-selected={tab === "meetings"}
+            aria-controls="meetings-panel"
             onClick={() => setTab("meetings")}
             className={cn(
               "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition",
@@ -75,7 +83,15 @@ export default function AdminSupportPage() {
           </button>
         </div>
 
-        <div className="mt-6">{tab === "tickets" ? <TicketsAdmin /> : <MeetingsAdmin />}</div>
+        {tab === "tickets" ? (
+          <div role="tabpanel" id="tickets-panel" aria-labelledby="tickets-tab" className="mt-6">
+            <TicketsAdmin />
+          </div>
+        ) : (
+          <div role="tabpanel" id="meetings-panel" aria-labelledby="meetings-tab" className="mt-6">
+            <MeetingsAdmin />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -295,8 +311,7 @@ function MeetingsAdmin() {
                       scheduledAt: draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : undefined,
                       adminResponse: draft.adminResponse,
                     };
-                    // If admin has set a time but status is still pending, auto-advance to scheduled
-                    if (draft.scheduledAt && m.status === "pending") {
+                    if (draft.scheduledAt) {
                       payload.status = "scheduled";
                     }
                     update(m._id, payload);

@@ -50,31 +50,63 @@ export default function ProfessionalSupportPage() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-2">
-          <TabButton active={tab === "ticket"} onClick={() => setTab("ticket")} icon={<LifeBuoy size={14} />}>
+        <div role="tablist" aria-label="Support sections" className="mt-6 flex flex-wrap gap-2">
+          <TabButton
+            id="ticket-tab"
+            controls="ticket-panel"
+            active={tab === "ticket"}
+            onClick={() => setTab("ticket")}
+            icon={<LifeBuoy size={14} />}
+          >
             Create ticket
           </TabButton>
-          <TabButton active={tab === "meeting"} onClick={() => setTab("meeting")} icon={<CalendarClock size={14} />}>
+          <TabButton
+            id="meeting-tab"
+            controls="meeting-panel"
+            active={tab === "meeting"}
+            onClick={() => setTab("meeting")}
+            icon={<CalendarClock size={14} />}
+          >
             Plan a meeting
           </TabButton>
-          <TabButton active={tab === "chat"} onClick={() => setTab("chat")} icon={<MessageCircle size={14} />}>
+          <TabButton
+            id="chat-tab"
+            controls="chat-panel"
+            active={tab === "chat"}
+            onClick={() => setTab("chat")}
+            icon={<MessageCircle size={14} />}
+          >
             Chat
           </TabButton>
         </div>
 
-        <div className="mt-6">
-          {tab === "ticket" && <TicketsTab />}
-          {tab === "meeting" && <MeetingsTab />}
-          {tab === "chat" && <ChatPlaceholder />}
-        </div>
+        {tab === "ticket" && (
+          <div role="tabpanel" id="ticket-panel" aria-labelledby="ticket-tab" className="mt-6">
+            <TicketsTab />
+          </div>
+        )}
+        {tab === "meeting" && (
+          <div role="tabpanel" id="meeting-panel" aria-labelledby="meeting-tab" className="mt-6">
+            <MeetingsTab />
+          </div>
+        )}
+        {tab === "chat" && (
+          <div role="tabpanel" id="chat-panel" aria-labelledby="chat-tab" className="mt-6">
+            <ChatPlaceholder />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function TabButton({ children, active, onClick, icon }: { children: React.ReactNode; active: boolean; onClick: () => void; icon?: React.ReactNode }) {
+function TabButton({ children, active, onClick, icon, id, controls }: { children: React.ReactNode; active: boolean; onClick: () => void; icon?: React.ReactNode; id?: string; controls?: string }) {
   return (
     <button
+      id={id}
+      role="tab"
+      aria-selected={active}
+      aria-controls={controls}
       onClick={onClick}
       className={cn(
         "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition",
