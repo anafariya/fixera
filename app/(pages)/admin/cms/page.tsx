@@ -11,9 +11,11 @@ import {
   CmsContentType,
   CMS_TYPE_LABELS,
   CMS_TYPE_ORDER,
+  getPublicPathForCms,
+  getLandingServicePath,
 } from "@/lib/cms";
 import { cn } from "@/lib/utils";
-import { AlertCircle, FileText, Loader2, Plus, Search, Sparkles } from "lucide-react";
+import { AlertCircle, FileText, Loader2, Plus, Search, Share2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUS_FILTERS: Array<{ value: CmsContentStatus | "all"; label: string }> = [
@@ -169,6 +171,12 @@ export default function CmsAdminListPage() {
               </span>
             </button>
           ))}
+          <Link
+            href="/admin/cms/social"
+            className="inline-flex items-center gap-2 rounded-xl border border-pink-200 bg-white/60 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 hover:shadow-sm"
+          >
+            <Share2 size={14} /> Social Media
+          </Link>
         </div>
 
         {/* Filters */}
@@ -238,6 +246,8 @@ export default function CmsAdminListPage() {
 }
 
 function ContentRow({ item }: { item: CmsContent }) {
+  const primaryPath = getPublicPathForCms(item.type, item.slug);
+  const landingServicePath = item.type === "landing" ? getLandingServicePath(item.slug) : null;
   return (
     <Link
       href={`/admin/cms/${item._id}/edit`}
@@ -267,6 +277,19 @@ function ContentRow({ item }: { item: CmsContent }) {
               </>
             ) : null}
           </div>
+          {primaryPath && (
+            <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-rose-400">
+              <span>Displayed at</span>
+              <code className="rounded bg-rose-50 px-1.5 py-0.5 text-rose-600">{primaryPath}</code>
+              {landingServicePath && (
+                <>
+                  <span>or</span>
+                  <code className="rounded bg-rose-50 px-1.5 py-0.5 text-rose-600">{landingServicePath}</code>
+                  <span>(if a matching service exists)</span>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </Link>

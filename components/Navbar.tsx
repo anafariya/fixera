@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Menu, X, Hammer, User, LogOut, MessageSquare } from "lucide-react";
+import { Menu, X, Hammer, User, LogOut, MessageSquare, LifeBuoy, Heart } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
 import {
@@ -88,6 +88,15 @@ const Navbar = () => {
                 <>
                   {isAuthenticated ? (
                     <>
+                      {user?.role === "customer" && (
+                        <Link
+                          href="/dashboard/favorites"
+                          className="relative inline-flex items-center justify-center h-8 w-8 rounded-full text-gray-600 hover:text-pink-600 hover:bg-gray-100 transition-colors"
+                          aria-label="Favorites"
+                        >
+                          <Heart className="h-5 w-5" />
+                        </Link>
+                      )}
                       {showChatIcon && (
                         <Link
                           href="/chat"
@@ -146,6 +155,14 @@ const Navbar = () => {
                               <Link href="/dashboard/benefits">
                                 <User className="mr-2 h-4 w-4" />
                                 <span>Benefits Program</span>
+                              </Link>
+                            </DropdownMenuItem>
+                          )}
+                          {user?.role === "professional" && (
+                            <DropdownMenuItem asChild>
+                              <Link href="/professional/support">
+                                <LifeBuoy className="mr-2 h-4 w-4" />
+                                <span>Professional Support</span>
                               </Link>
                             </DropdownMenuItem>
                           )}
@@ -216,6 +233,19 @@ const Navbar = () => {
               {link.name}
             </Link>
           ))}
+          {isAuthenticated && user?.role === "customer" && (
+            <>
+              <hr className="my-2" />
+              <Link
+                href="/dashboard/favorites"
+                className="flex items-center gap-2 p-2 text-lg font-medium text-gray-800 hover:text-pink-600 rounded-lg hover:bg-gray-50 transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <Heart className="h-5 w-5" />
+                Favorites
+              </Link>
+            </>
+          )}
           {showChatIcon && (
             <>
               <hr className="my-2" />
@@ -270,6 +300,11 @@ const Navbar = () => {
                   {(user?.role === "customer" || user?.role === "professional") && (
                     <Button asChild variant="outline" className="w-full">
                       <Link href="/dashboard/benefits">Benefits Program</Link>
+                    </Button>
+                  )}
+                  {user?.role === "professional" && (
+                    <Button asChild variant="outline" className="w-full">
+                      <Link href="/professional/support">Professional Support</Link>
                     </Button>
                   )}
                   <Button onClick={logout} variant="outline" className="w-full">

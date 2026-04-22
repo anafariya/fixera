@@ -19,6 +19,8 @@ import { getAuthToken, buildUsernameSuggestionParams } from '@/lib/utils'
 import { formatVATNumber, getVATCountryName, isEUVatNumber, validateVATFormat, validateVATWithAPI, updateProfessionalBusinessProfile, submitForVerification, COUNTRY_NAMES } from '@/lib/vatValidation'
 import { CompanyAvailability, DayAvailability, DEFAULT_COMPANY_AVAILABILITY } from '@/lib/defaults/companyAvailability'
 import { ONBOARDING_STEPS } from '@/lib/constants/onboardingSteps'
+import Link from 'next/link'
+import { publicListPolicyLinks, PolicyLink } from '@/lib/cms'
 
 const STEPS = [
   { id: ONBOARDING_STEPS.ID_UPLOAD, title: 'ID Upload', icon: Shield, required: true, gradient: 'from-violet-200 via-purple-200 to-fuchsia-200' },
@@ -1062,6 +1064,25 @@ function EmployeesStep({ gradient, setCurrentStep }: { gradient: string; setCurr
   )
 }
 
+function AgreementLabel({ policySlug, policies, children }: { policySlug: string; policies: PolicyLink[]; children: React.ReactNode }) {
+  const match = policies.find((p) => p.slug === policySlug)
+  if (!match) return <>{children}</>
+  return (
+    <>
+      {children}{' '}
+      <Link
+        href={match.path}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="text-indigo-600 underline underline-offset-2 hover:text-indigo-700"
+      >
+        (read)
+      </Link>
+    </>
+  )
+}
+
 function AgreementsStep({
   gradient,
   agreements,
@@ -1079,6 +1100,11 @@ function AgreementsStep({
   handleSubmit: () => void
   submitting: boolean
 }) {
+  const [policies, setPolicies] = useState<PolicyLink[]>([])
+  useEffect(() => {
+    publicListPolicyLinks().then(setPolicies).catch(() => setPolicies([]))
+  }, [])
+
   return (
     <GradientCard gradient={gradient}>
       <div className="p-6 sm:p-8 space-y-6">
@@ -1132,7 +1158,11 @@ function AgreementsStep({
               onCheckedChange={(checked) => setAgreements((prev) => ({ ...prev, rulesAccepted: Boolean(checked) }))}
               className="mt-0.5"
             />
-            <span className="text-sm text-gray-700 leading-relaxed">I agree to the platform rules and consequences</span>
+            <span className="text-sm text-gray-700 leading-relaxed">
+              <AgreementLabel policySlug="platform-rules" policies={policies}>
+                I agree to the platform rules and consequences
+              </AgreementLabel>
+            </span>
           </label>
 
           <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
@@ -1143,7 +1173,11 @@ function AgreementsStep({
               onCheckedChange={(checked) => setAgreements((prev) => ({ ...prev, termsAccepted: Boolean(checked) }))}
               className="mt-0.5"
             />
-            <span className="text-sm text-gray-700 leading-relaxed">I accept the General Terms & Conditions</span>
+            <span className="text-sm text-gray-700 leading-relaxed">
+              <AgreementLabel policySlug="terms-of-service" policies={policies}>
+                I accept the General Terms &amp; Conditions
+              </AgreementLabel>
+            </span>
           </label>
 
           <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
@@ -1154,7 +1188,11 @@ function AgreementsStep({
               onCheckedChange={(checked) => setAgreements((prev) => ({ ...prev, selfBillingAccepted: Boolean(checked) }))}
               className="mt-0.5"
             />
-            <span className="text-sm text-gray-700 leading-relaxed">I agree that Fixera prepares and issues invoices on my behalf (self-billing agreement)</span>
+            <span className="text-sm text-gray-700 leading-relaxed">
+              <AgreementLabel policySlug="self-billing-agreement" policies={policies}>
+                I agree that Fixera prepares and issues invoices on my behalf (self-billing agreement)
+              </AgreementLabel>
+            </span>
           </label>
         </div>
 

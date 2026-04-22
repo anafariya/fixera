@@ -40,6 +40,7 @@ import { formatCurrency } from '@/lib/formatters';
 import Image from 'next/image';
 import ProjectBookingForm from '@/components/project/ProjectBookingForm';
 import SubprojectComparisonTable from '@/components/project/SubprojectComparisonTable';
+import FavoriteButton from '@/components/favorites/FavoriteButton';
 import {
   formatPriceModelLabel,
   getCertificateGradient,
@@ -310,6 +311,7 @@ export default function ProjectDetailPage() {
   const [reviewRatingFilter, setReviewRatingFilter] = useState<number | null>(null);
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewTotalPages, setReviewTotalPages] = useState(1);
+  const [initialFavorited, setInitialFavorited] = useState(false);
   const { customerPrice } = useCommissionRate();
 
   const projectId = params.id as string;
@@ -327,6 +329,33 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     fetchProject();
   }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId || !isAuthenticated || user?.role !== 'customer') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { authFetch } = await import('@/lib/utils');
+        const res = await authFetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/favorites/status`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetType: 'project', targetIds: [projectId] }),
+          }
+        );
+        const json = await res.json();
+        if (!cancelled && res.ok && json?.success) {
+          setInitialFavorited(Boolean(json.data?.favorited?.[projectId]));
+        }
+      } catch {
+        // non-critical
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, isAuthenticated, user?.role]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -693,7 +722,7 @@ export default function ProjectDetailPage() {
             {/* Project Details */}
             <Card>
               <CardHeader>
-                <div className='flex items-start justify-between'>
+                <div className='flex items-start justify-between gap-3'>
                   <div>
                     <CardTitle className='text-3xl mb-2'>
                       {project.title}
@@ -713,6 +742,13 @@ export default function ProjectDetailPage() {
                       )}
                     </CardDescription>
                   </div>
+                  <FavoriteButton
+                    targetType='project'
+                    targetId={project._id}
+                    initialFavorited={initialFavorited}
+                    size='md'
+                    stopPropagation={false}
+                  />
                 </div>
               </CardHeader>
               <CardContent className='space-y-4'>
