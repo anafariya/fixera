@@ -66,7 +66,10 @@ export interface CmsUpsertPayload {
 
 export function cmsAuthorName(item: Pick<CmsContent, "author" | "authorOverride">): string | undefined {
   if (item.authorOverride && item.authorOverride.trim()) return item.authorOverride.trim();
-  if (typeof item.author === "object" && item.author) return item.author.name;
+  if (typeof item.author === "object" && item.author) {
+    const name = item.author.name?.trim();
+    if (name) return name;
+  }
   if (typeof item.author === "string" && item.author.trim()) return item.author.trim();
   return undefined;
 }

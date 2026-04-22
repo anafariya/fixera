@@ -107,7 +107,10 @@ function TicketsTab() {
     () =>
       proListMyTickets()
         .then(setItems)
-        .catch((e) => toast.error(e instanceof Error ? e.message : "Failed to load tickets")),
+        .catch((e) => {
+          setItems([]);
+          toast.error(e instanceof Error ? e.message : "Failed to load tickets");
+        }),
     []
   );
 
@@ -160,6 +163,7 @@ function TicketsTab() {
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="Subject"
+            aria-label="Ticket subject"
             maxLength={200}
             className="w-full rounded-xl border border-indigo-200 bg-white/60 px-4 py-2 text-sm outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-200"
           />
@@ -168,6 +172,7 @@ function TicketsTab() {
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
             placeholder="Describe the issue in detail"
+            aria-label="Ticket description"
             maxLength={5000}
             className="w-full resize-none rounded-xl border border-indigo-200 bg-white/60 px-4 py-2 text-sm outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-200"
           />
@@ -223,6 +228,7 @@ function TicketsTab() {
                         onChange={(e) => setReplyDraft((d) => ({ ...d, [t._id]: e.target.value }))}
                         disabled={Boolean(replySending[t._id])}
                         placeholder="Reply…"
+                        aria-label={`Reply to ticket ${t.subject}`}
                         className="flex-1 rounded-xl border border-indigo-200 bg-white/60 px-3 py-1.5 text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-200 disabled:opacity-50"
                       />
                       <button
@@ -255,7 +261,10 @@ function MeetingsTab() {
     () =>
       proListMyMeetingRequests()
         .then(setItems)
-        .catch((e) => toast.error(e instanceof Error ? e.message : "Failed to load requests")),
+        .catch((e) => {
+          setItems([]);
+          toast.error(e instanceof Error ? e.message : "Failed to load requests");
+        }),
     []
   );
 
@@ -292,6 +301,7 @@ function MeetingsTab() {
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             placeholder="Topic"
+            aria-label="Meeting topic"
             maxLength={200}
             className="w-full rounded-xl border border-indigo-200 bg-white/60 px-4 py-2 text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-200"
           />
@@ -300,12 +310,14 @@ function MeetingsTab() {
             onChange={(e) => setPreferredTimes(e.target.value)}
             rows={3}
             placeholder="Preferred dates/times (e.g. 'Mon–Wed morning, any time after 10:00')"
+            aria-label="Preferred dates and times"
             maxLength={1000}
             className="w-full resize-none rounded-xl border border-indigo-200 bg-white/60 px-4 py-2 text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-200"
           />
           <div className="flex items-center gap-3">
-            <label className="text-sm text-indigo-700">Duration</label>
+            <label htmlFor="meeting-duration" className="text-sm text-indigo-700">Duration</label>
             <select
+              id="meeting-duration"
               value={durationMinutes}
               onChange={(e) => setDurationMinutes(Number(e.target.value))}
               className="rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"

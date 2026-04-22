@@ -12,6 +12,21 @@ const LEGAL_SLOTS: Array<{ slug: string; label: string }> = [
   { slug: 'gdpr-compliance', label: 'GDPR Compliance' },
 ]
 
+// Mandatory fallbacks so transient fetch errors don't drop required legal links
+const MANDATORY_FALLBACKS: PolicyLink[] = [
+  { slug: 'privacy-policy', title: 'Privacy Policy', path: '/privacy-policy' },
+  { slug: 'terms-of-service', title: 'Terms of Service', path: '/pages/terms-of-service' },
+]
+
+function isSafeHttpUrl(href: string): boolean {
+  try {
+    const parsed = new URL(href)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 const SOCIAL_DEFS: Array<{ key: keyof NonNullable<SiteSettings['socialLinks']>; name: string; icon: React.ComponentType<{ className?: string }> }> = [
   { key: 'facebook', name: 'Facebook', icon: Facebook },
   { key: 'twitter', name: 'Twitter', icon: Twitter },
@@ -44,7 +59,10 @@ export default async function Footer() {
     publicGetSiteSettings().catch(() => ({ socialLinks: {} } as SiteSettings)),
   ])
 
-  const bySlug: Record<string, PolicyLink> = Object.fromEntries(policies.map((p) => [p.slug, p]))
+  // Merge: fetched wins on duplicate slug, fallbacks fill gaps for mandatory links
+  const bySlug: Record<string, PolicyLink> = Object.fromEntries(
+    [...MANDATORY_FALLBACKS, ...policies].map((p) => [p.slug, p])
+  )
 
   return (
     <footer className="bg-gray-900 ">
@@ -79,7 +97,7 @@ export default async function Footer() {
             <div className="flex items-center space-x-6">
               {SOCIAL_DEFS.map(({ key, name, icon: Icon }) => {
                 const href = settings?.socialLinks?.[key]
-                if (!href) return null
+                if (!href || !isSafeHttpUrl(href)) return null
                 return (
                   <a key={name} href={href} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                     <Icon className="w-6 h-6" />

@@ -311,7 +311,7 @@ export default function ProjectDetailPage() {
   const [reviewRatingFilter, setReviewRatingFilter] = useState<number | null>(null);
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewTotalPages, setReviewTotalPages] = useState(1);
-  const [initialFavorited, setInitialFavorited] = useState(false);
+  const [initialFavorited, setInitialFavorited] = useState<boolean | null>(null);
   const { customerPrice } = useCommissionRate();
 
   const projectId = params.id as string;
@@ -332,8 +332,13 @@ export default function ProjectDetailPage() {
 
   useEffect(() => {
     // Reset on projectId change so a stale favorited flag from the previous project can't leak
-    setInitialFavorited(false);
-    if (!projectId || !isAuthenticated || user?.role !== 'customer') return;
+    setInitialFavorited(null);
+    if (!projectId) return;
+    // Non-customers can't favorite; unblock render immediately with a concrete value
+    if (!isAuthenticated || user?.role !== 'customer') {
+      setInitialFavorited(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -347,11 +352,15 @@ export default function ProjectDetailPage() {
           }
         );
         const json = await res.json();
-        if (!cancelled && res.ok && json?.success) {
-          setInitialFavorited(Boolean(json.data?.favorited?.[projectId]));
+        if (!cancelled) {
+          if (res.ok && json?.success) {
+            setInitialFavorited(Boolean(json.data?.favorited?.[projectId]));
+          } else {
+            setInitialFavorited(false);
+          }
         }
       } catch {
-        // non-critical
+        if (!cancelled) setInitialFavorited(false);
       }
     })();
     return () => {
@@ -744,14 +753,16 @@ export default function ProjectDetailPage() {
                       )}
                     </CardDescription>
                   </div>
-                  <FavoriteButton
-                    key={project._id}
-                    targetType='project'
-                    targetId={project._id}
-                    initialFavorited={initialFavorited}
-                    size='md'
-                    stopPropagation={false}
-                  />
+                  {initialFavorited !== null && (
+                    <FavoriteButton
+                      key={project._id}
+                      targetType='project'
+                      targetId={project._id}
+                      initialFavorited={initialFavorited}
+                      size='md'
+                      stopPropagation={false}
+                    />
+                  )}
                 </div>
               </CardHeader>
               <CardContent className='space-y-4'>

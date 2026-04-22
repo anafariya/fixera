@@ -85,7 +85,10 @@ function TicketsAdmin() {
   const load = () =>
     adminListTickets()
       .then(setItems)
-      .catch((e) => toast.error(e instanceof Error ? e.message : "Failed to load tickets"));
+      .catch((e) => {
+        setItems([]);
+        toast.error(e instanceof Error ? e.message : "Failed to load tickets");
+      });
 
   useEffect(() => {
     load();
@@ -174,6 +177,14 @@ function TicketsAdmin() {
   );
 }
 
+function formatForDatetimeLocal(value: string | Date | undefined): string {
+  if (!value) return "";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 function MeetingsAdmin() {
   const [items, setItems] = useState<MeetingRequest[] | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { scheduledAt: string; adminResponse: string }>>({});
@@ -182,7 +193,10 @@ function MeetingsAdmin() {
   const load = () =>
     adminListMeetingRequests()
       .then(setItems)
-      .catch((e) => toast.error(e instanceof Error ? e.message : "Failed to load"));
+      .catch((e) => {
+        setItems([]);
+        toast.error(e instanceof Error ? e.message : "Failed to load");
+      });
 
   useEffect(() => {
     load();
@@ -209,7 +223,7 @@ function MeetingsAdmin() {
     <div className="space-y-3">
       {items.map((m) => {
         const u = typeof m.userId === "object" ? m.userId : null;
-        const draft = drafts[m._id] || { scheduledAt: m.scheduledAt ? new Date(m.scheduledAt).toISOString().slice(0, 16) : "", adminResponse: m.adminResponse || "" };
+        const draft = drafts[m._id] || { scheduledAt: formatForDatetimeLocal(m.scheduledAt), adminResponse: m.adminResponse || "" };
         return (
           <div key={m._id} className="rounded-2xl bg-gradient-to-br from-indigo-100 via-blue-100 to-cyan-100 p-[1.5px]">
             <div className="rounded-[calc(1rem-1.5px)] bg-white p-5 space-y-2">
