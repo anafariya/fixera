@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, Calendar } from "lucide-react";
-import { CmsContent } from "@/lib/cms";
+import { CmsContent, cmsAuthorName } from "@/lib/cms";
 
 interface Props {
   item: CmsContent;
@@ -8,7 +8,7 @@ interface Props {
 }
 
 export default function BlogCard({ item, basePath }: Props) {
-  const authorName = typeof item.author === "object" && item.author ? item.author.name : undefined;
+  const authorName = cmsAuthorName(item);
   const date = item.publishedAt || item.updatedAt;
 
   return (

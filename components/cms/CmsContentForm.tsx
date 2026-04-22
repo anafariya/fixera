@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, FileText, Loader2, Save, Send, Tag, Trash2, X } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, Loader2, Save, Send, Tag, Trash2, X } from "lucide-react";
 import {
   adminCreateCms,
   adminDeleteCms,
@@ -42,6 +42,7 @@ const EMPTY: Partial<CmsContent> = {
   coverImage: "",
   category: "",
   tags: [],
+  authorOverride: "",
   status: "draft",
   seo: {},
 };
@@ -134,6 +135,7 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
         coverImage: form.coverImage || undefined,
         category: isFaq ? form.category : undefined,
         tags: hasTags ? form.tags || [] : [],
+        authorOverride: hasTags ? (form.authorOverride || "").trim() : undefined,
         status,
         seo: form.seo || {},
       };
@@ -187,6 +189,25 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
             <ArrowLeft size={16} /> Back to content
           </button>
           <div className="flex items-center gap-2">
+            {mode === "edit" && publicPreviewPath && (
+              form.status === "published" ? (
+                <a
+                  href={publicPreviewPath}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-xl border border-pink-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50"
+                >
+                  <ExternalLink size={14} /> View live
+                </a>
+              ) : (
+                <span
+                  title="Publish first to view live"
+                  className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl border border-pink-200 bg-white/70 px-4 py-2 text-sm font-medium text-rose-400"
+                >
+                  <ExternalLink size={14} /> View live
+                </span>
+              )
+            )}
             {mode === "edit" && (
               <button
                 onClick={remove}
@@ -337,6 +358,22 @@ export default function CmsContentForm({ mode, initial, lockedType }: Props) {
               />
             </div>
           </GradientCard>
+
+          {hasTags && (
+            <GradientCard>
+              <div className="p-6 space-y-2">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-rose-700">Writer name</h3>
+                <input
+                  value={form.authorOverride || ""}
+                  onChange={(e) => update({ authorOverride: e.target.value })}
+                  placeholder="Defaults to your admin name"
+                  maxLength={120}
+                  className="w-full rounded-xl border border-pink-200 bg-white/60 px-4 py-2 text-sm outline-none transition focus:border-rose-400 focus:bg-white focus:ring-2 focus:ring-rose-200"
+                />
+                <p className="text-[11px] text-rose-400">Shown as the author on blog/news cards and detail pages.</p>
+              </div>
+            </GradientCard>
+          )}
 
           {isFaq && (
             <GradientCard>

@@ -1,0 +1,117 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { ArrowLeft, Loader2, Save, Share2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { adminGetSiteSettings, adminUpdateSiteSettings, SocialLinks } from "@/lib/siteSettings";
+
+const FIELDS: Array<{ key: keyof SocialLinks; label: string; placeholder: string }> = [
+  { key: "facebook", label: "Facebook", placeholder: "https://facebook.com/fixera" },
+  { key: "twitter", label: "Twitter / X", placeholder: "https://twitter.com/fixera" },
+  { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/fixera" },
+  { key: "linkedin", label: "LinkedIn", placeholder: "https://linkedin.com/company/fixera" },
+  { key: "tiktok", label: "TikTok", placeholder: "https://tiktok.com/@fixera" },
+  { key: "youtube", label: "YouTube", placeholder: "https://youtube.com/@fixera" },
+];
+
+export default function AdminSocialSettingsPage() {
+  const { user, isAuthenticated, loading } = useAuth();
+  const router = useRouter();
+  const [values, setValues] = useState<SocialLinks>({});
+  const [fetching, setFetching] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!isAuthenticated || user?.role !== "admin") {
+      router.replace("/login");
+    }
+  }, [user, isAuthenticated, loading, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== "admin") return;
+    setFetching(true);
+    adminGetSiteSettings()
+      .then((s) => setValues(s.socialLinks || {}))
+      .catch((err) => toast.error(err instanceof Error ? err.message : "Failed to load settings"))
+      .finally(() => setFetching(false));
+  }, [isAuthenticated, user]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const next = await adminUpdateSiteSettings({ socialLinks: values });
+      setValues(next.socialLinks || {});
+      toast.success("Social links saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading || fetching) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-gradient-to-br from-rose-50 via-pink-50 to-white">
+        <Loader2 className="animate-spin text-rose-500" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-white pt-16 pb-16">
+      <div className="sticky top-16 z-20 border-b border-pink-100 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
+          <Link
+            href="/admin/cms"
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-rose-700 transition hover:bg-rose-50"
+          >
+            <ArrowLeft size={16} /> Back to content
+          </Link>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 via-pink-500 to-orange-400 px-5 py-2 text-sm font-semibold text-white shadow-md shadow-rose-200 transition hover:shadow-lg hover:shadow-rose-300 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />} Save
+          </button>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-4xl px-6 pt-6">
+        <div className="rounded-2xl bg-gradient-to-br from-rose-100 via-pink-100 to-orange-100 p-[1.5px] shadow-sm">
+          <div className="rounded-[calc(1rem-1.5px)] bg-white">
+            <div className="space-y-5 p-6">
+              <div className="flex items-center gap-3">
+                <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-rose-400 to-pink-500 text-white shadow-md shadow-rose-200">
+                  <Share2 size={18} />
+                </div>
+                <div>
+                  <h1 className="text-lg font-semibold text-rose-900">Social Media</h1>
+                  <p className="text-xs text-rose-500">Paste full URLs. Icons hide automatically when a link is empty.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {FIELDS.map((f) => (
+                  <div key={f.key} className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-rose-700">{f.label}</label>
+                    <input
+                      value={values[f.key] || ""}
+                      onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                      placeholder={f.placeholder}
+                      className="w-full rounded-xl border border-pink-200 bg-white/60 px-4 py-2 text-sm outline-none transition focus:border-rose-400 focus:bg-white focus:ring-2 focus:ring-rose-200"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

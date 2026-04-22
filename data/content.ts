@@ -1,5 +1,4 @@
 import { iconMapData } from './icons';
-import { Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
 
 export const iconMap = iconMapData;
 
@@ -371,8 +370,6 @@ export const footerSections = [
       links: [
         { name: 'Join as Professional', href: '/join' },
         { name: 'Success Stories', href: '#professionals' },
-        { name: 'Business Resources', href: '#' },
-        { name: 'Professional Support', href: '#' },
       ]
     },
     {
@@ -392,19 +389,6 @@ export const footerContact = {
     email: 'support@fixera.com',
 };
 
-export const socialLinks = [
-    { name: 'Facebook', icon: Facebook, href: '#' },
-    { name: 'Twitter', icon: Twitter, href: '#' },
-    { name: 'Instagram', icon: Instagram, href: '#' },
-    { name: 'Linkedin', icon: Linkedin, href: '#' },
-];
-
-export const legalLinks = [
-    { name: 'Privacy Policy', href: '/privacy-policy' },
-    { name: 'Terms of Service', href: '/pages/terms-of-service' },
-    { name: 'Cookie Policy', href: '/pages/cookie-policy' },
-    { name: 'GDPR Compliance', href: '/pages/gdpr-compliance' },
-];
 
 
 export const subNavbarCategories = [

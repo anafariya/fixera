@@ -25,7 +25,7 @@ export default function FaqAccordion({ groups }: Props) {
           </div>
           <div className="space-y-3">
             {group.items.map((item) => (
-              <FaqItem key={item._id} title={item.title} body={item.body} />
+              <FaqItem key={item._id} anchor={item.slug} title={item.title} body={item.body} />
             ))}
           </div>
         </section>
@@ -34,13 +34,13 @@ export default function FaqAccordion({ groups }: Props) {
   );
 }
 
-function FaqItem({ title, body }: { title: string; body: string }) {
+function FaqItem({ anchor, title, body }: { anchor: string; title: string; body: string }) {
   const [open, setOpen] = useState(false);
   const reactId = useId();
   const buttonId = `faq-btn-${reactId}`;
   const panelId = `faq-panel-${reactId}`;
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-rose-100 via-pink-100 to-orange-100 p-[1.5px] transition hover:from-rose-200 hover:via-pink-200 hover:to-orange-200 hover:shadow-md hover:shadow-rose-100">
+    <div id={anchor} className="scroll-mt-24 rounded-2xl bg-gradient-to-br from-rose-100 via-pink-100 to-orange-100 p-[1.5px] transition hover:from-rose-200 hover:via-pink-200 hover:to-orange-200 hover:shadow-md hover:shadow-rose-100">
       <div className="rounded-[calc(1rem-1.5px)] bg-white">
         <button
           id={buttonId}

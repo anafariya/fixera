@@ -1,27 +1,49 @@
-'use client'
-
 import React from 'react'
 import Link from 'next/link'
-import { Hammer } from 'lucide-react'
-import { footerSections, socialLinks, legalLinks } from '@/data/content'
+import { Hammer, Facebook, Twitter, Instagram, Linkedin, Youtube } from 'lucide-react'
+import { footerSections } from '@/data/content'
+import { publicListPolicyLinks, PolicyLink } from '@/lib/cms'
+import { publicGetSiteSettings, SiteSettings } from '@/lib/siteSettings'
 
-const FooterLinkColumn = ({ title, links }: { title: string, links: {name: string, href: string}[] }) => (
-    <div>
-        <h4 className="text-lg font-semibold text-white mb-6">{title}</h4>
-        <ul className="space-y-4">
-            {links.map((link) => (
-                <li key={link.name}>
-                    <Link href={link.href} className="text-gray-300 hover:text-white hover:underline transition-colors">
-                        {link.name}
-                    </Link>
-                </li>
-            ))}
-        </ul>
-    </div>
-);
+const LEGAL_SLOTS: Array<{ slug: string; label: string }> = [
+  { slug: 'privacy-policy', label: 'Privacy Policy' },
+  { slug: 'terms-of-service', label: 'Terms of Service' },
+  { slug: 'cookie-policy', label: 'Cookie Policy' },
+  { slug: 'gdpr-compliance', label: 'GDPR Compliance' },
+]
 
-const Footer = () => {
+const SOCIAL_DEFS: Array<{ key: keyof NonNullable<SiteSettings['socialLinks']>; name: string; icon: React.ComponentType<{ className?: string }> }> = [
+  { key: 'facebook', name: 'Facebook', icon: Facebook },
+  { key: 'twitter', name: 'Twitter', icon: Twitter },
+  { key: 'instagram', name: 'Instagram', icon: Instagram },
+  { key: 'linkedin', name: 'LinkedIn', icon: Linkedin },
+  { key: 'youtube', name: 'YouTube', icon: Youtube },
+]
+
+const FooterLinkColumn = ({ title, links }: { title: string; links: { name: string; href: string }[] }) => (
+  <div>
+    <h4 className="text-lg font-semibold text-white mb-6">{title}</h4>
+    <ul className="space-y-4">
+      {links.map((link) => (
+        <li key={link.name}>
+          <Link href={link.href} className="text-gray-300 hover:text-white hover:underline transition-colors">
+            {link.name}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  </div>
+)
+
+export default async function Footer() {
   const currentYear = new Date().getFullYear()
+
+  const [policies, settings] = await Promise.all([
+    publicListPolicyLinks().catch(() => [] as PolicyLink[]),
+    publicGetSiteSettings().catch(() => ({ socialLinks: {} } as SiteSettings)),
+  ])
+
+  const bySlug: Record<string, PolicyLink> = Object.fromEntries(policies.map((p) => [p.slug, p]))
 
   return (
     <footer className="bg-gray-900 ">
@@ -40,7 +62,7 @@ const Footer = () => {
               Fixera is a trusted platform connecting customers with verified professionals for any property service. From minor repairs to major renovations, we make it simple to get the job done with quality and security guaranteed.
             </p>
           </div>
-          
+
           {footerSections.map((section) => (
             <FooterLinkColumn key={section.title} title={section.title} links={section.links} />
           ))}
@@ -54,28 +76,32 @@ const Footer = () => {
               © {currentYear} Fixera. All rights reserved.
             </p>
             <div className="flex items-center space-x-6">
-              {socialLinks.map((link) => {
-                const Icon = link.icon;
+              {SOCIAL_DEFS.map(({ key, name, icon: Icon }) => {
+                const href = settings?.socialLinks?.[key]
+                if (!href) return null
                 return (
-                  <a key={link.name} href={link.href} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                  <a key={name} href={href} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                     <Icon className="w-6 h-6" />
-                    <span className="sr-only">{link.name}</span>
+                    <span className="sr-only">{name}</span>
                   </a>
-                );
+                )
               })}
             </div>
           </div>
-           <div className="mt-6 flex flex-wrap justify-center sm:justify-start gap-x-6 gap-y-2">
-              {legalLinks.map((link) => (
-                <Link key={link.name} href={link.href} className="text-sm text-gray-400 hover:text-white hover:underline">
-                  {link.name}
+          <div className="mt-6 flex flex-wrap justify-center sm:justify-start gap-x-6 gap-y-2">
+            {LEGAL_SLOTS.map((slot) => {
+              const match = bySlug[slot.slug]
+              return match ? (
+                <Link key={slot.slug} href={match.path} className="text-sm text-gray-400 hover:text-white hover:underline">
+                  {slot.label}
                 </Link>
-              ))}
-            </div>
+              ) : (
+                <span key={slot.slug} className="text-sm text-gray-500">{slot.label}</span>
+              )
+            })}
+          </div>
         </div>
       </div>
     </footer>
   )
 }
-
-export default Footer
