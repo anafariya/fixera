@@ -255,11 +255,10 @@ export async function publicListSitemapEntries(
 
 const RESERVED_POLICY_PATHS: Record<string, string> = {
   "privacy-policy": "/privacy-policy",
-};
-
-const RESERVED_LANDING_PATHS: Record<string, string> = {
   about: "/about",
 };
+
+const RESERVED_LANDING_PATHS: Record<string, string> = {};
 
 export function getPublicPathForCms(type: CmsContentType, slug: string): string | null {
   if (!slug) return null;

@@ -84,9 +84,10 @@ function TicketsAdmin() {
 
   const load = () =>
     adminListTickets()
-      .then(setItems)
+      .then((next) => setItems(next))
       .catch((e) => {
-        setItems([]);
+        // Preserve prior items on refresh failure; only fall back to [] on first load
+        setItems((prev) => (prev === null ? [] : prev));
         toast.error(e instanceof Error ? e.message : "Failed to load tickets");
       });
 
@@ -129,6 +130,8 @@ function TicketsAdmin() {
                   </p>
                 </div>
                 <select
+                  id={`ticket-status-${t._id}`}
+                  aria-label={`Status for ticket "${t.subject}"`}
                   value={t.status}
                   onChange={(e) => update(t._id, { status: e.target.value as SupportTicketStatus })}
                   className="rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
@@ -154,6 +157,8 @@ function TicketsAdmin() {
               )}
               <div className="mt-3 flex items-center gap-2">
                 <input
+                  id={`ticket-reply-${t._id}`}
+                  aria-label={`Reply to ticket "${t.subject}"`}
                   value={reply[t._id] || ""}
                   onChange={(e) => setReply((r) => ({ ...r, [t._id]: e.target.value }))}
                   disabled={Boolean(saving[t._id])}
@@ -192,9 +197,9 @@ function MeetingsAdmin() {
 
   const load = () =>
     adminListMeetingRequests()
-      .then(setItems)
+      .then((next) => setItems(next))
       .catch((e) => {
-        setItems([]);
+        setItems((prev) => (prev === null ? [] : prev));
         toast.error(e instanceof Error ? e.message : "Failed to load");
       });
 
@@ -235,6 +240,8 @@ function MeetingsAdmin() {
                   </p>
                 </div>
                 <select
+                  id={`meeting-status-${m._id}`}
+                  aria-label={`Meeting status for "${m.topic}"`}
                   value={m.status}
                   onChange={(e) => update(m._id, { status: e.target.value as MeetingRequestStatus })}
                   className="rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"

@@ -106,9 +106,9 @@ function TicketsTab() {
   const load = useCallback(
     () =>
       proListMyTickets()
-        .then(setItems)
+        .then((next) => setItems(next))
         .catch((e) => {
-          setItems([]);
+          setItems((prev) => (prev === null ? [] : prev));
           toast.error(e instanceof Error ? e.message : "Failed to load tickets");
         }),
     []
@@ -260,9 +260,9 @@ function MeetingsTab() {
   const load = useCallback(
     () =>
       proListMyMeetingRequests()
-        .then(setItems)
+        .then((next) => setItems(next))
         .catch((e) => {
-          setItems([]);
+          setItems((prev) => (prev === null ? [] : prev));
           toast.error(e instanceof Error ? e.message : "Failed to load requests");
         }),
     []

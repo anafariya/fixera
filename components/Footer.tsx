@@ -16,6 +16,8 @@ const LEGAL_SLOTS: Array<{ slug: string; label: string }> = [
 const MANDATORY_FALLBACKS: PolicyLink[] = [
   { slug: 'privacy-policy', title: 'Privacy Policy', path: '/privacy-policy' },
   { slug: 'terms-of-service', title: 'Terms of Service', path: '/pages/terms-of-service' },
+  { slug: 'cookie-policy', title: 'Cookie Policy', path: '/pages/cookie-policy' },
+  { slug: 'gdpr-compliance', title: 'GDPR Compliance', path: '/pages/gdpr-compliance' },
 ]
 
 function isSafeHttpUrl(href: string): boolean {

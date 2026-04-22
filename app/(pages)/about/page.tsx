@@ -13,9 +13,9 @@ export const dynamic = "force-dynamic";
 
 async function fetchAboutContent() {
   try {
-    const landing = await publicGetCms("landing", "about");
-    if (landing) return landing;
-    return await publicGetCms("policy", "about");
+    const policy = await publicGetCms("policy", "about");
+    if (policy) return policy;
+    return await publicGetCms("landing", "about");
   } catch {
     return null;
   }
