@@ -22,7 +22,7 @@ interface ProjectData {
 async function fetchProject(id: string): Promise<ProjectData | null> {
   try {
     const base = process.env.NEXT_PUBLIC_BACKEND_URL || "";
-    const res = await fetch(`${base}/api/public/projects/${id}`, { cache: "no-store" });
+    const res = await fetch(`${base}/api/public/projects/${encodeURIComponent(id)}`, { cache: "no-store" });
     if (!res.ok) return null;
     const data = await res.json();
     return data?.project || data?.data || null;
@@ -34,11 +34,12 @@ async function fetchProject(id: string): Promise<ProjectData | null> {
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const project = await fetchProject(id);
+  const safePath = `/projects/${encodeURIComponent(id)}`;
   if (!project) {
     return buildMetadata({
       title: "Project",
       description: "View a published project on Fixera.",
-      path: `/projects/${id}`,
+      path: safePath,
     });
   }
   const title = project.title || "Project";
@@ -49,7 +50,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return buildMetadata({
     title,
     description,
-    path: `/projects/${id}`,
+    path: safePath,
     image,
   });
 }
@@ -57,13 +58,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function ProjectLayout({ children, params }: Props) {
   const { id } = await params;
   const project = await fetchProject(id);
+  const safePath = `/projects/${encodeURIComponent(id)}`;
   return (
     <>
       <JsonLd
         data={breadcrumbSchema([
           { name: "Home", path: "/" },
           { name: "Projects", path: "/projects" },
-          { name: project?.title || "Project", path: `/projects/${id}` },
+          { name: project?.title || "Project", path: safePath },
         ])}
       />
       {children}

@@ -13,7 +13,7 @@ export default function BlogCard({ item, basePath }: Props) {
 
   return (
     <Link
-      href={`/${basePath}/${item.slug}`}
+      href={`/${basePath}/${encodeURIComponent(item.slug)}`}
       className="group block rounded-3xl bg-gradient-to-br from-rose-200 via-pink-200 to-orange-200 p-[1.5px] transition hover:from-rose-300 hover:via-pink-300 hover:to-orange-300 hover:shadow-xl hover:shadow-rose-100 hover:-translate-y-0.5"
     >
       <article className="flex h-full flex-col overflow-hidden rounded-[calc(1.5rem-1.5px)] bg-white">

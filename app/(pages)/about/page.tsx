@@ -11,8 +11,16 @@ import { breadcrumbSchema } from "@/lib/seo/jsonLd";
 
 export const dynamic = "force-dynamic";
 
+async function fetchAboutContent() {
+  try {
+    return await publicGetCms("policy", "about");
+  } catch {
+    return null;
+  }
+}
+
 export async function generateMetadata(): Promise<Metadata> {
-  const content = await publicGetCms("policy", "about");
+  const content = await fetchAboutContent();
   return buildMetadata({
     title: content?.seo?.titleTag || content?.title || "About Fixera",
     description:
@@ -26,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AboutPage() {
-  const content = await publicGetCms("policy", "about");
+  const content = await fetchAboutContent();
 
   return (
     <main className="mt-10">

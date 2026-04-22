@@ -148,6 +148,8 @@ function ToolbarBtn({
       type="button"
       onClick={onClick}
       title={title}
+      aria-label={title}
+      aria-pressed={active ?? undefined}
       className={cn(
         "inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-700 transition-all",
         "hover:bg-gradient-to-br hover:from-rose-200 hover:to-pink-200 hover:shadow-sm hover:scale-105",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import RichTextRenderer from "./RichTextRenderer";
@@ -20,7 +20,7 @@ export default function FaqAccordion({ groups }: Props) {
               <h2 className="bg-gradient-to-r from-rose-600 to-pink-500 bg-clip-text text-xl font-bold text-transparent">
                 {group.name}
               </h2>
-              <p className="text-xs text-rose-500">{group.items.length} article{group.items.length === 1 ? "" : "s"}</p>
+              <p className="text-xs text-rose-500">{group.items.length} question{group.items.length === 1 ? "" : "s"}</p>
             </div>
           </div>
           <div className="space-y-3">
@@ -36,11 +36,17 @@ export default function FaqAccordion({ groups }: Props) {
 
 function FaqItem({ title, body }: { title: string; body: string }) {
   const [open, setOpen] = useState(false);
+  const reactId = useId();
+  const buttonId = `faq-btn-${reactId}`;
+  const panelId = `faq-panel-${reactId}`;
   return (
     <div className="rounded-2xl bg-gradient-to-br from-rose-100 via-pink-100 to-orange-100 p-[1.5px] transition hover:from-rose-200 hover:via-pink-200 hover:to-orange-200 hover:shadow-md hover:shadow-rose-100">
       <div className="rounded-[calc(1rem-1.5px)] bg-white">
         <button
+          id={buttonId}
           type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
           onClick={() => setOpen((v) => !v)}
           className={cn(
             "flex w-full items-center justify-between gap-3 rounded-[calc(1rem-1.5px)] px-5 py-4 text-left transition",
@@ -54,7 +60,12 @@ function FaqItem({ title, body }: { title: string; body: string }) {
           />
         </button>
         {open && (
-          <div className="border-t border-pink-100 px-5 py-4">
+          <div
+            id={panelId}
+            role="region"
+            aria-labelledby={buttonId}
+            className="border-t border-pink-100 px-5 py-4"
+          >
             <RichTextRenderer html={body} className="prose-sm" />
           </div>
         )}

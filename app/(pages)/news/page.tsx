@@ -22,15 +22,9 @@ export default async function NewsIndexPage({ searchParams }: PageProps) {
   const { page: pageRaw, tag } = await searchParams;
   const page = Math.max(1, parseInt(pageRaw || "1", 10) || 1);
 
-  let items: CmsContent[] = [];
-  let pagination = { page, limit: 12, total: 0, totalPages: 0 };
-  try {
-    const res = await publicListCms("news", { page, limit: 12, tag });
-    items = res.items;
-    pagination = res.pagination;
-  } catch {
-    items = [];
-  }
+  const res = await publicListCms("news", { page, limit: 12, tag });
+  const items: CmsContent[] = res.items;
+  const pagination = res.pagination;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-white pt-24 pb-20">
@@ -63,23 +57,30 @@ export default async function NewsIndexPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        {pagination.totalPages > 1 && (
-          <div className="mt-10 flex items-center justify-center gap-2">
-            {page > 1 && (
-              <Link href={`/news?page=${page - 1}${tag ? `&tag=${tag}` : ""}`} className="rounded-xl border border-pink-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50">
-                Previous
-              </Link>
-            )}
-            <span className="rounded-xl bg-gradient-to-r from-rose-100 to-pink-100 px-4 py-2 text-sm font-medium text-rose-700">
-              Page {page} of {pagination.totalPages}
-            </span>
-            {page < pagination.totalPages && (
-              <Link href={`/news?page=${page + 1}${tag ? `&tag=${tag}` : ""}`} className="rounded-xl bg-gradient-to-r from-rose-400 to-pink-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-rose-200 transition hover:shadow-lg hover:shadow-rose-300">
-                Next
-              </Link>
-            )}
-          </div>
-        )}
+        {pagination.totalPages > 1 && (() => {
+          const link = (p: number) => {
+            const qs = new URLSearchParams({ page: String(p) });
+            if (tag) qs.set("tag", tag);
+            return `/news?${qs.toString()}`;
+          };
+          return (
+            <div className="mt-10 flex items-center justify-center gap-2">
+              {page > 1 && (
+                <Link href={link(page - 1)} className="rounded-xl border border-pink-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50">
+                  Previous
+                </Link>
+              )}
+              <span className="rounded-xl bg-gradient-to-r from-rose-100 to-pink-100 px-4 py-2 text-sm font-medium text-rose-700">
+                Page {page} of {pagination.totalPages}
+              </span>
+              {page < pagination.totalPages && (
+                <Link href={link(page + 1)} className="rounded-xl bg-gradient-to-r from-rose-400 to-pink-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-rose-200 transition hover:shadow-lg hover:shadow-rose-300">
+                  Next
+                </Link>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

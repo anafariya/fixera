@@ -22,15 +22,9 @@ export default async function BlogIndexPage({ searchParams }: PageProps) {
   const { page: pageRaw, tag } = await searchParams;
   const page = Math.max(1, parseInt(pageRaw || "1", 10) || 1);
 
-  let items: CmsContent[] = [];
-  let pagination = { page, limit: 12, total: 0, totalPages: 0 };
-  try {
-    const res = await publicListCms("blog", { page, limit: 12, tag });
-    items = res.items;
-    pagination = res.pagination;
-  } catch {
-    items = [];
-  }
+  const res = await publicListCms("blog", { page, limit: 12, tag });
+  const items: CmsContent[] = res.items;
+  const pagination = res.pagination;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-white pt-24 pb-20">
@@ -95,7 +89,11 @@ function EmptyBlog() {
 }
 
 function Pagination({ page, totalPages, basePath, tag }: { page: number; totalPages: number; basePath: string; tag?: string }) {
-  const link = (p: number) => `${basePath}?page=${p}${tag ? `&tag=${tag}` : ""}`;
+  const link = (p: number) => {
+    const qs = new URLSearchParams({ page: String(p) });
+    if (tag) qs.set("tag", tag);
+    return `${basePath}?${qs.toString()}`;
+  };
   return (
     <div className="mt-10 flex items-center justify-center gap-2">
       {page > 1 && (

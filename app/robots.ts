@@ -11,12 +11,8 @@ export default function robots(): MetadataRoute.Robots {
         disallow: [
           "/admin",
           "/admin/*",
-          "/profile",
-          "/profile/*",
           "/dashboard",
           "/dashboard/*",
-          "/bookings",
-          "/bookings/*",
           "/chat",
           "/chat/*",
           "/login",

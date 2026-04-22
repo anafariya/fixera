@@ -14,9 +14,17 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+async function fetchNewsPost(slug: string) {
+  try {
+    return await publicGetCms("news", slug);
+  } catch {
+    return null;
+  }
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const post = await publicGetCms("news", slug);
+  const post = await fetchNewsPost(slug);
   if (!post) return buildMetadata({ title: "News article not found", path: `/news/${slug}`, noindex: true });
   return buildMetadata({
     title: post.seo?.titleTag || post.title,
@@ -32,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function NewsDetailPage({ params }: Props) {
   const { slug } = await params;
-  const post = await publicGetCms("news", slug);
+  const post = await fetchNewsPost(slug);
   if (!post) notFound();
 
   const date = post.publishedAt || post.updatedAt;

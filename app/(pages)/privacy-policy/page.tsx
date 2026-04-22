@@ -8,8 +8,16 @@ import { breadcrumbSchema } from "@/lib/seo/jsonLd";
 
 export const dynamic = "force-dynamic";
 
+async function fetchPrivacyContent() {
+  try {
+    return await publicGetCms("policy", "privacy-policy");
+  } catch {
+    return null;
+  }
+}
+
 export async function generateMetadata(): Promise<Metadata> {
-  const content = await publicGetCms("policy", "privacy-policy");
+  const content = await fetchPrivacyContent();
   return buildMetadata({
     title: content?.seo?.titleTag || content?.title || "Privacy Policy",
     description:
@@ -22,7 +30,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function PrivacyPolicyPage() {
-  const content = await publicGetCms("policy", "privacy-policy");
+  const content = await fetchPrivacyContent();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-white pb-20">

@@ -17,8 +17,21 @@ export default function CoverImageUpload({ value, onChange, required }: Props) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const ALLOWED_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+  const MAX_BYTES = 5 * 1024 * 1024;
+
   const handle = async (file?: File | null) => {
     if (!file) return;
+    if (!ALLOWED_MIMES.has(file.type)) {
+      toast.error("Unsupported format — use JPEG, PNG, or WebP");
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      toast.error("Image exceeds 5MB limit");
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
     setUploading(true);
     try {
       const { url } = await adminUploadCmsImage(file);
