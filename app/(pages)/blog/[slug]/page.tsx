@@ -3,7 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Calendar, Tag } from "lucide-react";
 import type { Metadata } from "next";
-import { publicGetCms } from "@/lib/cms";
+import { publicGetCms, cmsAuthorName } from "@/lib/cms";
 import RichTextRenderer from "@/components/cms/RichTextRenderer";
 import { buildMetadata } from "@/lib/seo/metadata";
 import JsonLd from "@/components/seo/JsonLd";
@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     keywords: post.tags,
     publishedTime: post.publishedAt,
     modifiedTime: post.updatedAt,
-    authorName: typeof post.author === "object" && post.author ? post.author.name : undefined,
+    authorName: cmsAuthorName(post),
   });
 }
 
@@ -48,7 +48,7 @@ export default async function BlogDetailPage({ params }: Props) {
   }
   if (!post) notFound();
 
-  const authorName = typeof post.author === "object" && post.author ? post.author.name : undefined;
+  const authorName = cmsAuthorName(post);
   const date = post.publishedAt || post.updatedAt;
 
   return (

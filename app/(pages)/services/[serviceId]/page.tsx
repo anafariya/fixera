@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { cache } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
@@ -13,6 +13,18 @@ import ProfessionalFilters from '@/components/ProfessionalFilters';
 import JsonLd from '@/components/seo/JsonLd';
 import { breadcrumbSchema, serviceSchema } from '@/lib/seo/jsonLd';
 import { buildMetadata } from '@/lib/seo/metadata';
+import { publicGetCms } from '@/lib/cms';
+import RichTextRenderer from '@/components/cms/RichTextRenderer';
+
+export const dynamic = "force-dynamic";
+
+const fetchServiceLanding = cache(async (serviceId: string) => {
+  try {
+    return await publicGetCms("landing", serviceId);
+  } catch {
+    return null;
+  }
+});
 
 type Props = {
   params: Promise<{
@@ -35,6 +47,16 @@ function findServiceMeta(serviceId: string) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { serviceId } = await params;
+  const landing = await fetchServiceLanding(serviceId);
+  if (landing) {
+    return buildMetadata({
+      title: landing.seo?.titleTag || landing.title,
+      description: landing.seo?.metaDescription || landing.excerpt,
+      path: landing.seo?.canonical || `/services/${encodeURIComponent(serviceId)}`,
+      image: landing.seo?.ogImage || landing.coverImage,
+      noindex: landing.seo?.noindex,
+    });
+  }
   const meta = findServiceMeta(serviceId);
   if (!meta) notFound();
   const description = meta.description || `Find verified professionals for ${meta.name.toLowerCase()} on Fixera.`;
@@ -92,7 +114,54 @@ export default async function Page({ params }: Props) {
 
   const { serviceId } = await params;
 
+  const landing = await fetchServiceLanding(serviceId);
   const meta = findServiceMeta(serviceId);
+
+  if (landing) {
+    const safePath = `/services/${encodeURIComponent(serviceId)}`;
+    return (
+      <div className="bg-white">
+        <JsonLd
+          data={breadcrumbSchema([
+            { name: 'Home', path: '/' },
+            { name: 'Services', path: '/services' },
+            { name: landing.title, path: safePath },
+          ])}
+        />
+        {landing.coverImage && (
+          <div className="relative h-72 md:h-96 w-full">
+            <Image src={landing.coverImage} alt={landing.title} fill className="object-cover" priority unoptimized />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/20" />
+            <div className="absolute inset-0 flex flex-col justify-end">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pb-12">
+                <div className="flex items-center text-sm text-white mb-2">
+                  <Link href="/" className="hover:underline">Home</Link>
+                  <ChevronRight className="w-4 h-4 mx-1" />
+                  <Link href="/services" className="hover:underline">Services</Link>
+                </div>
+                <h1 className="text-4xl md:text-6xl font-bold text-white tracking-tight">{landing.title}</h1>
+              </div>
+            </div>
+          </div>
+        )}
+        {!landing.coverImage && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-28 pb-6">
+            <div className="flex items-center text-sm text-gray-500 mb-2">
+              <Link href="/" className="hover:underline">Home</Link>
+              <ChevronRight className="w-4 h-4 mx-1" />
+              <Link href="/services" className="hover:underline">Services</Link>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight">{landing.title}</h1>
+            {landing.excerpt && <p className="mt-3 text-lg text-gray-600 max-w-3xl">{landing.excerpt}</p>}
+          </div>
+        )}
+        <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <RichTextRenderer html={landing.body} />
+        </main>
+      </div>
+    );
+  }
+
   if (!meta) notFound();
   const serviceName = meta.name;
   const safePath = `/services/${encodeURIComponent(serviceId)}`;

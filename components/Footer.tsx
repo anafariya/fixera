@@ -1,27 +1,70 @@
-'use client'
-
 import React from 'react'
 import Link from 'next/link'
-import { Hammer } from 'lucide-react'
-import { footerSections, socialLinks, legalLinks } from '@/data/content'
+import { Hammer, Facebook, Twitter, Instagram, Linkedin, Youtube, Music2 } from 'lucide-react'
+import { footerSections } from '@/data/content'
+import { publicListPolicyLinks, PolicyLink } from '@/lib/cms'
+import { publicGetSiteSettings, SiteSettings } from '@/lib/siteSettings'
 
-const FooterLinkColumn = ({ title, links }: { title: string, links: {name: string, href: string}[] }) => (
-    <div>
-        <h4 className="text-lg font-semibold text-white mb-6">{title}</h4>
-        <ul className="space-y-4">
-            {links.map((link) => (
-                <li key={link.name}>
-                    <Link href={link.href} className="text-gray-300 hover:text-white hover:underline transition-colors">
-                        {link.name}
-                    </Link>
-                </li>
-            ))}
-        </ul>
-    </div>
-);
+const LEGAL_SLOTS: Array<{ slug: string; label: string }> = [
+  { slug: 'privacy-policy', label: 'Privacy Policy' },
+  { slug: 'terms-of-service', label: 'Terms of Service' },
+  { slug: 'cookie-policy', label: 'Cookie Policy' },
+  { slug: 'gdpr-compliance', label: 'GDPR Compliance' },
+]
 
-const Footer = () => {
+// Mandatory fallbacks so transient fetch errors don't drop required legal links
+const MANDATORY_FALLBACKS: PolicyLink[] = [
+  { slug: 'privacy-policy', title: 'Privacy Policy', path: '/privacy-policy' },
+  { slug: 'terms-of-service', title: 'Terms of Service', path: '/pages/terms-of-service' },
+  { slug: 'cookie-policy', title: 'Cookie Policy', path: '/pages/cookie-policy' },
+  { slug: 'gdpr-compliance', title: 'GDPR Compliance', path: '/pages/gdpr-compliance' },
+]
+
+function isSafeHttpUrl(href: string): boolean {
+  try {
+    const parsed = new URL(href)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const SOCIAL_DEFS: Array<{ key: keyof NonNullable<SiteSettings['socialLinks']>; name: string; icon: React.ComponentType<{ className?: string }> }> = [
+  { key: 'facebook', name: 'Facebook', icon: Facebook },
+  { key: 'twitter', name: 'Twitter', icon: Twitter },
+  { key: 'instagram', name: 'Instagram', icon: Instagram },
+  { key: 'linkedin', name: 'LinkedIn', icon: Linkedin },
+  { key: 'tiktok', name: 'TikTok', icon: Music2 },
+  { key: 'youtube', name: 'YouTube', icon: Youtube },
+]
+
+const FooterLinkColumn = ({ title, links }: { title: string; links: { name: string; href: string }[] }) => (
+  <div>
+    <h4 className="text-lg font-semibold text-white mb-6">{title}</h4>
+    <ul className="space-y-4">
+      {links.map((link) => (
+        <li key={link.name}>
+          <Link href={link.href} className="text-gray-300 hover:text-white hover:underline transition-colors">
+            {link.name}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  </div>
+)
+
+export default async function Footer() {
   const currentYear = new Date().getFullYear()
+
+  const [policies, settings] = await Promise.all([
+    publicListPolicyLinks().catch(() => [] as PolicyLink[]),
+    publicGetSiteSettings().catch(() => ({ socialLinks: {} } as SiteSettings)),
+  ])
+
+  // Merge: fetched wins on duplicate slug, fallbacks fill gaps for mandatory links
+  const bySlug: Record<string, PolicyLink> = Object.fromEntries(
+    [...MANDATORY_FALLBACKS, ...policies].map((p) => [p.slug, p])
+  )
 
   return (
     <footer className="bg-gray-900 ">
@@ -40,7 +83,7 @@ const Footer = () => {
               Fixera is a trusted platform connecting customers with verified professionals for any property service. From minor repairs to major renovations, we make it simple to get the job done with quality and security guaranteed.
             </p>
           </div>
-          
+
           {footerSections.map((section) => (
             <FooterLinkColumn key={section.title} title={section.title} links={section.links} />
           ))}
@@ -54,28 +97,31 @@ const Footer = () => {
               © {currentYear} Fixera. All rights reserved.
             </p>
             <div className="flex items-center space-x-6">
-              {socialLinks.map((link) => {
-                const Icon = link.icon;
+              {SOCIAL_DEFS.map(({ key, name, icon: Icon }) => {
+                const href = settings?.socialLinks?.[key]
+                if (!href || !isSafeHttpUrl(href)) return null
                 return (
-                  <a key={link.name} href={link.href} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                  <a key={name} href={href} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                     <Icon className="w-6 h-6" />
-                    <span className="sr-only">{link.name}</span>
+                    <span className="sr-only">{name}</span>
                   </a>
-                );
+                )
               })}
             </div>
           </div>
-           <div className="mt-6 flex flex-wrap justify-center sm:justify-start gap-x-6 gap-y-2">
-              {legalLinks.map((link) => (
-                <Link key={link.name} href={link.href} className="text-sm text-gray-400 hover:text-white hover:underline">
-                  {link.name}
+          <div className="mt-6 flex flex-wrap justify-center sm:justify-start gap-x-6 gap-y-2">
+            {LEGAL_SLOTS.map((slot) => {
+              const match = bySlug[slot.slug]
+              if (!match) return null
+              return (
+                <Link key={slot.slug} href={match.path} className="text-sm text-gray-400 hover:text-white hover:underline">
+                  {slot.label}
                 </Link>
-              ))}
-            </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </footer>
   )
 }
-
-export default Footer

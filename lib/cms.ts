@@ -35,6 +35,7 @@ export interface CmsContent {
   tags: string[];
   status: CmsContentStatus;
   author?: { _id: string; name?: string; email?: string } | string;
+  authorOverride?: string;
   publishedAt?: string;
   seo: CmsSeo;
   relatedContent?: Array<{ _id: string; title?: string; slug?: string; type?: CmsContentType } | string>;
@@ -56,10 +57,21 @@ export interface CmsUpsertPayload {
   tags?: string[];
   status?: CmsContentStatus;
   author?: string;
+  authorOverride?: string;
   publishedAt?: string;
   seo?: CmsSeo;
   relatedContent?: string[];
   relatedServices?: string[];
+}
+
+export function cmsAuthorName(item: Pick<CmsContent, "author" | "authorOverride">): string | undefined {
+  if (item.authorOverride && item.authorOverride.trim()) return item.authorOverride.trim();
+  if (typeof item.author === "object" && item.author) {
+    const name = item.author.name?.trim();
+    if (name) return name;
+  }
+  if (typeof item.author === "string" && item.author.trim()) return item.author.trim();
+  return undefined;
 }
 
 export interface FaqCategory {
@@ -199,6 +211,22 @@ export async function publicGetFaq(): Promise<{ groups: FaqGroup[]; categories: 
   return parseJsonRequired<{ groups: FaqGroup[]; categories: FaqCategory[] }>(res);
 }
 
+export interface PolicyLink {
+  title: string;
+  slug: string;
+  path: string;
+}
+
+export async function publicListPolicyLinks(): Promise<PolicyLink[]> {
+  try {
+    const res = await fetch(`${API()}/api/public/cms/policy-links`, { cache: "no-store" });
+    const data = await parseJsonRequired<{ items: PolicyLink[] }>(res);
+    return data.items || [];
+  } catch {
+    return [];
+  }
+}
+
 export interface SitemapEntry {
   type: CmsContentType;
   slug: string;
@@ -226,9 +254,11 @@ export async function publicListSitemapEntries(
 // ---------- Utils ----------
 
 const RESERVED_POLICY_PATHS: Record<string, string> = {
-  about: "/about",
   "privacy-policy": "/privacy-policy",
+  about: "/about",
 };
+
+const RESERVED_LANDING_PATHS: Record<string, string> = {};
 
 export function getPublicPathForCms(type: CmsContentType, slug: string): string | null {
   if (!slug) return null;
@@ -238,13 +268,19 @@ export function getPublicPathForCms(type: CmsContentType, slug: string): string 
     case "news":
       return `/news/${slug}`;
     case "landing":
-      return `/pages/${slug}`;
+      return RESERVED_LANDING_PATHS[slug] || `/pages/${slug}`;
     case "policy":
       return RESERVED_POLICY_PATHS[slug] || `/pages/${slug}`;
     case "faq":
+      return `/faq#${slug}`;
     default:
       return null;
   }
+}
+
+export function getLandingServicePath(slug: string): string | null {
+  if (!slug || RESERVED_LANDING_PATHS[slug]) return null;
+  return `/services/${slug}`;
 }
 
 export function getPublicSlugPrefixForCms(type: CmsContentType): string | null {

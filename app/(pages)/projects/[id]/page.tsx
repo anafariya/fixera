@@ -40,6 +40,7 @@ import { formatCurrency } from '@/lib/formatters';
 import Image from 'next/image';
 import ProjectBookingForm from '@/components/project/ProjectBookingForm';
 import SubprojectComparisonTable from '@/components/project/SubprojectComparisonTable';
+import FavoriteButton from '@/components/favorites/FavoriteButton';
 import {
   formatPriceModelLabel,
   getCertificateGradient,
@@ -148,7 +149,7 @@ type ProvidedByCardProps = {
 
 const ProvidedByCard = ({ pro, stats }: ProvidedByCardProps) => {
   const proName =
-    pro.businessInfo?.companyName || pro.name || pro.username || 'Professional';
+    pro.name || pro.businessInfo?.companyName || pro.username || 'Professional';
   const proLocation = [pro.businessInfo?.city, pro.businessInfo?.country]
     .filter(Boolean)
     .join(', ');
@@ -310,6 +311,7 @@ export default function ProjectDetailPage() {
   const [reviewRatingFilter, setReviewRatingFilter] = useState<number | null>(null);
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewTotalPages, setReviewTotalPages] = useState(1);
+  const [initialFavorited, setInitialFavorited] = useState<boolean | null>(null);
   const { customerPrice } = useCommissionRate();
 
   const projectId = params.id as string;
@@ -327,6 +329,44 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     fetchProject();
   }, [projectId]);
+
+  useEffect(() => {
+    // Reset on projectId change so a stale favorited flag from the previous project can't leak
+    setInitialFavorited(null);
+    if (!projectId) return;
+    // Non-customers can't favorite; unblock render immediately with a concrete value
+    if (!isAuthenticated || user?.role !== 'customer') {
+      setInitialFavorited(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { authFetch } = await import('@/lib/utils');
+        const res = await authFetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/favorites/status`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetType: 'project', targetIds: [projectId] }),
+          }
+        );
+        const json = await res.json();
+        if (!cancelled) {
+          if (res.ok && json?.success) {
+            setInitialFavorited(Boolean(json.data?.favorited?.[projectId]));
+          } else {
+            setInitialFavorited(false);
+          }
+        }
+      } catch {
+        if (!cancelled) setInitialFavorited(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, isAuthenticated, user?.role]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -693,7 +733,7 @@ export default function ProjectDetailPage() {
             {/* Project Details */}
             <Card>
               <CardHeader>
-                <div className='flex items-start justify-between'>
+                <div className='flex items-start justify-between gap-3'>
                   <div>
                     <CardTitle className='text-3xl mb-2'>
                       {project.title}
@@ -713,6 +753,16 @@ export default function ProjectDetailPage() {
                       )}
                     </CardDescription>
                   </div>
+                  {initialFavorited !== null && (
+                    <FavoriteButton
+                      key={project._id}
+                      targetType='project'
+                      targetId={project._id}
+                      initialFavorited={initialFavorited}
+                      size='md'
+                      stopPropagation={false}
+                    />
+                  )}
                 </div>
               </CardHeader>
               <CardContent className='space-y-4'>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Calendar } from "lucide-react";
 import type { Metadata } from "next";
-import { publicGetCms } from "@/lib/cms";
+import { publicGetCms, cmsAuthorName } from "@/lib/cms";
 import RichTextRenderer from "@/components/cms/RichTextRenderer";
 import { buildMetadata } from "@/lib/seo/metadata";
 import JsonLd from "@/components/seo/JsonLd";
@@ -44,6 +44,7 @@ export default async function NewsDetailPage({ params }: Props) {
   if (!post) notFound();
 
   const date = post.publishedAt || post.updatedAt;
+  const authorName = cmsAuthorName(post);
 
   return (
     <article className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-white pb-20">
@@ -56,6 +57,7 @@ export default async function NewsDetailPage({ params }: Props) {
             image: post.coverImage,
             datePublished: post.publishedAt,
             dateModified: post.updatedAt,
+            authorName,
           }),
           breadcrumbSchema([
             { name: "Home", path: "/" },
@@ -80,12 +82,15 @@ export default async function NewsDetailPage({ params }: Props) {
         <h1 className="bg-gradient-to-r from-rose-700 via-pink-600 to-rose-500 bg-clip-text text-4xl font-bold text-transparent md:text-5xl">
           {post.title}
         </h1>
-        {date && (
-          <div className="mt-4 inline-flex items-center gap-1 text-sm text-rose-500">
-            <Calendar size={14} />
-            {new Date(date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
-          </div>
-        )}
+        <div className="mt-4 flex items-center gap-3 text-sm text-rose-500">
+          {date && (
+            <span className="inline-flex items-center gap-1">
+              <Calendar size={14} />
+              {new Date(date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+            </span>
+          )}
+          {authorName && <span>· by {authorName}</span>}
+        </div>
         <div className="mt-8">
           <RichTextRenderer html={post.body} className="prose-lg" />
         </div>

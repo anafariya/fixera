@@ -32,7 +32,7 @@ interface FavoriteItem {
 export default function FavoritesPage() {
   const router = useRouter();
   const { user, isAuthenticated, loading } = useAuth();
-  const [tab, setTab] = useState<"professional" | "project">("professional");
+  const [tab, setTab] = useState<"professional" | "project">("project");
   const [items, setItems] = useState<FavoriteItem[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const requestIdRef = useRef(0);
@@ -96,8 +96,8 @@ export default function FavoritesPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "professional" | "project")}>
         <TabsList>
-          <TabsTrigger value="professional">Professionals</TabsTrigger>
           <TabsTrigger value="project">Projects</TabsTrigger>
+          <TabsTrigger value="professional">Professionals</TabsTrigger>
         </TabsList>
 
         <TabsContent value="professional" className="mt-6">
