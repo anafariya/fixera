@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { cache } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
@@ -18,13 +18,13 @@ import RichTextRenderer from '@/components/cms/RichTextRenderer';
 
 export const dynamic = "force-dynamic";
 
-async function fetchServiceLanding(serviceId: string) {
+const fetchServiceLanding = cache(async (serviceId: string) => {
   try {
     return await publicGetCms("landing", serviceId);
   } catch {
     return null;
   }
-}
+});
 
 type Props = {
   params: Promise<{

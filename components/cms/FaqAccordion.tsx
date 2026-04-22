@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import RichTextRenderer from "./RichTextRenderer";
@@ -39,6 +39,17 @@ function FaqItem({ anchor, title, body }: { anchor: string; title: string; body:
   const reactId = useId();
   const buttonId = `faq-btn-${reactId}`;
   const panelId = `faq-panel-${reactId}`;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const check = () => {
+      if (window.location.hash === `#${anchor}`) setOpen(true);
+    };
+    check();
+    window.addEventListener("hashchange", check);
+    return () => window.removeEventListener("hashchange", check);
+  }, [anchor]);
+
   return (
     <div id={anchor} className="scroll-mt-24 rounded-2xl bg-gradient-to-br from-rose-100 via-pink-100 to-orange-100 p-[1.5px] transition hover:from-rose-200 hover:via-pink-200 hover:to-orange-200 hover:shadow-md hover:shadow-rose-100">
       <div className="rounded-[calc(1rem-1.5px)] bg-white">

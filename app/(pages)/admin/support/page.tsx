@@ -80,6 +80,7 @@ export default function AdminSupportPage() {
 function TicketsAdmin() {
   const [items, setItems] = useState<SupportTicket[] | null>(null);
   const [reply, setReply] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
 
   const load = () =>
     adminListTickets()
@@ -91,13 +92,19 @@ function TicketsAdmin() {
   }, []);
 
   const update = async (id: string, payload: { status?: SupportTicketStatus; reply?: string }) => {
+    if (saving[id]) return;
+    setSaving((s) => ({ ...s, [id]: true }));
     try {
       await adminUpdateTicket(id, payload);
-      setReply((r) => ({ ...r, [id]: "" }));
+      if (payload.reply && payload.reply.trim()) {
+        setReply((r) => ({ ...r, [id]: "" }));
+      }
       toast.success("Updated");
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setSaving((s) => ({ ...s, [id]: false }));
     }
   };
 
@@ -146,13 +153,16 @@ function TicketsAdmin() {
                 <input
                   value={reply[t._id] || ""}
                   onChange={(e) => setReply((r) => ({ ...r, [t._id]: e.target.value }))}
+                  disabled={Boolean(saving[t._id])}
                   placeholder="Reply to the professional…"
-                  className="flex-1 rounded-xl border border-indigo-200 bg-white/60 px-3 py-1.5 text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-200"
+                  className="flex-1 rounded-xl border border-indigo-200 bg-white/60 px-3 py-1.5 text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-200 disabled:opacity-50"
                 />
                 <button
                   onClick={() => reply[t._id]?.trim() && update(t._id, { reply: reply[t._id].trim() })}
-                  className="rounded-xl bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-600"
+                  disabled={Boolean(saving[t._id]) || !reply[t._id]?.trim()}
+                  className="inline-flex items-center gap-1 rounded-xl bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
+                  {saving[t._id] ? <Loader2 className="animate-spin" size={12} /> : null}
                   Send
                 </button>
               </div>
@@ -167,6 +177,7 @@ function TicketsAdmin() {
 function MeetingsAdmin() {
   const [items, setItems] = useState<MeetingRequest[] | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { scheduledAt: string; adminResponse: string }>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
 
   const load = () =>
     adminListMeetingRequests()
@@ -178,12 +189,16 @@ function MeetingsAdmin() {
   }, []);
 
   const update = async (id: string, payload: Parameters<typeof adminUpdateMeetingRequest>[1]) => {
+    if (saving[id]) return;
+    setSaving((s) => ({ ...s, [id]: true }));
     try {
       await adminUpdateMeetingRequest(id, payload);
       toast.success("Updated");
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setSaving((s) => ({ ...s, [id]: false }));
     }
   };
 
@@ -245,8 +260,10 @@ function MeetingsAdmin() {
                       adminResponse: draft.adminResponse,
                     })
                   }
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-600"
+                  disabled={Boolean(saving[m._id])}
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
+                  {saving[m._id] ? <Loader2 className="animate-spin" size={12} /> : null}
                   Save
                 </button>
               </div>

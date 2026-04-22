@@ -331,6 +331,8 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   useEffect(() => {
+    // Reset on projectId change so a stale favorited flag from the previous project can't leak
+    setInitialFavorited(false);
     if (!projectId || !isAuthenticated || user?.role !== 'customer') return;
     let cancelled = false;
     (async () => {
@@ -743,6 +745,7 @@ export default function ProjectDetailPage() {
                     </CardDescription>
                   </div>
                   <FavoriteButton
+                    key={project._id}
                     targetType='project'
                     targetId={project._id}
                     initialFavorited={initialFavorited}

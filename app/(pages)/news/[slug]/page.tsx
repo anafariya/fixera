@@ -57,6 +57,7 @@ export default async function NewsDetailPage({ params }: Props) {
             image: post.coverImage,
             datePublished: post.publishedAt,
             dateModified: post.updatedAt,
+            authorName,
           }),
           breadcrumbSchema([
             { name: "Home", path: "/" },

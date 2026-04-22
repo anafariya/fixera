@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, LifeBuoy, CalendarClock, MessageCircle, Send, Plus } from "lucide-react";
@@ -101,15 +101,19 @@ function TicketsTab() {
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [replyDraft, setReplyDraft] = useState<Record<string, string>>({});
+  const [replySending, setReplySending] = useState<Record<string, boolean>>({});
 
-  const load = () =>
-    proListMyTickets()
-      .then(setItems)
-      .catch((e) => toast.error(e instanceof Error ? e.message : "Failed to load tickets"));
+  const load = useCallback(
+    () =>
+      proListMyTickets()
+        .then(setItems)
+        .catch((e) => toast.error(e instanceof Error ? e.message : "Failed to load tickets")),
+    []
+  );
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const submit = async () => {
     if (!subject.trim() || !description.trim()) {
@@ -131,8 +135,10 @@ function TicketsTab() {
   };
 
   const sendReply = async (id: string) => {
+    if (replySending[id]) return;
     const body = replyDraft[id]?.trim();
     if (!body) return;
+    setReplySending((s) => ({ ...s, [id]: true }));
     try {
       await proReplyTicket(id, body);
       setReplyDraft((d) => ({ ...d, [id]: "" }));
@@ -140,6 +146,8 @@ function TicketsTab() {
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to reply");
+    } finally {
+      setReplySending((s) => ({ ...s, [id]: false }));
     }
   };
 
@@ -213,14 +221,16 @@ function TicketsTab() {
                       <input
                         value={replyDraft[t._id] || ""}
                         onChange={(e) => setReplyDraft((d) => ({ ...d, [t._id]: e.target.value }))}
+                        disabled={Boolean(replySending[t._id])}
                         placeholder="Reply…"
-                        className="flex-1 rounded-xl border border-indigo-200 bg-white/60 px-3 py-1.5 text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-200"
+                        className="flex-1 rounded-xl border border-indigo-200 bg-white/60 px-3 py-1.5 text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-200 disabled:opacity-50"
                       />
                       <button
                         onClick={() => sendReply(t._id)}
-                        className="inline-flex items-center gap-1 rounded-xl bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-600"
+                        disabled={Boolean(replySending[t._id]) || !replyDraft[t._id]?.trim()}
+                        className="inline-flex items-center gap-1 rounded-xl bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Send size={12} /> Send
+                        {replySending[t._id] ? <Loader2 className="animate-spin" size={12} /> : <Send size={12} />} Send
                       </button>
                     </div>
                   )}
@@ -241,14 +251,17 @@ function MeetingsTab() {
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [saving, setSaving] = useState(false);
 
-  const load = () =>
-    proListMyMeetingRequests()
-      .then(setItems)
-      .catch((e) => toast.error(e instanceof Error ? e.message : "Failed to load requests"));
+  const load = useCallback(
+    () =>
+      proListMyMeetingRequests()
+        .then(setItems)
+        .catch((e) => toast.error(e instanceof Error ? e.message : "Failed to load requests")),
+    []
+  );
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const submit = async () => {
     if (!topic.trim() || !preferredTimes.trim()) {

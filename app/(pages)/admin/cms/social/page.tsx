@@ -17,6 +17,16 @@ const FIELDS: Array<{ key: keyof SocialLinks; label: string; placeholder: string
   { key: "youtube", label: "YouTube", placeholder: "https://youtube.com/@fixera" },
 ];
 
+function isValidUrl(v: string): boolean {
+  if (!v.trim()) return true;
+  try {
+    const parsed = new URL(v.trim());
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export default function AdminSocialSettingsPage() {
   const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
@@ -35,12 +45,29 @@ export default function AdminSocialSettingsPage() {
     if (!isAuthenticated || user?.role !== "admin") return;
     setFetching(true);
     adminGetSiteSettings()
-      .then((s) => setValues(s.socialLinks || {}))
+      .then((s) => {
+        const loaded = s.socialLinks || {};
+        setValues(loaded);
+        const invalid = (Object.entries(loaded) as Array<[keyof SocialLinks, string | undefined]>)
+          .filter(([, v]) => v && !isValidUrl(v))
+          .map(([k]) => k);
+        if (invalid.length > 0) {
+          toast.error(`Stored link looks malformed: ${invalid.join(", ")}`);
+        }
+      })
       .catch((err) => toast.error(err instanceof Error ? err.message : "Failed to load settings"))
       .finally(() => setFetching(false));
   }, [isAuthenticated, user]);
 
+  const fieldErrors = (Object.entries(values) as Array<[keyof SocialLinks, string | undefined]>)
+    .filter(([, v]) => v && !isValidUrl(v))
+    .map(([k]) => k);
+
   const save = async () => {
+    if (fieldErrors.length > 0) {
+      toast.error(`Fix invalid URL(s): ${fieldErrors.join(", ")}`);
+      return;
+    }
     setSaving(true);
     try {
       const next = await adminUpdateSiteSettings({ socialLinks: values });
@@ -73,8 +100,8 @@ export default function AdminSocialSettingsPage() {
           </Link>
           <button
             onClick={save}
-            disabled={saving}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 via-pink-500 to-orange-400 px-5 py-2 text-sm font-semibold text-white shadow-md shadow-rose-200 transition hover:shadow-lg hover:shadow-rose-300 disabled:opacity-50"
+            disabled={saving || fieldErrors.length > 0}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 via-pink-500 to-orange-400 px-5 py-2 text-sm font-semibold text-white shadow-md shadow-rose-200 transition hover:shadow-lg hover:shadow-rose-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />} Save
           </button>
@@ -96,17 +123,29 @@ export default function AdminSocialSettingsPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {FIELDS.map((f) => (
-                  <div key={f.key} className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-rose-700">{f.label}</label>
-                    <input
-                      value={values[f.key] || ""}
-                      onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                      placeholder={f.placeholder}
-                      className="w-full rounded-xl border border-pink-200 bg-white/60 px-4 py-2 text-sm outline-none transition focus:border-rose-400 focus:bg-white focus:ring-2 focus:ring-rose-200"
-                    />
-                  </div>
-                ))}
+                {FIELDS.map((f) => {
+                  const raw = values[f.key] || "";
+                  const invalid = Boolean(raw) && !isValidUrl(raw);
+                  return (
+                    <div key={f.key} className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-rose-700">{f.label}</label>
+                      <input
+                        value={raw}
+                        onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                        placeholder={f.placeholder}
+                        aria-invalid={invalid || undefined}
+                        className={
+                          invalid
+                            ? "w-full rounded-xl border border-rose-400 bg-rose-50/60 px-4 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-2 focus:ring-rose-300"
+                            : "w-full rounded-xl border border-pink-200 bg-white/60 px-4 py-2 text-sm outline-none transition focus:border-rose-400 focus:bg-white focus:ring-2 focus:ring-rose-200"
+                        }
+                      />
+                      {invalid && (
+                        <p className="text-[11px] text-rose-600">Use a full URL starting with http:// or https://</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
-import { Hammer, Facebook, Twitter, Instagram, Linkedin, Youtube } from 'lucide-react'
+import { Hammer, Facebook, Twitter, Instagram, Linkedin, Youtube, Music2 } from 'lucide-react'
 import { footerSections } from '@/data/content'
 import { publicListPolicyLinks, PolicyLink } from '@/lib/cms'
 import { publicGetSiteSettings, SiteSettings } from '@/lib/siteSettings'
@@ -17,6 +17,7 @@ const SOCIAL_DEFS: Array<{ key: keyof NonNullable<SiteSettings['socialLinks']>; 
   { key: 'twitter', name: 'Twitter', icon: Twitter },
   { key: 'instagram', name: 'Instagram', icon: Instagram },
   { key: 'linkedin', name: 'LinkedIn', icon: Linkedin },
+  { key: 'tiktok', name: 'TikTok', icon: Music2 },
   { key: 'youtube', name: 'YouTube', icon: Youtube },
 ]
 
@@ -91,12 +92,11 @@ export default async function Footer() {
           <div className="mt-6 flex flex-wrap justify-center sm:justify-start gap-x-6 gap-y-2">
             {LEGAL_SLOTS.map((slot) => {
               const match = bySlug[slot.slug]
-              return match ? (
+              if (!match) return null
+              return (
                 <Link key={slot.slug} href={match.path} className="text-sm text-gray-400 hover:text-white hover:underline">
                   {slot.label}
                 </Link>
-              ) : (
-                <span key={slot.slug} className="text-sm text-gray-500">{slot.label}</span>
               )
             })}
           </div>
