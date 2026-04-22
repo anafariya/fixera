@@ -29,7 +29,11 @@ export default function AdminSupportPage() {
 
   useEffect(() => {
     if (loading) return;
-    if (!isAuthenticated || user?.role !== "admin") router.replace("/login");
+    if (!isAuthenticated) {
+      router.replace("/login");
+    } else if (user?.role !== "admin") {
+      router.replace("/dashboard");
+    }
   }, [user, isAuthenticated, loading, router]);
 
   if (loading || !isAuthenticated || user?.role !== "admin") {
@@ -43,7 +47,7 @@ export default function AdminSupportPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-white pb-16 pt-24">
       <div className="mx-auto max-w-6xl px-6">
-        <h1 className="text-3xl font-bold text-indigo-900">Professional Support</h1>
+        <h1 className="text-3xl font-bold text-indigo-900">Support — Admin</h1>
         <p className="mt-1 text-sm text-indigo-600/80">Tickets and meeting requests from professionals.</p>
 
         <div className="mt-6 flex gap-2">
@@ -243,7 +247,18 @@ function MeetingsAdmin() {
                   id={`meeting-status-${m._id}`}
                   aria-label={`Meeting status for "${m.topic}"`}
                   value={m.status}
-                  onChange={(e) => update(m._id, { status: e.target.value as MeetingRequestStatus })}
+                  onChange={(e) => {
+                    const next = e.target.value as MeetingRequestStatus;
+                    if (next === "scheduled" && !draft.scheduledAt && !m.scheduledAt) {
+                      toast.error("Set a scheduled time before marking as scheduled");
+                      return;
+                    }
+                    const payload: Parameters<typeof adminUpdateMeetingRequest>[1] = { status: next };
+                    if (next === "scheduled" && draft.scheduledAt) {
+                      payload.scheduledAt = new Date(draft.scheduledAt).toISOString();
+                    }
+                    update(m._id, payload);
+                  }}
                   className="rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
                 >
                   {MEETING_STATUSES.map((s) => (
@@ -275,12 +290,17 @@ function MeetingsAdmin() {
               </div>
               <div className="flex justify-end">
                 <button
-                  onClick={() =>
-                    update(m._id, {
+                  onClick={() => {
+                    const payload: Parameters<typeof adminUpdateMeetingRequest>[1] = {
                       scheduledAt: draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : undefined,
                       adminResponse: draft.adminResponse,
-                    })
-                  }
+                    };
+                    // If admin has set a time but status is still pending, auto-advance to scheduled
+                    if (draft.scheduledAt && m.status === "pending") {
+                      payload.status = "scheduled";
+                    }
+                    update(m._id, payload);
+                  }}
                   disabled={Boolean(saving[m._id])}
                   className="inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >

@@ -25,8 +25,10 @@ export default function ProfessionalSupportPage() {
 
   useEffect(() => {
     if (loading) return;
-    if (!isAuthenticated || user?.role !== "professional") {
+    if (!isAuthenticated) {
       router.replace("/login?redirect=/professional/support");
+    } else if (user?.role !== "professional") {
+      router.replace("/dashboard");
     }
   }, [user, isAuthenticated, loading, router]);
 
