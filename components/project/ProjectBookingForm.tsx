@@ -359,6 +359,7 @@ export default function ProjectBookingForm({
       .filter(Boolean)
     : [];
   const debugSignatureRef = useRef('');
+  const latestSlotsRequestRef = useRef(0);
   const isDebugProject =
     Boolean(debugProjectId) && String(project._id) === debugProjectId;
   const debugLog = useMemo(
@@ -562,11 +563,15 @@ export default function ProjectBookingForm({
 
   useEffect(() => {
     if (projectMode !== 'hours' || !selectedDate) {
+      latestSlotsRequestRef.current += 1;
       setServerSlotsForSelectedDate(null);
       setLoadingServerSlots(false);
       return;
     }
+    const requestId = ++latestSlotsRequestRef.current;
     const controller = new AbortController();
+    const isCurrent = () =>
+      requestId === latestSlotsRequestRef.current && !controller.signal.aborted;
     const run = async () => {
       try {
         setServerSlotsForSelectedDate(null);
@@ -576,11 +581,12 @@ export default function ProjectBookingForm({
           url += `&subprojectIndex=${selectedPackageIndex}`;
         }
         const res = await fetch(url, { signal: controller.signal });
+        if (!isCurrent()) return;
         if (!res.ok) {
           return;
         }
         const data = await res.json();
-        if (controller.signal.aborted) return;
+        if (!isCurrent()) return;
         if (!Array.isArray(data?.slots)) {
           return;
         }
@@ -588,7 +594,7 @@ export default function ProjectBookingForm({
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return;
       } finally {
-        if (!controller.signal.aborted) {
+        if (isCurrent()) {
           setLoadingServerSlots(false);
         }
       }
@@ -2814,7 +2820,9 @@ export default function ProjectBookingForm({
                             {selectedPackage.pricing.type === 'fixed' &&
                               selectedPackage.pricing.amount && (
                                 <div className='text-2xl font-bold text-blue-600'>
-                                  {hasDisplayPackageDiscount ? (
+                                  {!customerPricingReady ? (
+                                    <span className='inline-block h-7 w-24 animate-pulse rounded bg-gray-200' aria-label='Loading price' />
+                                  ) : hasDisplayPackageDiscount ? (
                                     <div className='flex flex-col items-end'>
                                       <span className='text-base font-semibold text-gray-400 line-through'>
                                         {formatCurrency(displayPackagePrice)}
@@ -2909,7 +2917,9 @@ export default function ProjectBookingForm({
                                 Estimated Price:
                               </p>
                               <div className='text-4xl font-bold text-blue-600'>
-                                {hasDisplayPackageDiscount ? (
+                                {!customerPricingReady ? (
+                                  <span className='inline-block h-10 w-32 animate-pulse rounded bg-gray-200' aria-label='Loading price' />
+                                ) : hasDisplayPackageDiscount ? (
                                   <div className='flex flex-col'>
                                     <span className='text-base font-semibold text-gray-400 line-through'>
                                       {formatCurrency(displayPackagePrice)}
@@ -3442,7 +3452,9 @@ export default function ProjectBookingForm({
                         <div className='flex justify-between items-center text-sm'>
                           <span className='text-gray-700'>Package Price:</span>
                           <span className='font-semibold'>
-                            {typeof displayPackagePrice === 'number'
+                            {!customerPricingReady ? (
+                              <span className='inline-block h-4 w-20 animate-pulse rounded bg-gray-200' aria-label='Loading price' />
+                            ) : typeof displayPackagePrice === 'number'
                               ? formatCurrency(displayPackagePrice)
                               : 'Quote Required'}
                           </span>
@@ -3519,7 +3531,11 @@ export default function ProjectBookingForm({
                               Grand Total:
                             </span>
                             <span className='text-2xl font-bold text-blue-600'>
-                              {formatCurrency(finalDisplayTotal)}
+                              {customerPricingReady ? (
+                                formatCurrency(finalDisplayTotal)
+                              ) : (
+                                <span className='inline-block h-7 w-28 animate-pulse rounded bg-gray-200' aria-label='Loading total' />
+                              )}
                             </span>
                           </div>
                         )}
@@ -4089,7 +4105,11 @@ export default function ProjectBookingForm({
                             Grand Total:
                           </span>
                           <span className='text-2xl font-bold text-blue-600'>
-                            {formatCurrency(finalDisplayTotal)}
+                            {customerPricingReady ? (
+                              formatCurrency(finalDisplayTotal)
+                            ) : (
+                              <span className='inline-block h-7 w-28 animate-pulse rounded bg-gray-200' aria-label='Loading total' />
+                            )}
                           </span>
                         </div>
                       )}

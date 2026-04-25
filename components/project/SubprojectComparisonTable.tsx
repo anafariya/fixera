@@ -62,7 +62,8 @@ export default function SubprojectComparisonTable({
   companyBlockedRanges,
   onContactProfessional
 }: SubprojectComparisonTableProps) {
-  const { customerPrice, originalPrice, loyalty } = useCustomerPricing()
+  const { customerPrice, originalPrice, loyalty, commissionPercent, loyaltyLoaded } = useCustomerPricing()
+  const isPricingReady = commissionPercent != null && loyaltyLoaded
 
 
   const formatDuration = (duration?: { value?: number; unit: 'hours' | 'days' }): string => {
@@ -242,6 +243,8 @@ export default function SubprojectComparisonTable({
                   <div className="text-4xl font-bold text-gray-900">
                     {effectivePricingType(currentSubproject) === 'rfq' ? (
                       <span className="text-2xl">RFQ</span>
+                    ) : !isPricingReady ? (
+                      <span className="inline-block h-10 w-32 animate-pulse rounded bg-gray-200" aria-label="Loading price" />
                     ) : effectivePricingType(currentSubproject) === 'unit' ? (
                       <>
                         {hasCurrentDiscount ? (
@@ -273,7 +276,7 @@ export default function SubprojectComparisonTable({
                       )
                     )}
                   </div>
-                  {effectivePricingType(currentSubproject) === 'unit' && currentSubproject.pricing.minProjectValue && (
+                  {isPricingReady && effectivePricingType(currentSubproject) === 'unit' && currentSubproject.pricing.minProjectValue && (
                     <p className="text-sm text-gray-500 mt-2">
                       Min. order: {hasMinProjectDiscount ? (
                         <>
@@ -287,7 +290,7 @@ export default function SubprojectComparisonTable({
                       )}
                     </p>
                   )}
-                  {effectivePricingType(currentSubproject) === 'rfq' && currentSubproject.pricing.priceRange && (
+                  {isPricingReady && effectivePricingType(currentSubproject) === 'rfq' && currentSubproject.pricing.priceRange && (
                     <p className="text-sm text-gray-500 mt-2">
                       Estimated range: {hasMinRangeDiscount ? (
                         <>
@@ -312,12 +315,12 @@ export default function SubprojectComparisonTable({
                       )}
                     </p>
                   )}
-                  {repeatBuyerDiscount?.enabled && currentPricing.hasRepeatBuyerDiscount && (
+                  {isPricingReady && repeatBuyerDiscount?.enabled && currentPricing.hasRepeatBuyerDiscount && (
                     <p className="text-sm text-green-600 mt-2">
                       Returning customer price available
                     </p>
                   )}
-                  {loyalty && loyalty.percentage > 0 && currentPricing.hasLoyaltyDiscount && (
+                  {isPricingReady && loyalty && loyalty.percentage > 0 && currentPricing.hasLoyaltyDiscount && (
                     <p className="text-sm text-amber-700 mt-1">
                       {loyalty.level} member savings applied
                     </p>

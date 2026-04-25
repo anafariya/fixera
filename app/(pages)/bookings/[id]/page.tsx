@@ -717,13 +717,16 @@ export default function BookingDetailPage() {
     if (!autoOpenCompletion) return
     if (user?.role !== "professional") return
     if (booking?.status !== "in_progress") return
+    const milestonesAllDone = !booking?.milestonePayments?.length
+      || booking.milestonePayments.every((m) => (m.workStatus || 'pending') === 'completed')
+    if (!milestonesAllDone) return
     setShowCompletionModal(true)
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href)
       url.searchParams.delete("openCompletion")
       router.replace(`${url.pathname}${url.search}${url.hash}`)
     }
-  }, [autoOpenCompletion, user?.role, booking?.status, router])
+  }, [autoOpenCompletion, user?.role, booking?.status, booking?.milestonePayments, router])
 
   useEffect(() => {
     if (!autoPayExtras) return
@@ -1533,6 +1536,13 @@ export default function BookingDetailPage() {
   const handleProfessionalComplete = async () => {
     if (!bookingId) return
 
+    const milestonesAllDone = !booking?.milestonePayments?.length
+      || booking.milestonePayments.every((m) => (m.workStatus || 'pending') === 'completed')
+    if (!milestonesAllDone) {
+      toast.error('Complete all milestones before confirming completion.')
+      return
+    }
+
     const invalidExtraCost = completionExtraCosts.find((cost) => {
       if (!cost.justification.trim()) return true
       if ((cost.type === 'condition' || cost.type === 'option') && !hasSelectedReferenceIndex(cost.referenceIndex)) {
@@ -1741,6 +1751,10 @@ export default function BookingDetailPage() {
 
       const isNumericValue = (v: unknown) => {
         if (typeof v === 'number' && Number.isFinite(v) && v > 0) return true
+        if (typeof v === 'string') {
+          const n = Number(v.trim())
+          return Number.isFinite(n) && n > 0
+        }
         if (typeof v === 'object' && v != null && 'min' in v && 'max' in v) {
           const minNum = Number((v as { min: unknown }).min)
           return Number.isFinite(minNum) && minNum > 0
@@ -2388,7 +2402,7 @@ export default function BookingDetailPage() {
                             {currentVersion.milestones.map((ms, i) => (
                               <div key={i} className="flex justify-between items-center text-sm bg-gray-50 rounded px-2 py-1">
                                 <span className="text-gray-700">{ms.title}</span>
-                                <span className="font-medium">{booking.quote?.currency || 'EUR'} {customerPrice(ms.amount).toFixed(2)}</span>
+                                <span className="font-medium">{booking.quote?.currency || 'EUR'} {ms.amount.toFixed(2)}</span>
                               </div>
                             ))}
                           </div>
@@ -2421,7 +2435,7 @@ export default function BookingDetailPage() {
                                   <span className="font-medium">v{v.version}</span>
                                   <span className="text-xs text-gray-500">{new Date(v.createdAt).toLocaleDateString()}</span>
                                 </div>
-                                <p className="text-xs text-gray-600">{booking.quote?.currency || 'EUR'} {customerPrice(v.totalAmount).toFixed(2)}</p>
+                                <p className="text-xs text-gray-600">{booking.quote?.currency || 'EUR'} {v.totalAmount.toFixed(2)}</p>
                                 {v.changeNote && <p className="text-xs text-gray-500 italic mt-1">{v.changeNote}</p>}
                               </div>
                             ))}

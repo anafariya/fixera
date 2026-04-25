@@ -37,6 +37,7 @@ export function useCustomerPricing(): CustomerPricing {
       setLoyaltyLoaded(true)
       return
     }
+    setLoyalty(null)
     setLoyaltyLoaded(false)
     const controller = new AbortController()
     const token = getAuthToken()
@@ -48,9 +49,11 @@ export function useCustomerPricing(): CustomerPricing {
       signal: controller.signal,
     })
       .then(async (res) => {
+        if (controller.signal.aborted) return null
         if (!res.ok) {
           let body = ''
           try { body = await res.text() } catch { /* ignore */ }
+          if (controller.signal.aborted) return null
           console.error(`Loyalty status request failed: ${res.status} ${res.statusText}`, body)
           setLoyalty(null)
           return null
@@ -58,6 +61,7 @@ export function useCustomerPricing(): CustomerPricing {
         return res.json()
       })
       .then((json) => {
+        if (controller.signal.aborted) return
         if (!json) return
         const tierInfo = json?.data?.userStats?.tierInfo
         const level = json?.data?.loyaltyStatus?.level || tierInfo?.name
@@ -70,6 +74,7 @@ export function useCustomerPricing(): CustomerPricing {
         }
       })
       .catch((error) => {
+        if (controller.signal.aborted) return
         if (error instanceof Error && error.name === 'AbortError') return
         console.error('Failed to fetch loyalty status:', error)
       })
