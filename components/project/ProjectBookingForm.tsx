@@ -251,7 +251,8 @@ export default function ProjectBookingForm({
   onBack,
   selectedSubprojectIndex,
 }: ProjectBookingFormProps) {
-  const { customerPrice, commissionPercent } = useCustomerPricing();
+  const { customerPrice, commissionPercent, loyaltyLoaded } = useCustomerPricing();
+  const customerPricingReady = commissionPercent != null && loyaltyLoaded;
   const router = useRouter();
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
@@ -1994,6 +1995,11 @@ export default function ProjectBookingForm({
   const handleSubmit = async () => {
     if (uploadingQuestionIndexes.size > 0 || uploadingRfqAttachment) {
       toast.error('Please wait for all uploads to finish before submitting.');
+      return;
+    }
+
+    if (shouldPayAtCheckoutFlow && !customerPricingReady) {
+      toast.error('Please wait while we finalize pricing.');
       return;
     }
 
@@ -4115,7 +4121,7 @@ export default function ProjectBookingForm({
           ) : (
             <Button
               onClick={handleSubmit}
-              disabled={loading || isOutsideServiceArea || uploadingQuestionIndexes.size > 0 || uploadingRfqAttachment || (shouldPayAtCheckoutFlow && commissionPercent == null)}
+              disabled={loading || isOutsideServiceArea || uploadingQuestionIndexes.size > 0 || uploadingRfqAttachment || (shouldPayAtCheckoutFlow && !customerPricingReady)}
               className='bg-blue-600 hover:bg-blue-700'
             >
               {loading ? (

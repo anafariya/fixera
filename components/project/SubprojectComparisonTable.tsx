@@ -175,11 +175,8 @@ export default function SubprojectComparisonTable({
   const currentPricing = getCustomerPricing(currentSubproject.pricing.amount)
   const currentCustomerAmount = currentPricing.customerAmount
   const currentDiscountedAmount = currentPricing.discountedAmount
-  const canShowUnitDiscountRate =
-    effectivePricingType(currentSubproject) !== 'unit' ||
-    repeatBuyerDiscount?.maxDiscountAmount == null
   const hasCurrentDiscount =
-    canShowUnitDiscountRate &&
+    (currentPricing.hasLoyaltyDiscount || currentPricing.hasRepeatBuyerDiscount) &&
     currentCustomerAmount != null &&
     currentDiscountedAmount != null &&
     currentDiscountedAmount < currentCustomerAmount
@@ -257,7 +254,7 @@ export default function SubprojectComparisonTable({
                         ) : (
                           formatCurrency(currentCustomerAmount ?? currentSubproject.pricing.amount)
                         )}
-                        {priceModel && (
+                        {priceModel && !isNonUnitPriceModel(priceModel) && (
                           <span className="text-lg font-normal text-gray-500 ml-2">
                             /{priceModel}
                           </span>

@@ -78,7 +78,7 @@ export function useCustomerPricing(): CustomerPricing {
         setLoyaltyLoaded(true)
       })
     return () => controller.abort()
-  }, [isAuthenticated, user?.role])
+  }, [isAuthenticated, user?.role, user?._id])
 
   const applyLoyaltyDiscount = useCallback(
     (commissionInclusiveAmount: number) => {

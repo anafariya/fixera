@@ -183,7 +183,6 @@ const hasPayableMilestone = (milestones: TimelineBooking["milestonePayments"]): 
       return false
     }
     if (dueCondition === "custom_date") {
-      if (workStatus === "completed") return true
       if (ms.customDueDate && new Date(ms.customDueDate) <= new Date()) return true
       return false
     }

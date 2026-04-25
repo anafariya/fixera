@@ -2547,8 +2547,8 @@ export default function BookingDetailPage() {
                             </div>
                           </div>
                           <div className="flex justify-between text-xs text-gray-600">
-                            <span>{booking.quote?.currency || 'EUR'} {(user?.role === 'customer' ? customerPrice(completed) : completed).toFixed(2)} completed</span>
-                            <span>{booking.quote?.currency || 'EUR'} {(user?.role === 'customer' ? customerPrice(paid) : paid).toFixed(2)} paid</span>
+                            <span>{booking.quote?.currency || 'EUR'} {completed.toFixed(2)} completed</span>
+                            <span>{booking.quote?.currency || 'EUR'} {paid.toFixed(2)} paid</span>
                           </div>
                         </div>
                       )
@@ -3040,7 +3040,7 @@ export default function BookingDetailPage() {
                         <div className="flex justify-between items-center pt-1 border-t border-gray-200">
                           <span className="text-xs font-semibold text-gray-800">Total Extra Costs</span>
                           <span className={`text-sm font-bold ${(booking.extraCostTotal || 0) >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            {(booking.extraCostTotal || 0) >= 0 ? '+' : ''}{booking.payment?.currency || 'EUR'} {(user?.role === "customer" ? customerPrice(booking.extraCostTotal || 0) : (booking.extraCostTotal || 0)).toFixed(2)}
+                            {(booking.extraCostTotal || 0) >= 0 ? '+' : ''}{booking.payment?.currency || 'EUR'} {(booking.extraCostTotal || 0).toFixed(2)}
                           </span>
                         </div>
                       </div>

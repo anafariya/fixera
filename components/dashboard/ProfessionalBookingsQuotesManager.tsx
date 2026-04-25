@@ -444,7 +444,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
         setIsLoading(false)
       }
     }
-  }, [isAuthenticated, user?.role, mode, statusFilter, serviceFilter, debouncedSearch, debouncedCustomerNameFilter])
+  }, [isAuthenticated, user?.role, mode, statusFilter, serviceFilter, debouncedSearch, debouncedCustomerNameFilter?.trim()])
 
   const refreshBookings = useCallback(async () => {
     await fetchBookings(1, false)
@@ -502,7 +502,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
     } catch (error) {
       console.error("Failed to fetch timeline bookings:", error)
     }
-  }, [isAuthenticated, user?.role, statusFilter, serviceFilter, debouncedSearch, debouncedCustomerNameFilter])
+  }, [isAuthenticated, user?.role, statusFilter, serviceFilter, debouncedSearch, debouncedCustomerNameFilter?.trim()])
 
   useEffect(() => {
     void refreshBookings()
@@ -758,7 +758,7 @@ export default function ProfessionalBookingsQuotesManager({ mode }: Professional
         <div className="flex flex-col sm:flex-row gap-2 -mt-2 mb-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            {customerNameFilter !== debouncedCustomerNameFilter && (
+            {customerNameFilter.trim() !== debouncedCustomerNameFilter.trim() && (
               <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 animate-spin" />
             )}
             <Input
