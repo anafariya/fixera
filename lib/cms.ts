@@ -339,11 +339,7 @@ export function getLandingServicePath(slug: string): string | null {
   return `/services/${slug}`;
 }
 
-export function getPublicSlugPrefixForCms(type: CmsContentType, slug?: string): string | null {
-  if (slug) {
-    if (type === "landing" && RESERVED_LANDING_PATHS[slug]) return RESERVED_LANDING_PATHS[slug];
-    if (type === "policy" && RESERVED_POLICY_PATHS[slug]) return RESERVED_POLICY_PATHS[slug];
-  }
+export function getPublicSlugPrefixForCms(type: CmsContentType): string | null {
   switch (type) {
     case "blog":
       return "/blog/";

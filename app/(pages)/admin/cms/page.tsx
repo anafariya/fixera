@@ -51,6 +51,7 @@ export default function CmsAdminListPage() {
   const [reservedSlotsError, setReservedSlotsError] = useState<string | null>(null);
   const [landingSlots, setLandingSlots] = useState<CmsLandingSlot[]>([]);
   const [landingSlotsError, setLandingSlotsError] = useState<string | null>(null);
+  const [landingSlotsSyncError, setLandingSlotsSyncError] = useState<string | null>(null);
   const [landingSlotsLoading, setLandingSlotsLoading] = useState(true);
   const [landingSlotsOpen, setLandingSlotsOpen] = useState(false);
 
@@ -160,22 +161,27 @@ export default function CmsAdminListPage() {
     let cancelled = false;
     setLandingSlotsLoading(true);
     setLandingSlotsError(null);
-    adminSyncLandingSlots()
-      .catch(() => { /* sync failure shouldn't block listing — list fetch surfaces the error */ })
-      .then(() => adminListLandingSlots())
-      .then((slots) => {
-        if (cancelled || !slots) return;
+    setLandingSlotsSyncError(null);
+    (async () => {
+      try {
+        await adminSyncLandingSlots();
+      } catch (err) {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : "Failed to sync landing slots";
+        setLandingSlotsSyncError(msg);
+      }
+      try {
+        const slots = await adminListLandingSlots();
+        if (cancelled) return;
         setLandingSlots(slots);
-      })
-      .catch((err: unknown) => {
+      } catch (err) {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : "Failed to refresh landing slots";
         setLandingSlotsError(msg);
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLandingSlotsLoading(false);
-      });
+      } finally {
+        if (!cancelled) setLandingSlotsLoading(false);
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -286,6 +292,23 @@ export default function CmsAdminListPage() {
                   <div className="flex-1">
                     <span className="font-semibold">Couldn&apos;t refresh landing slots:</span>{" "}
                     <span>{landingSlotsError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRefreshKey((k) => k + 1)}
+                    className="rounded border border-amber-300 bg-white px-2 py-0.5 text-[11px] font-medium text-amber-700 hover:bg-amber-100"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              {landingSlotsSyncError && !landingSlotsError && (
+                <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <AlertCircle size={14} className="mt-0.5 shrink-0 text-amber-600" />
+                  <div className="flex-1">
+                    <span className="font-semibold">Couldn&apos;t auto-create missing landing drafts:</span>{" "}
+                    <span>{landingSlotsSyncError}</span>{" "}
+                    <span className="text-amber-700">Existing slots are still shown — new ones may not appear until sync succeeds.</span>
                   </div>
                   <button
                     type="button"
