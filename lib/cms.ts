@@ -303,10 +303,9 @@ export const CMS_RESERVED_LANDINGS: CmsReservedPolicy[] = [
   { slug: "about", label: "About", path: "/about", usedFor: "About page (overrides hardcoded content)" },
 ];
 
-const RESERVED_POLICY_PATHS: Record<string, string> = {
-  ...Object.fromEntries(CMS_RESERVED_POLICIES.map((r) => [r.slug, r.path])),
-  about: "/about",
-};
+const RESERVED_POLICY_PATHS: Record<string, string> = Object.fromEntries(
+  CMS_RESERVED_POLICIES.map((r) => [r.slug, r.path])
+);
 
 const RESERVED_LANDING_PATHS: Record<string, string> = Object.fromEntries(
   CMS_RESERVED_LANDINGS.map((r) => [r.slug, r.path])

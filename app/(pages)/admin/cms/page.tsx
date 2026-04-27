@@ -347,7 +347,7 @@ export default function CmsAdminListPage() {
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {landingSlotsLoading ? (
               <p className="col-span-full text-xs text-gray-500">Loading…</p>
-            ) : landingSlots.length === 0 ? (
+            ) : !landingSlotsError && landingSlots.length === 0 ? (
               <p className="col-span-full text-xs text-gray-500">No landing slots configured.</p>
             ) : (
               landingSlots.map((slot) => {

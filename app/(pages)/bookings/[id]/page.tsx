@@ -2398,14 +2398,14 @@ export default function BookingDetailPage() {
                           </ul>
                         </div>
                       )}
-                      {(booking.project?.minResources || booking.project?.minOverlapPercentage) && (
+                      {(booking.project?.minResources != null || booking.project?.minOverlapPercentage != null) && (
                         <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2">
                           <p className="text-xs text-blue-800">
                             <span className="font-semibold">Team requirement:</span>{' '}
-                            {booking.project?.minResources
-                              ? `${booking.project.minResources}${booking.project?.resources?.length ? ` of ${booking.project.resources.length}` : ''} team member${(booking.project.minResources || 0) > 1 ? 's' : ''} required`
+                            {booking.project?.minResources != null
+                              ? `${booking.project.minResources}${booking.project?.resources?.length ? ` of ${booking.project.resources.length}` : ''} team member${booking.project.minResources === 1 ? '' : 's'} required`
                               : 'No minimum team size'}
-                            {booking.project?.minOverlapPercentage
+                            {booking.project?.minOverlapPercentage != null
                               ? ` · ${booking.project.minOverlapPercentage}% schedule overlap`
                               : ''}
                           </p>
