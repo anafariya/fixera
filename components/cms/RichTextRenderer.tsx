@@ -28,6 +28,18 @@ export default function RichTextRenderer({ html, className }: Props) {
     allowedSchemesByTag: { a: ["http", "https", "mailto"] },
     allowProtocolRelative: false,
     allowedSchemesAppliedToAttributes: ["href", "src"],
+    transformTags: {
+      a: (tagName, attribs) => {
+        if (attribs.target === "_blank") {
+          const existing = (attribs.rel || "").split(/\s+/).filter(Boolean);
+          for (const required of ["noopener", "noreferrer"]) {
+            if (!existing.includes(required)) existing.push(required);
+          }
+          attribs.rel = existing.join(" ");
+        }
+        return { tagName, attribs };
+      },
+    },
   });
 
   return (

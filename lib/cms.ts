@@ -304,13 +304,13 @@ export const CMS_RESERVED_LANDINGS: CmsReservedPolicy[] = [
 ];
 
 const RESERVED_POLICY_PATHS: Record<string, string> = {
-  "privacy-policy": "/privacy-policy",
+  ...Object.fromEntries(CMS_RESERVED_POLICIES.map((r) => [r.slug, r.path])),
   about: "/about",
 };
 
-const RESERVED_LANDING_PATHS: Record<string, string> = {
-  about: "/about",
-};
+const RESERVED_LANDING_PATHS: Record<string, string> = Object.fromEntries(
+  CMS_RESERVED_LANDINGS.map((r) => [r.slug, r.path])
+);
 
 export function getPublicPathForCms(type: CmsContentType, slug: string): string | null {
   if (!slug) return null;

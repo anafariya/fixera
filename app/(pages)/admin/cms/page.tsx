@@ -50,6 +50,7 @@ export default function CmsAdminListPage() {
   const [reservedSlotsError, setReservedSlotsError] = useState<string | null>(null);
   const [landingSlots, setLandingSlots] = useState<CmsLandingSlot[]>([]);
   const [landingSlotsError, setLandingSlotsError] = useState<string | null>(null);
+  const [landingSlotsLoading, setLandingSlotsLoading] = useState(true);
   const [landingSlotsOpen, setLandingSlotsOpen] = useState(false);
 
   useEffect(() => {
@@ -156,6 +157,7 @@ export default function CmsAdminListPage() {
   useEffect(() => {
     if (!isAuthenticated || user?.role !== "admin") return;
     let cancelled = false;
+    setLandingSlotsLoading(true);
     adminListLandingSlots()
       .then((slots) => {
         if (cancelled) return;
@@ -166,6 +168,10 @@ export default function CmsAdminListPage() {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : "Failed to refresh landing slots";
         setLandingSlotsError(msg);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLandingSlotsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -339,8 +345,10 @@ export default function CmsAdminListPage() {
                 </div>
               )}
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            {landingSlots.length === 0 ? (
+            {landingSlotsLoading ? (
               <p className="col-span-full text-xs text-gray-500">Loading…</p>
+            ) : landingSlots.length === 0 ? (
+              <p className="col-span-full text-xs text-gray-500">No landing slots configured.</p>
             ) : (
               landingSlots.map((slot) => {
                 const present = !!slot.item;
