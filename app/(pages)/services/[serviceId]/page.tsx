@@ -18,11 +18,7 @@ import RichTextRenderer from '@/components/cms/RichTextRenderer';
 export const dynamic = "force-dynamic";
 
 const fetchServiceLanding = cache(async (serviceId: string) => {
-  try {
-    return await publicGetCms("landing", serviceId);
-  } catch {
-    return null;
-  }
+  return await publicGetCms("landing", serviceId);
 });
 
 type Props = {
@@ -56,7 +52,11 @@ function humanizeSlug(slug: string): string {
 function hasMeaningfulBody(html: string | undefined | null): boolean {
   if (!html) return false;
   if (/<(img|video|iframe|picture|audio|object|embed)\b/i.test(html)) return true;
-  return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, "").trim().length > 0;
+  return html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;|&#0*160;|&#x0*a0;/gi, "")
+    .replace(/[\s ]+/g, "")
+    .length > 0;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
