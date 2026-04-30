@@ -3068,13 +3068,16 @@ export default function BookingDetailPage() {
                       <div className="bg-white/60 rounded p-2 space-y-2">
                         <p className="text-xs font-semibold text-gray-700">Extra Costs:</p>
                         {booking.extraCosts.map((cost, i) => {
-                          const displayAmount = customerPrice(cost.amount)
+                          const displayAmount = customerPricingReady ? originalPrice(cost.amount) : null
+                          const isPositive = displayAmount == null ? cost.amount >= 0 : displayAmount >= 0
                           return (
                             <div key={i} className="border-b border-gray-100 pb-1.5 last:border-0">
                               <div className="flex justify-between items-center">
                                 <span className="text-xs font-medium text-gray-800">{cost.name}</span>
-                                <span className={`text-xs font-semibold ${displayAmount >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                  {displayAmount >= 0 ? '+' : ''}{booking.payment?.currency || 'EUR'} {displayAmount.toFixed(2)}
+                                <span className={`text-xs font-semibold ${isPositive ? 'text-red-600' : 'text-green-600'}`}>
+                                  {customerPricingReady
+                                    ? `${displayAmount! >= 0 ? '+' : ''}${booking.payment?.currency || 'EUR'} ${displayAmount!.toFixed(2)}`
+                                    : '...'}
                                 </span>
                               </div>
                               <p className="text-xs text-gray-500 mt-0.5">
@@ -3085,7 +3088,7 @@ export default function BookingDetailPage() {
                             </div>
                           )
                         })}
-                        {(() => {
+                        {customerPricingReady ? (() => {
                           const currency = booking.payment?.currency || 'EUR'
                           const rawTotal = booking.extraCostTotal || 0
                           const subtotalInclCommission = originalPrice(rawTotal)
@@ -3114,7 +3117,12 @@ export default function BookingDetailPage() {
                               </div>
                             </div>
                           )
-                        })()}
+                        })() : (
+                          <div className="flex justify-between items-center pt-1 border-t border-gray-200 text-xs">
+                            <span className="font-semibold text-gray-800">Total Extra Costs</span>
+                            <span className="font-bold text-gray-400">...</span>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -3151,7 +3159,7 @@ export default function BookingDetailPage() {
                       </Button>
                     </div>
 
-                    {(booking.extraCostTotal || 0) > 0 && extraCostClientSecret && (
+                    {(booking.extraCostTotal || 0) > 0 && extraCostClientSecret && (booking.payment?.extraCostAmount != null || customerPricingReady) && (
                       <div className="rounded-lg border border-teal-200 bg-white/80 p-3 space-y-3">
                         <div>
                           <p className="text-sm font-semibold text-teal-900">Pay extra costs before final confirmation</p>
