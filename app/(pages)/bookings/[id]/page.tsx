@@ -3045,12 +3045,19 @@ export default function BookingDetailPage() {
                     )}
 
                     {booking.completionAttestation?.attachments && booking.completionAttestation.attachments.length > 0 && (
-                      <div className="bg-white/60 rounded p-2">
+                      <div className="bg-white/60 rounded p-2 space-y-1">
                         <p className="text-xs font-medium text-gray-700 mb-1">Attachments ({booking.completionAttestation.attachments.length}):</p>
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-col gap-1">
                           {booking.completionAttestation.attachments.map((url, i) => (
-                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
-                              Attachment {i + 1}
+                            <a
+                              key={`${url}-${i}`}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-indigo-700 hover:bg-slate-100"
+                            >
+                              <span className="truncate pr-3">{getFileLabel(url, `Attachment ${i + 1}`)}</span>
+                              <span className="font-medium">Open</span>
                             </a>
                           ))}
                         </div>
@@ -3061,7 +3068,7 @@ export default function BookingDetailPage() {
                       <div className="bg-white/60 rounded p-2 space-y-2">
                         <p className="text-xs font-semibold text-gray-700">Extra Costs:</p>
                         {booking.extraCosts.map((cost, i) => {
-                          const displayAmount = cost.amount
+                          const displayAmount = cost.amount > 0 ? customerPrice(cost.amount) : cost.amount
                           return (
                             <div key={i} className="border-b border-gray-100 pb-1.5 last:border-0">
                               <div className="flex justify-between items-center">
@@ -3081,7 +3088,7 @@ export default function BookingDetailPage() {
                         <div className="flex justify-between items-center pt-1 border-t border-gray-200">
                           <span className="text-xs font-semibold text-gray-800">Total Extra Costs</span>
                           <span className={`text-sm font-bold ${(booking.extraCostTotal || 0) >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            {(booking.extraCostTotal || 0) >= 0 ? '+' : ''}{booking.payment?.currency || 'EUR'} {(booking.extraCostTotal || 0).toFixed(2)}
+                            {(booking.extraCostTotal || 0) >= 0 ? '+' : ''}{booking.payment?.currency || 'EUR'} {((booking.extraCostTotal || 0) > 0 ? customerPrice(booking.extraCostTotal!) : (booking.extraCostTotal || 0)).toFixed(2)}
                           </span>
                         </div>
                       </div>
@@ -3136,7 +3143,7 @@ export default function BookingDetailPage() {
                         <StripeProvider>
                           <PaymentForm
                             clientSecret={extraCostClientSecret}
-                            amount={booking.extraCostTotal || 0}
+                            amount={booking.payment?.extraCostAmount ?? ((booking.extraCostTotal || 0) > 0 ? customerPrice(booking.extraCostTotal!) : 0)}
                             currency={booking.payment?.currency || "EUR"}
                             onSuccess={handleExtraCostPaymentSuccess}
                             onError={handleExtraCostPaymentError}
