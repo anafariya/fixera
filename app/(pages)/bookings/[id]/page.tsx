@@ -3092,8 +3092,10 @@ export default function BookingDetailPage() {
                           const currency = booking.payment?.currency || 'EUR'
                           const rawTotal = booking.extraCostTotal || 0
                           const subtotalInclCommission = originalPrice(rawTotal)
-                          const finalTotal = customerPrice(rawTotal)
-                          const loyaltyDiscount = rawTotal > 0 ? Math.max(0, +(subtotalInclCommission - finalTotal).toFixed(2)) : 0
+                          const displayedTotal = typeof booking.payment?.extraCostAmount === 'number'
+                            ? booking.payment.extraCostAmount
+                            : customerPrice(rawTotal)
+                          const loyaltyDiscount = rawTotal > 0 ? Math.max(0, +(subtotalInclCommission - displayedTotal).toFixed(2)) : 0
                           const showLoyalty = loyaltyDiscount > 0 && loyalty && loyalty.percentage > 0
                           return (
                             <div className="space-y-1 pt-1 border-t border-gray-200 text-xs">
@@ -3111,8 +3113,8 @@ export default function BookingDetailPage() {
                               )}
                               <div className="flex justify-between items-center pt-1 border-t border-gray-200">
                                 <span className="text-xs font-semibold text-gray-800">Total Extra Costs</span>
-                                <span className={`text-sm font-bold ${finalTotal >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                  {finalTotal >= 0 ? '+' : ''}{currency} {finalTotal.toFixed(2)}
+                                <span className={`text-sm font-bold ${displayedTotal >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                  {displayedTotal >= 0 ? '+' : ''}{currency} {displayedTotal.toFixed(2)}
                                 </span>
                               </div>
                             </div>
