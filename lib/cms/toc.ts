@@ -12,6 +12,7 @@ export interface TocResult {
 
 const H2_RE = /<h2\b([^>]*)>([\s\S]*?)<\/h2>/gi;
 const ID_ATTR_RE = /\bid\s*=\s*("([^"]*)"|'([^']*)')/i;
+const ID_ATTR_RE_GLOBAL = /\bid\s*=\s*("([^"]*)"|'([^']*)')/gi;
 
 function stripTags(html: string): string {
   return html.replace(/<[^>]*>/g, "");
@@ -33,6 +34,12 @@ export function extractTocAndAddIds(input: string | null | undefined): TocResult
 
   const usedIds = new Set<string>();
   const toc: TocItem[] = [];
+
+  const nonH2Html = html.replace(H2_RE, "");
+  for (const match of nonH2Html.matchAll(ID_ATTR_RE_GLOBAL)) {
+    const existingId = (match[2] || match[3] || "").trim();
+    if (existingId) usedIds.add(existingId);
+  }
 
   const transformed = html.replace(H2_RE, (full, attrs: string, inner: string) => {
     const text = decodeEntities(stripTags(inner)).replace(/\s+/g, " ").trim();

@@ -28,6 +28,7 @@ function LinkList({ items, className }: { items: TocItem[]; className?: string }
           <a
             href={`#${item.id}`}
             onClick={(e) => {
+              if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
               e.preventDefault();
               smoothScrollTo(item.id);
             }}

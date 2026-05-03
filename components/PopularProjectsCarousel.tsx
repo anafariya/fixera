@@ -54,19 +54,24 @@ const PopularProjectsCarousel = ({ serviceName, heading, limit = 10 }: PopularPr
           signal: controller.signal,
         });
 
+        if (controller.signal.aborted) return;
+
         if (response.ok) {
           const data = await response.json();
+          if (controller.signal.aborted) return;
           setProjects(Array.isArray(data?.projects) ? data.projects : []);
         } else {
           const errorText = await response.text().catch(() => '');
+          if (controller.signal.aborted) return;
           console.error(`Failed to fetch popular projects: ${response.status}`, errorText);
           setProjects([]);
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
+        if (controller.signal.aborted) return;
         console.error('Failed to fetch popular projects:', error);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
     fetchPopularProjects();

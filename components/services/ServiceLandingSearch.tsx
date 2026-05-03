@@ -73,6 +73,7 @@ export default function ServiceLandingSearch({ serviceName }: Props) {
           <div className="lg:col-span-4 px-2 lg:border-l lg:border-gray-200">
             <label htmlFor="service-landing-location" className="sr-only">Location</label>
             <LocationAutocomplete
+              id="service-landing-location"
               value={location}
               onChange={(value: string, locationData?: LocationData) => {
                 setLocation(value);
