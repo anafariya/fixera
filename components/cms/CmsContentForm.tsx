@@ -7,11 +7,13 @@ import { ArrowLeft, ExternalLink, FileText, Loader2, Save, Send, Tag, Trash2, X 
 import {
   adminCreateCms,
   adminDeleteCms,
+  adminListCmsServiceOptions,
   adminListFaqCategories,
   adminUpdateCms,
   CmsContent,
   CmsContentStatus,
   CmsContentType,
+  CmsServiceOption,
   CmsUpsertPayload,
   CMS_TYPE_LABELS,
   CMS_TYPE_ORDER,
@@ -47,6 +49,7 @@ const EMPTY: Partial<CmsContent> = {
   authorOverride: "",
   status: "draft",
   seo: {},
+  relatedServiceSlug: "",
 };
 
 export default function CmsContentForm({ mode, initial, lockedType, initialSlug, initialTitle }: Props) {
@@ -70,6 +73,8 @@ export default function CmsContentForm({ mode, initial, lockedType, initialSlug,
   const [tagInput, setTagInput] = useState("");
   const [faqCategories, setFaqCategories] = useState<FaqCategory[]>([]);
   const [faqCategoriesError, setFaqCategoriesError] = useState<string | null>(null);
+  const [serviceOptions, setServiceOptions] = useState<CmsServiceOption[]>([]);
+  const [serviceOptionsError, setServiceOptionsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -83,6 +88,18 @@ export default function CmsContentForm({ mode, initial, lockedType, initialSlug,
       .catch((err: unknown) => {
         setFaqCategories([]);
         setFaqCategoriesError(err instanceof Error ? err.message : "Failed to load FAQ categories");
+      });
+  }, []);
+
+  useEffect(() => {
+    adminListCmsServiceOptions()
+      .then((opts) => {
+        setServiceOptions(opts);
+        setServiceOptionsError(null);
+      })
+      .catch((err: unknown) => {
+        setServiceOptions([]);
+        setServiceOptionsError(err instanceof Error ? err.message : "Failed to load service options");
       });
   }, []);
 
@@ -145,6 +162,7 @@ export default function CmsContentForm({ mode, initial, lockedType, initialSlug,
         authorOverride: hasTags ? (form.authorOverride || "").trim() : undefined,
         status,
         seo: form.seo || {},
+        relatedServiceSlug: hasTags ? (form.relatedServiceSlug || "").trim() : undefined,
       };
       if (mode === "create") {
         const created = await adminCreateCms(payload);
@@ -378,6 +396,34 @@ export default function CmsContentForm({ mode, initial, lockedType, initialSlug,
                   className="w-full rounded-xl border border-pink-200 bg-white/60 px-4 py-2 text-sm outline-none transition focus:border-rose-400 focus:bg-white focus:ring-2 focus:ring-rose-200"
                 />
                 <p className="text-[11px] text-rose-400">Shown as the author on blog/news cards and detail pages.</p>
+              </div>
+            </GradientCard>
+          )}
+
+          {hasTags && (
+            <GradientCard>
+              <div className="p-6 space-y-2">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-rose-700">Related service</h3>
+                {serviceOptionsError ? (
+                  <div className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+                    <div className="font-semibold">Couldn&apos;t load services</div>
+                    <div className="mt-0.5 text-rose-600">{serviceOptionsError}</div>
+                  </div>
+                ) : (
+                  <select
+                    value={form.relatedServiceSlug || ""}
+                    onChange={(e) => update({ relatedServiceSlug: e.target.value })}
+                    className="w-full rounded-xl border border-pink-200 bg-white/60 px-4 py-2 text-sm outline-none transition focus:border-rose-400 focus:bg-white focus:ring-2 focus:ring-rose-200"
+                  >
+                    <option value="">— None —</option>
+                    {serviceOptions.map((opt) => (
+                      <option key={opt.slug} value={opt.slug}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <p className="text-[11px] text-rose-400">Optional. Surfaces this {CMS_TYPE_LABELS[type].toLowerCase()} in the matching service landing page&apos;s related-articles section.</p>
               </div>
             </GradientCard>
           )}

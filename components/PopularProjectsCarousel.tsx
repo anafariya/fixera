@@ -26,7 +26,13 @@ interface PopularProject {
   } | null;
 }
 
-const PopularProjectsCarousel = () => {
+interface PopularProjectsCarouselProps {
+  serviceName?: string;
+  heading?: string;
+  limit?: number;
+}
+
+const PopularProjectsCarousel = ({ serviceName, heading, limit = 10 }: PopularProjectsCarouselProps = {}) => {
   const [projects, setProjects] = useState<PopularProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -38,7 +44,10 @@ const PopularProjectsCarousel = () => {
     const fetchPopularProjects = async () => {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
-        const response = await fetch(`${backendUrl}/api/search/popular-projects?limit=10`, {
+        const params = new URLSearchParams();
+        params.set('limit', String(limit));
+        if (serviceName) params.set('service', serviceName);
+        const response = await fetch(`${backendUrl}/api/search/popular-projects?${params.toString()}`, {
           credentials: 'include',
           signal: controller.signal,
         });
@@ -60,7 +69,7 @@ const PopularProjectsCarousel = () => {
     };
     fetchPopularProjects();
     return () => controller.abort();
-  }, []);
+  }, [serviceName, limit]);
 
   const updateScrollButtons = useCallback(() => {
     const el = scrollRef.current;
@@ -102,7 +111,7 @@ const PopularProjectsCarousel = () => {
   if (loading) {
     return (
       <div className="mt-10 max-w-5xl mx-auto">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4 text-left">Popular Projects</h3>
+        <h3 className="text-lg font-semibold text-gray-800 mb-4 text-left">{heading || 'Popular Projects'}</h3>
         <div className="flex gap-4 overflow-hidden">
           {[1, 2, 3].map((i) => (
             <div key={i} className="min-w-[280px] rounded-xl border border-gray-200 overflow-hidden">
@@ -124,7 +133,7 @@ const PopularProjectsCarousel = () => {
   return (
     <div className="mt-10 max-w-5xl mx-auto text-left">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">Popular Projects</h3>
+        <h3 className="text-lg font-semibold text-gray-800">{heading || 'Popular Projects'}</h3>
         <div className="flex gap-2">
           <button
             onClick={() => scroll('left')}

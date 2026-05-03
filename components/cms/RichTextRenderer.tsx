@@ -46,7 +46,7 @@ export default function RichTextRenderer({ html, className }: Props) {
     <div
       className={cn(
         "prose prose-pink max-w-none",
-        "prose-headings:text-rose-900 prose-headings:font-bold",
+        "prose-headings:text-rose-900 prose-headings:font-bold prose-headings:scroll-mt-24",
         "prose-h1:bg-gradient-to-r prose-h1:from-rose-600 prose-h1:to-pink-500 prose-h1:bg-clip-text prose-h1:text-transparent",
         "prose-a:text-pink-600 prose-a:font-medium hover:prose-a:text-rose-700",
         "prose-strong:text-rose-900",

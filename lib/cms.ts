@@ -40,6 +40,7 @@ export interface CmsContent {
   seo: CmsSeo;
   relatedContent?: Array<{ _id: string; title?: string; slug?: string; type?: CmsContentType } | string>;
   relatedServices?: Array<{ _id: string; name?: string; slug?: string } | string>;
+  relatedServiceSlug?: string;
   viewCount?: number;
   createdAt: string;
   updatedAt: string;
@@ -62,6 +63,12 @@ export interface CmsUpsertPayload {
   seo?: CmsSeo;
   relatedContent?: string[];
   relatedServices?: string[];
+  relatedServiceSlug?: string;
+}
+
+export interface CmsServiceOption {
+  slug: string;
+  label: string;
 }
 
 export function cmsAuthorName(item: Pick<CmsContent, "author" | "authorOverride">): string | undefined {
@@ -177,6 +184,12 @@ export async function adminListFaqCategories(): Promise<FaqCategory[]> {
   return parseJsonRequired<FaqCategory[]>(res);
 }
 
+export async function adminListCmsServiceOptions(): Promise<CmsServiceOption[]> {
+  const res = await authFetch(`${API()}/api/admin/cms/service-options`);
+  const data = await parseJsonRequired<{ items: CmsServiceOption[] }>(res);
+  return data.items || [];
+}
+
 export interface CmsLandingSlot {
   slug: string;
   label: string;
@@ -206,12 +219,13 @@ export async function adminSyncLandingSlots(): Promise<{ created: number }> {
 
 export async function publicListCms(
   type: CmsContentType,
-  params: { page?: number; limit?: number; tag?: string } = {}
+  params: { page?: number; limit?: number; tag?: string; serviceSlug?: string } = {}
 ): Promise<CmsListResponse> {
   const qs = new URLSearchParams();
   if (params.page) qs.set("page", String(params.page));
   if (params.limit) qs.set("limit", String(params.limit));
   if (params.tag) qs.set("tag", params.tag);
+  if (params.serviceSlug) qs.set("serviceSlug", params.serviceSlug);
   const res = await fetch(`${API()}/api/public/cms/${type}?${qs.toString()}`, { cache: "no-store" });
   return parseJsonRequired<CmsListResponse>(res);
 }
