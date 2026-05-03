@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,11 @@ export default function ServiceLandingSearch({ serviceName }: Props) {
     }
   }, [user]);
 
+  const handleLocationChange = useCallback((value: string, locationData?: LocationData) => {
+    setLocation(value);
+    setCoords(locationData?.coordinates || null);
+  }, []);
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams();
@@ -75,10 +80,7 @@ export default function ServiceLandingSearch({ serviceName }: Props) {
             <LocationAutocomplete
               id="service-landing-location"
               value={location}
-              onChange={(value: string, locationData?: LocationData) => {
-                setLocation(value);
-                setCoords(locationData?.coordinates || null);
-              }}
+              onChange={handleLocationChange}
               placeholder="City, Country"
             />
           </div>

@@ -11,8 +11,8 @@ export interface TocResult {
 }
 
 const H2_RE = /<h2\b([^>]*)>([\s\S]*?)<\/h2>/gi;
-const ID_ATTR_RE = /\bid\s*=\s*("([^"]*)"|'([^']*)')/i;
-const ID_ATTR_RE_GLOBAL = /\bid\s*=\s*("([^"]*)"|'([^']*)')/gi;
+const ID_ATTR_RE = /(^|\s)id\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+const ID_ATTR_RE_GLOBAL = /(^|\s)id\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
 
 function stripTags(html: string): string {
   return html.replace(/<[^>]*>/g, "");
@@ -37,7 +37,7 @@ export function extractTocAndAddIds(input: string | null | undefined): TocResult
 
   const nonH2Html = html.replace(H2_RE, "");
   for (const match of nonH2Html.matchAll(ID_ATTR_RE_GLOBAL)) {
-    const existingId = (match[2] || match[3] || "").trim();
+    const existingId = (match[2] || match[3] || match[4] || "").trim();
     if (existingId) usedIds.add(existingId);
   }
 
@@ -47,7 +47,7 @@ export function extractTocAndAddIds(input: string | null | undefined): TocResult
 
     let id: string | undefined;
     const existing = ID_ATTR_RE.exec(attrs);
-    const originalExistingId = existing ? (existing[2] || existing[3] || "").trim() : "";
+    const originalExistingId = existing ? (existing[2] || existing[3] || existing[4] || "").trim() : "";
     if (originalExistingId) {
       id = originalExistingId;
     }
@@ -62,7 +62,7 @@ export function extractTocAndAddIds(input: string | null | undefined): TocResult
 
     if (existing) {
       if (id === originalExistingId) return full;
-      const newAttrs = attrs.replace(ID_ATTR_RE, `id="${id}"`);
+      const newAttrs = attrs.replace(ID_ATTR_RE, `$1id="${id}"`);
       return `<h2${newAttrs}>${inner}</h2>`;
     }
     return `<h2${attrs} id="${id}">${inner}</h2>`;

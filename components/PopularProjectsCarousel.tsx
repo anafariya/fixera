@@ -32,7 +32,9 @@ interface PopularProjectsCarouselProps {
   limit?: number;
 }
 
-const PopularProjectsCarousel = ({ serviceName, heading, limit = 10 }: PopularProjectsCarouselProps = {}) => {
+const DEFAULT_LIMIT = 10;
+
+const PopularProjectsCarousel = ({ serviceName, heading, limit = DEFAULT_LIMIT }: PopularProjectsCarouselProps = {}) => {
   const [projects, setProjects] = useState<PopularProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -46,8 +48,13 @@ const PopularProjectsCarousel = ({ serviceName, heading, limit = 10 }: PopularPr
     const fetchPopularProjects = async () => {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+        const numericLimit = Number(limit);
+        const normalizedLimit =
+          Number.isFinite(numericLimit) && numericLimit >= 1
+            ? Math.floor(numericLimit)
+            : DEFAULT_LIMIT;
         const params = new URLSearchParams();
-        params.set('limit', String(limit));
+        params.set('limit', String(normalizedLimit));
         if (serviceName) params.set('service', serviceName);
         const response = await fetch(`${backendUrl}/api/search/popular-projects?${params.toString()}`, {
           credentials: 'include',
