@@ -13,7 +13,9 @@ function smoothScrollTo(id: string) {
   const el = document.getElementById(id);
   if (!el) return;
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  if (history.pushState) {
+  if (typeof history.replaceState === 'function') {
+    history.replaceState(null, '', `#${id}`);
+  } else if (typeof history.pushState === 'function') {
     history.pushState(null, '', `#${id}`);
   }
 }

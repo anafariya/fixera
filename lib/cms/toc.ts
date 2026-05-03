@@ -40,22 +40,23 @@ export function extractTocAndAddIds(input: string | null | undefined): TocResult
 
     let id: string | undefined;
     const existing = ID_ATTR_RE.exec(attrs);
-    if (existing) {
-      id = (existing[2] || existing[3] || "").trim();
+    const originalExistingId = existing ? (existing[2] || existing[3] || "").trim() : "";
+    if (originalExistingId) {
+      id = originalExistingId;
     }
-    if (!id) {
-      const base = slugify(text) || "section";
-      id = base;
-      let n = 2;
-      while (usedIds.has(id)) {
-        id = `${base}-${n++}`;
-      }
+    const base = id || slugify(text) || "section";
+    if (!id) id = base;
+    let n = 2;
+    while (usedIds.has(id)) {
+      id = `${base}-${n++}`;
     }
     usedIds.add(id);
     toc.push({ id, text });
 
     if (existing) {
-      return full;
+      if (id === originalExistingId) return full;
+      const newAttrs = attrs.replace(ID_ATTR_RE, `id="${id}"`);
+      return `<h2${newAttrs}>${inner}</h2>`;
     }
     return `<h2${attrs} id="${id}">${inner}</h2>`;
   });

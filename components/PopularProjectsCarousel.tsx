@@ -41,6 +41,8 @@ const PopularProjectsCarousel = ({ serviceName, heading, limit = 10 }: PopularPr
 
   useEffect(() => {
     const controller = new AbortController();
+    setLoading(true);
+    setProjects([]);
     const fetchPopularProjects = async () => {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';

@@ -26,13 +26,19 @@ export default function ServiceLandingSearch({ serviceName }: Props) {
   useEffect(() => {
     if (user?.location?.city && user?.location?.country) {
       setLocation(`${user.location.city}, ${user.location.country}`);
+    } else {
+      setLocation('');
     }
     const c = user?.location?.coordinates;
     if (Array.isArray(c) && c.length === 2) {
       const [lng, lat] = c;
       if (typeof lat === 'number' && typeof lng === 'number') {
         setCoords({ lat, lng });
+      } else {
+        setCoords(null);
       }
+    } else {
+      setCoords(null);
     }
   }, [user]);
 

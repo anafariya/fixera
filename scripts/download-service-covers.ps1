@@ -1,6 +1,6 @@
-# Downloads bundled CC0 service cover images from Pexels.
+# Downloads bundled service cover images from Pexels.
 # All sourced from public Pexels URLs (Pexels License: free for commercial use, no attribution required).
-# Run from repo root: powershell -ExecutionPolicy Bypass -File fixera/scripts/download-service-covers.ps1
+# Run from repo root: powershell -ExecutionPolicy Bypass -File scripts/download-service-covers.ps1
 
 $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
@@ -37,25 +37,34 @@ $categories = @(
     @{ slug = 'outdoor-garden';      id = '1108572' }
 )
 
+$downloadFailed = $false
+
 function Get-PexelsImage($id, $outFile) {
     $url = "https://images.pexels.com/photos/$id/pexels-photo-$id.jpeg$qs"
     try {
         Invoke-WebRequest -Uri $url -OutFile $outFile -UseBasicParsing -TimeoutSec 30
         $size = (Get-Item $outFile).Length
         Write-Output "OK  $outFile ($size bytes)"
+        return $true
     } catch {
         Write-Output "ERR $outFile  $_"
+        return $false
     }
 }
 
 foreach ($s in $services) {
     $out = Join-Path $svcDir ("{0}.jpg" -f $s.slug)
     if (Test-Path $out) { Write-Output "SKIP $out (exists)"; continue }
-    Get-PexelsImage $s.id $out
+    if (-not (Get-PexelsImage $s.id $out)) { $downloadFailed = $true }
 }
 
 foreach ($c in $categories) {
     $out = Join-Path $catDir ("{0}.jpg" -f $c.slug)
     if (Test-Path $out) { Write-Output "SKIP $out (exists)"; continue }
-    Get-PexelsImage $c.id $out
+    if (-not (Get-PexelsImage $c.id $out)) { $downloadFailed = $true }
+}
+
+if ($downloadFailed) {
+    Write-Output "One or more downloads failed."
+    exit 1
 }

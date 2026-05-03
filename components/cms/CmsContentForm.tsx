@@ -403,7 +403,7 @@ export default function CmsContentForm({ mode, initial, lockedType, initialSlug,
           {hasTags && (
             <GradientCard>
               <div className="p-6 space-y-2">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-rose-700">Related service</h3>
+                <label htmlFor="related-service-select" className="block text-sm font-semibold uppercase tracking-wide text-rose-700">Related service</label>
                 {serviceOptionsError ? (
                   <div className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs text-rose-700">
                     <div className="font-semibold">Couldn&apos;t load services</div>
@@ -411,6 +411,7 @@ export default function CmsContentForm({ mode, initial, lockedType, initialSlug,
                   </div>
                 ) : (
                   <select
+                    id="related-service-select"
                     value={form.relatedServiceSlug || ""}
                     onChange={(e) => update({ relatedServiceSlug: e.target.value })}
                     className="w-full rounded-xl border border-pink-200 bg-white/60 px-4 py-2 text-sm outline-none transition focus:border-rose-400 focus:bg-white focus:ring-2 focus:ring-rose-200"
