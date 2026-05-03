@@ -55,7 +55,12 @@ const PopularProjectsCarousel = ({ serviceName, heading, limit = DEFAULT_LIMIT }
             : DEFAULT_LIMIT;
         const params = new URLSearchParams();
         params.set('limit', String(normalizedLimit));
-        if (serviceName) params.set('service', serviceName);
+        const trimmedServiceName = serviceName?.trim();
+        if (trimmedServiceName) {
+          params.set('service', trimmedServiceName);
+        } else {
+          params.delete('service');
+        }
         const response = await fetch(`${backendUrl}/api/search/popular-projects?${params.toString()}`, {
           credentials: 'include',
           signal: controller.signal,

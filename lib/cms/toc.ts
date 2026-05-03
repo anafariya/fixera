@@ -43,7 +43,21 @@ export function extractTocAndAddIds(input: string | null | undefined): TocResult
 
   const transformed = html.replace(H2_RE, (full, attrs: string, inner: string) => {
     const text = decodeEntities(stripTags(inner)).replace(/\s+/g, " ").trim();
-    if (!text) return full;
+
+    if (!text) {
+      const emptyExisting = ID_ATTR_RE.exec(attrs);
+      const emptyExistingId = emptyExisting ? (emptyExisting[2] || emptyExisting[3] || emptyExisting[4] || "").trim() : "";
+      if (!emptyExistingId) return full;
+      let reservedId = emptyExistingId;
+      let m = 2;
+      while (usedIds.has(reservedId)) {
+        reservedId = `${emptyExistingId}-${m++}`;
+      }
+      usedIds.add(reservedId);
+      if (reservedId === emptyExistingId) return full;
+      const rewrittenAttrs = attrs.replace(ID_ATTR_RE, `$1id="${reservedId}"`);
+      return `<h2${rewrittenAttrs}>${inner}</h2>`;
+    }
 
     let id: string | undefined;
     const existing = ID_ATTR_RE.exec(attrs);

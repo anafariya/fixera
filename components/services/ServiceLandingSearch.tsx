@@ -24,11 +24,8 @@ export default function ServiceLandingSearch({ serviceName }: Props) {
   }, [serviceName]);
 
   useEffect(() => {
-    if (user?.location?.city && user?.location?.country) {
-      setLocation(`${user.location.city}, ${user.location.country}`);
-    } else {
-      setLocation('');
-    }
+    const parts = [user?.location?.city, user?.location?.country].filter(Boolean);
+    setLocation(parts.length > 0 ? parts.join(', ') : '');
     const c = user?.location?.coordinates;
     if (Array.isArray(c) && c.length === 2) {
       const [lng, lat] = c;
