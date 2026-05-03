@@ -20,12 +20,36 @@ function stripTags(html: string): string {
 
 function decodeEntities(text: string): string {
   return text
+    .replace(/&#x([0-9a-fA-F]+);?/g, (m, hex: string) => {
+      const code = parseInt(hex, 16);
+      if (!Number.isFinite(code) || code < 0 || code > 0x10ffff) return m;
+      try {
+        return String.fromCodePoint(code);
+      } catch {
+        return m;
+      }
+    })
+    .replace(/&#(\d+);?/g, (m, dec: string) => {
+      const code = parseInt(dec, 10);
+      if (!Number.isFinite(code) || code < 0 || code > 0x10ffff) return m;
+      try {
+        return String.fromCodePoint(code);
+      } catch {
+        return m;
+      }
+    })
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'");
+}
+
+function safeSlug(text: string): string {
+  const s = slugify(text);
+  if (/^untitled-[a-z0-9]+$/.test(s)) return "untitled";
+  return s;
 }
 
 export function extractTocAndAddIds(input: string | null | undefined): TocResult {
@@ -65,7 +89,7 @@ export function extractTocAndAddIds(input: string | null | undefined): TocResult
     if (originalExistingId) {
       id = originalExistingId;
     }
-    const base = id || slugify(text) || "section";
+    const base = id || safeSlug(text) || "untitled";
     if (!id) id = base;
     let n = 2;
     while (usedIds.has(id)) {
