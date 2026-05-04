@@ -12,8 +12,14 @@ import ProfessionalFilters from '@/components/ProfessionalFilters';
 import JsonLd from '@/components/seo/JsonLd';
 import { breadcrumbSchema, serviceSchema } from '@/lib/seo/jsonLd';
 import { buildMetadata } from '@/lib/seo/metadata';
-import { publicGetCms } from '@/lib/cms';
+import { CmsContent, publicGetCms, publicListCms } from '@/lib/cms';
 import RichTextRenderer from '@/components/cms/RichTextRenderer';
+import BlogCard from '@/components/cms/BlogCard';
+import PopularProjectsCarousel from '@/components/PopularProjectsCarousel';
+import ServiceLandingSearch from '@/components/services/ServiceLandingSearch';
+import ServiceTableOfContents from '@/components/services/ServiceTableOfContents';
+import { extractTocAndAddIds } from '@/lib/cms/toc';
+import { getServiceCoverImage } from '@/lib/serviceCovers';
 
 export const dynamic = "force-dynamic";
 
@@ -31,14 +37,26 @@ function findServiceMeta(serviceId: string) {
   for (const cat of serviceCategories) {
     for (const sub of cat.subCategories || []) {
       for (const svc of sub.services || []) {
-        if (svc.id === serviceId) return { name: svc.name, description: svc.description, category: cat.name };
+        if (svc.id === serviceId) return { name: svc.name, description: svc.description, category: cat.name, categorySlug: cat.slug };
       }
     }
   }
   const navSvc = subNavbarCategories.flatMap((c) => c.services).find((s) => s.id === serviceId);
-  if (navSvc) return { name: navSvc.name, description: undefined as string | undefined, category: undefined as string | undefined };
+  if (navSvc) return { name: navSvc.name, description: undefined as string | undefined, category: undefined as string | undefined, categorySlug: undefined as string | undefined };
   return null;
 }
+
+const fetchRelatedArticles = cache(async (serviceSlug: string) => {
+  try {
+    const [blogs, news] = await Promise.all([
+      publicListCms('blog', { serviceSlug, limit: 6 }).then((r) => r.items).catch(() => [] as CmsContent[]),
+      publicListCms('news', { serviceSlug, limit: 4 }).then((r) => r.items).catch(() => [] as CmsContent[]),
+    ]);
+    return { blogs, news };
+  } catch {
+    return { blogs: [] as CmsContent[], news: [] as CmsContent[] };
+  }
+});
 
 function humanizeSlug(slug: string): string {
   const cleaned = (slug || "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
@@ -141,6 +159,11 @@ export default async function Page({ params }: Props) {
 
   if (landing && hasMeaningfulBody(landing.body)) {
     const safePath = `/services/${encodeURIComponent(serviceId)}`;
+    const serviceName = landing.title || meta?.name || humanizeSlug(serviceId);
+    const coverSrc = landing.coverImage || getServiceCoverImage(serviceId, meta?.categorySlug);
+    const { html: bodyHtml, toc } = extractTocAndAddIds(landing.body);
+    const { blogs, news } = await fetchRelatedArticles(serviceId);
+
     return (
       <div className="bg-white">
         <JsonLd
@@ -150,35 +173,48 @@ export default async function Page({ params }: Props) {
             { name: landing.title, path: safePath },
           ])}
         />
-        {landing.coverImage && (
-          <div className="relative h-72 md:h-96 w-full">
-            <Image src={landing.coverImage} alt={landing.title} fill className="object-cover" priority unoptimized />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/20" />
-            <div className="absolute inset-0 flex flex-col justify-end">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pb-12">
-                <div className="flex items-center text-sm text-white mb-2">
-                  <Link href="/" className="hover:underline">Home</Link>
-                  <ChevronRight className="w-4 h-4 mx-1" />
-                  <Link href="/services" className="hover:underline">Services</Link>
-                </div>
-                <h1 className="text-4xl md:text-6xl font-bold text-white tracking-tight">{landing.title}</h1>
+        <div className="relative h-[28rem] md:h-[32rem] w-full">
+          <Image src={coverSrc} alt={landing.title} fill className="object-cover" priority unoptimized={Boolean(landing.coverImage)} />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/20" />
+          <div className="absolute inset-0 flex flex-col justify-end">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pb-10 md:pb-14">
+              <div className="flex items-center text-sm text-white mb-2">
+                <Link href="/" className="hover:underline">Home</Link>
+                <ChevronRight className="w-4 h-4 mx-1" />
+                <Link href="/services" className="hover:underline">Services</Link>
               </div>
+              <h1 className="text-4xl md:text-6xl font-bold text-white tracking-tight mb-6">{landing.title}</h1>
+              <ServiceLandingSearch serviceName={serviceName} />
             </div>
           </div>
-        )}
-        {!landing.coverImage && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-28 pb-6">
-            <div className="flex items-center text-sm text-gray-500 mb-2">
-              <Link href="/" className="hover:underline">Home</Link>
-              <ChevronRight className="w-4 h-4 mx-1" />
-              <Link href="/services" className="hover:underline">Services</Link>
+        </div>
+
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 md:pt-16">
+          <PopularProjectsCarousel serviceName={serviceName} heading={`Popular ${serviceName} projects`} limit={10} />
+        </section>
+
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 md:pt-20 pb-16">
+          <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-10">
+            {toc.length >= 2 && <ServiceTableOfContents items={toc} />}
+            <div className="min-w-0">
+              <RichTextRenderer html={bodyHtml} />
+
+              {(blogs.length > 0 || news.length > 0) && (
+                <section className="mt-16 pt-12 border-t border-gray-200">
+                  <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Related articles</h2>
+                  <p className="text-sm text-gray-600 mb-8">More reading on {serviceName.toLowerCase()}.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {blogs.map((b) => (
+                      <BlogCard key={b._id} item={b} basePath="blog" />
+                    ))}
+                    {news.map((n) => (
+                      <BlogCard key={n._id} item={n} basePath="news" />
+                    ))}
+                  </div>
+                </section>
+              )}
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight">{landing.title}</h1>
-            {landing.excerpt && <p className="mt-3 text-lg text-gray-600 max-w-3xl">{landing.excerpt}</p>}
           </div>
-        )}
-        <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <RichTextRenderer html={landing.body} />
         </main>
       </div>
     );
@@ -269,30 +305,35 @@ export default async function Page({ params }: Props) {
           ]),
         ]}
       />
-      <div className="relative h-72 md:h-96 w-full">
+      <div className="relative h-[28rem] md:h-[32rem] w-full">
         <Image
-          src="/images/banner.jpg"
+          src={getServiceCoverImage(serviceId, meta.categorySlug)}
           alt={`Showcase for ${serviceName}`}
           fill
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/20" />
         <div className="absolute inset-0 flex flex-col justify-end">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pb-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pb-10 md:pb-14">
             <div className="flex items-center text-sm text-white mb-2">
               <Link href="/" className="hover:underline">Home</Link>
               <ChevronRight className="w-4 h-4 mx-1" />
               <Link href="/services" className="hover:underline">Services</Link>
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-white tracking-tight">
+            <h1 className="text-4xl md:text-6xl font-bold text-white tracking-tight mb-6">
               {serviceName}
             </h1>
+            <ServiceLandingSearch serviceName={serviceName} />
           </div>
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 md:pt-16">
+        <PopularProjectsCarousel serviceName={serviceName} heading={`Popular ${serviceName} projects`} limit={10} />
+      </section>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 md:pt-20 pb-16">
         <ProfessionalFilters resultsCount={professionalsForService.length} />
         <Separator className="mb-8" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">

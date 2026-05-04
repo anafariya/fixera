@@ -26,7 +26,15 @@ interface PopularProject {
   } | null;
 }
 
-const PopularProjectsCarousel = () => {
+interface PopularProjectsCarouselProps {
+  serviceName?: string;
+  heading?: string;
+  limit?: number;
+}
+
+const DEFAULT_LIMIT = 10;
+
+const PopularProjectsCarousel = ({ serviceName, heading, limit = DEFAULT_LIMIT }: PopularProjectsCarouselProps = {}) => {
   const [projects, setProjects] = useState<PopularProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -35,32 +43,52 @@ const PopularProjectsCarousel = () => {
 
   useEffect(() => {
     const controller = new AbortController();
+    setLoading(true);
+    setProjects([]);
     const fetchPopularProjects = async () => {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
-        const response = await fetch(`${backendUrl}/api/search/popular-projects?limit=10`, {
+        const numericLimit = Number(limit);
+        const normalizedLimit =
+          Number.isFinite(numericLimit) && numericLimit >= 1
+            ? Math.floor(numericLimit)
+            : DEFAULT_LIMIT;
+        const params = new URLSearchParams();
+        params.set('limit', String(normalizedLimit));
+        const trimmedServiceName = serviceName?.trim();
+        if (trimmedServiceName) {
+          params.set('service', trimmedServiceName);
+        } else {
+          params.delete('service');
+        }
+        const response = await fetch(`${backendUrl}/api/search/popular-projects?${params.toString()}`, {
           credentials: 'include',
           signal: controller.signal,
         });
 
+        if (controller.signal.aborted) return;
+
         if (response.ok) {
           const data = await response.json();
+          if (controller.signal.aborted) return;
           setProjects(Array.isArray(data?.projects) ? data.projects : []);
         } else {
           const errorText = await response.text().catch(() => '');
+          if (controller.signal.aborted) return;
           console.error(`Failed to fetch popular projects: ${response.status}`, errorText);
           setProjects([]);
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
+        if (controller.signal.aborted) return;
         console.error('Failed to fetch popular projects:', error);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
     fetchPopularProjects();
     return () => controller.abort();
-  }, []);
+  }, [serviceName, limit]);
 
   const updateScrollButtons = useCallback(() => {
     const el = scrollRef.current;
@@ -102,7 +130,7 @@ const PopularProjectsCarousel = () => {
   if (loading) {
     return (
       <div className="mt-10 max-w-5xl mx-auto">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4 text-left">Popular Projects</h3>
+        <h3 className="text-lg font-semibold text-gray-800 mb-4 text-left">{heading || 'Popular Projects'}</h3>
         <div className="flex gap-4 overflow-hidden">
           {[1, 2, 3].map((i) => (
             <div key={i} className="min-w-[280px] rounded-xl border border-gray-200 overflow-hidden">
@@ -124,7 +152,7 @@ const PopularProjectsCarousel = () => {
   return (
     <div className="mt-10 max-w-5xl mx-auto text-left">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">Popular Projects</h3>
+        <h3 className="text-lg font-semibold text-gray-800">{heading || 'Popular Projects'}</h3>
         <div className="flex gap-2">
           <button
             onClick={() => scroll('left')}

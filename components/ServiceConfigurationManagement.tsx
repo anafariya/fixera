@@ -196,6 +196,13 @@ export default function ServiceConfigurationManagement() {
     return options.map(o => o.name).join(' or ')
   }
 
+  // Build a toast-friendly message from a backend error response that may carry fieldErrors
+  const formatBackendError = (error: { message?: string; fieldErrors?: Array<{ path?: string; message?: string }> } | undefined, fallback: string) => {
+    const detail = error?.fieldErrors?.map(fe => `${fe.path ?? 'field'}: ${fe.message ?? 'invalid'}`).join('; ')
+    if (detail) return `${error?.message ?? fallback} — ${detail}`
+    return error?.message || fallback
+  }
+
   // Create new service
   const createService = async (dataOverride?: ServiceConfiguration) => {
     const cleanedActive = (formData.activeCountries || []).filter(Boolean)
@@ -232,7 +239,7 @@ export default function ServiceConfigurationManagement() {
       } else {
         const error = await response.json()
         console.error('Create failed:', error)
-        toast.error(error.message || 'Failed to create service')
+        toast.error(formatBackendError(error, 'Failed to create service'))
       }
     } catch (error) {
       console.error('Error creating service:', error)
@@ -278,7 +285,7 @@ export default function ServiceConfigurationManagement() {
       } else {
         const error = await response.json()
         console.error('Update failed:', error)
-        toast.error(error.message || 'Failed to update service')
+        toast.error(formatBackendError(error, 'Failed to update service'))
       }
     } catch (error) {
       console.error('Error updating service:', error)
@@ -403,12 +410,26 @@ export default function ServiceConfigurationManagement() {
         toast.error(`Pricing option "${opt.name}" requires a unit (e.g., m², hour)`)
         return
       }
+      if (opt.pricingType === 'fixed_price' && opt.unit?.trim()) {
+        toast.error(`Pricing option "${opt.name}" must not have a unit (it is fixed price)`)
+        return
+      }
     }
     // Validate service parameter fields
     for (const field of formData.professionalInputFields) {
       if (!field.fieldName?.trim() || !field.label?.trim()) {
         toast.error('Each service parameter must have a field name and label')
         return
+      }
+      if (field.fieldType === 'range') {
+        if (field.max == null) {
+          toast.error(`Range parameter "${field.label}" must have a Max Value`)
+          return
+        }
+        if (field.min != null && field.min >= field.max) {
+          toast.error(`Range parameter "${field.label}" needs Min Value less than Max Value`)
+          return
+        }
       }
     }
 
@@ -872,7 +893,13 @@ export default function ServiceConfigurationManagement() {
                           value={option.pricingType}
                           onChange={(e) => setFormData(prev => ({
                             ...prev,
-                            pricingOptions: prev.pricingOptions.map((o, i) => i === index ? { ...o, pricingType: e.target.value as 'fixed_price' | 'price_per_unit' } : o)
+                            pricingOptions: prev.pricingOptions.map((o, i) => {
+                              if (i !== index) return o
+                              const nextType = e.target.value as 'fixed_price' | 'price_per_unit'
+                              return nextType === 'fixed_price'
+                                ? { ...o, pricingType: nextType, unit: undefined }
+                                : { ...o, pricingType: nextType }
+                            })
                           }))}
                         >
                           <option value="fixed_price">Fixed price</option>

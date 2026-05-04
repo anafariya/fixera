@@ -1,0 +1,110 @@
+import { slugify } from "@/lib/cms";
+
+export interface TocItem {
+  id: string;
+  text: string;
+}
+
+export interface TocResult {
+  html: string;
+  toc: TocItem[];
+}
+
+const H2_RE = /<h2\b([^>]*)>([\s\S]*?)<\/h2>/gi;
+const ID_ATTR_RE = /(^|\s)id\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+const ID_ATTR_RE_GLOBAL = /(^|\s)id\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
+
+function stripTags(html: string): string {
+  return html.replace(/<[^>]*>/g, "");
+}
+
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&#x([0-9a-fA-F]+);?/g, (m, hex: string) => {
+      const code = parseInt(hex, 16);
+      if (!Number.isFinite(code) || code < 0 || code > 0x10ffff) return m;
+      try {
+        return String.fromCodePoint(code);
+      } catch {
+        return m;
+      }
+    })
+    .replace(/&#(\d+);?/g, (m, dec: string) => {
+      const code = parseInt(dec, 10);
+      if (!Number.isFinite(code) || code < 0 || code > 0x10ffff) return m;
+      try {
+        return String.fromCodePoint(code);
+      } catch {
+        return m;
+      }
+    })
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+}
+
+function safeSlug(text: string): string {
+  const s = slugify(text);
+  if (/^untitled-[a-z0-9]+$/.test(s)) return "untitled";
+  return s;
+}
+
+export function extractTocAndAddIds(input: string | null | undefined): TocResult {
+  const html = input || "";
+  if (!html) return { html, toc: [] };
+
+  const usedIds = new Set<string>();
+  const toc: TocItem[] = [];
+
+  const nonH2Html = html.replace(H2_RE, "");
+  for (const match of nonH2Html.matchAll(ID_ATTR_RE_GLOBAL)) {
+    const existingId = (match[2] || match[3] || match[4] || "").trim();
+    if (existingId) usedIds.add(existingId);
+  }
+
+  const transformed = html.replace(H2_RE, (full, attrs: string, inner: string) => {
+    const text = decodeEntities(stripTags(inner)).replace(/\s+/g, " ").trim();
+
+    if (!text) {
+      const emptyExisting = ID_ATTR_RE.exec(attrs);
+      const emptyExistingId = emptyExisting ? (emptyExisting[2] || emptyExisting[3] || emptyExisting[4] || "").trim() : "";
+      if (!emptyExistingId) return full;
+      let reservedId = emptyExistingId;
+      let m = 2;
+      while (usedIds.has(reservedId)) {
+        reservedId = `${emptyExistingId}-${m++}`;
+      }
+      usedIds.add(reservedId);
+      if (reservedId === emptyExistingId) return full;
+      const rewrittenAttrs = attrs.replace(ID_ATTR_RE, `$1id="${reservedId}"`);
+      return `<h2${rewrittenAttrs}>${inner}</h2>`;
+    }
+
+    let id: string | undefined;
+    const existing = ID_ATTR_RE.exec(attrs);
+    const originalExistingId = existing ? (existing[2] || existing[3] || existing[4] || "").trim() : "";
+    if (originalExistingId) {
+      id = originalExistingId;
+    }
+    const base = id || safeSlug(text) || "untitled";
+    if (!id) id = base;
+    let n = 2;
+    while (usedIds.has(id)) {
+      id = `${base}-${n++}`;
+    }
+    usedIds.add(id);
+    toc.push({ id, text });
+
+    if (existing) {
+      if (id === originalExistingId) return full;
+      const newAttrs = attrs.replace(ID_ATTR_RE, `$1id="${id}"`);
+      return `<h2${newAttrs}>${inner}</h2>`;
+    }
+    return `<h2${attrs} id="${id}">${inner}</h2>`;
+  });
+
+  return { html: transformed, toc };
+}
