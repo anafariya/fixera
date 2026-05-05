@@ -317,7 +317,7 @@ function MeetingsAdmin() {
                     const draftIso = draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : "";
                     const persistedIso = m.scheduledAt ? new Date(m.scheduledAt).toISOString() : "";
                     if (draftIso !== persistedIso) {
-                      payload.scheduledAt = draftIso || undefined;
+                      payload.scheduledAt = draftIso === "" ? null : draftIso;
                     }
                     if (draft.adminResponse !== (m.adminResponse || "")) {
                       payload.adminResponse = draft.adminResponse;

@@ -37,16 +37,16 @@ export interface MeetingRequest {
   updatedAt: string;
 }
 
-async function asJson<T>(res: Response): Promise<T> {
+async function asJson<T>(res: Response): Promise<T | undefined> {
   if (res.status === 204) {
-    return undefined as T;
+    return undefined;
   }
   const body = await res.json().catch(() => null);
   if (!res.ok || body?.success === false) {
     throw new Error(body?.msg || `Request failed (${res.status})`);
   }
   if (body == null) {
-    return undefined as T;
+    return undefined;
   }
   if (body.data == null) {
     throw new Error(`Empty response data (HTTP ${res.status})${body?.msg ? `: ${body.msg}` : ""}`);
@@ -54,9 +54,17 @@ async function asJson<T>(res: Response): Promise<T> {
   return body.data as T;
 }
 
+async function asJsonRequired<T>(res: Response): Promise<T> {
+  const data = await asJson<T>(res);
+  if (data === undefined) {
+    throw new Error(`Empty response data (HTTP ${res.status})`);
+  }
+  return data;
+}
+
 export async function proListMyTickets(): Promise<SupportTicket[]> {
   const res = await authFetch(`${API}/api/professionals/support/tickets`);
-  return (await asJson<{ items: SupportTicket[] }>(res)).items;
+  return (await asJsonRequired<{ items: SupportTicket[] }>(res)).items;
 }
 
 export async function proCreateTicket(payload: { subject: string; description: string }): Promise<SupportTicket> {
@@ -65,7 +73,7 @@ export async function proCreateTicket(payload: { subject: string; description: s
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return asJson<SupportTicket>(res);
+  return asJsonRequired<SupportTicket>(res);
 }
 
 export async function proReplyTicket(id: string, body: string): Promise<SupportTicket> {
@@ -74,12 +82,12 @@ export async function proReplyTicket(id: string, body: string): Promise<SupportT
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ body }),
   });
-  return asJson<SupportTicket>(res);
+  return asJsonRequired<SupportTicket>(res);
 }
 
 export async function proListMyMeetingRequests(): Promise<MeetingRequest[]> {
   const res = await authFetch(`${API}/api/professionals/support/meeting-requests`);
-  return (await asJson<{ items: MeetingRequest[] }>(res)).items;
+  return (await asJsonRequired<{ items: MeetingRequest[] }>(res)).items;
 }
 
 export async function proCreateMeetingRequest(payload: {
@@ -92,13 +100,13 @@ export async function proCreateMeetingRequest(payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return asJson<MeetingRequest>(res);
+  return asJsonRequired<MeetingRequest>(res);
 }
 
 export async function adminListTickets(status?: SupportTicketStatus): Promise<SupportTicket[]> {
   const qs = status ? `?status=${status}` : "";
   const res = await authFetch(`${API}/api/admin/support/tickets${qs}`);
-  return (await asJson<{ items: SupportTicket[] }>(res)).items;
+  return (await asJsonRequired<{ items: SupportTicket[] }>(res)).items;
 }
 
 export async function adminUpdateTicket(id: string, payload: { status?: SupportTicketStatus; reply?: string }): Promise<SupportTicket> {
@@ -107,24 +115,24 @@ export async function adminUpdateTicket(id: string, payload: { status?: SupportT
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return asJson<SupportTicket>(res);
+  return asJsonRequired<SupportTicket>(res);
 }
 
 export async function adminListMeetingRequests(status?: MeetingRequestStatus): Promise<MeetingRequest[]> {
   const qs = status ? `?status=${status}` : "";
   const res = await authFetch(`${API}/api/admin/support/meeting-requests${qs}`);
-  return (await asJson<{ items: MeetingRequest[] }>(res)).items;
+  return (await asJsonRequired<{ items: MeetingRequest[] }>(res)).items;
 }
 
 export async function adminUpdateMeetingRequest(id: string, payload: {
   status?: MeetingRequestStatus;
   adminResponse?: string;
-  scheduledAt?: string;
+  scheduledAt?: string | null;
 }): Promise<MeetingRequest> {
   const res = await authFetch(`${API}/api/admin/support/meeting-requests/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return asJson<MeetingRequest>(res);
+  return asJsonRequired<MeetingRequest>(res);
 }

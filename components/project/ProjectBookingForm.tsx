@@ -1951,6 +1951,11 @@ export default function ProjectBookingForm({
         toast.error('Please select a time slot for your booking');
         return false;
       }
+
+      if (projectMode === 'hours' && serverSlotsError) {
+        toast.error('Could not load availability. Please try a different date.');
+        return false;
+      }
     }
 
     if (currentStep === 3 && selectedPackage?.pricing?.type === 'rfq') {

@@ -836,12 +836,12 @@ export default function BookingPaymentPage() {
   const persistedCodeLabel = discountInfo?.codeLabel ?? null;
 
   useEffect(() => {
-    if (persistedCodeLabel && appliedDiscountCode !== persistedCodeLabel) {
-      setAppliedDiscountCode(persistedCodeLabel);
-    } else if (!persistedCodeLabel && appliedDiscountCode) {
-      setAppliedDiscountCode(null);
-    }
-  }, [persistedCodeLabel, appliedDiscountCode]);
+    setAppliedDiscountCode((prev) => {
+      if (persistedCodeLabel && prev !== persistedCodeLabel) return persistedCodeLabel;
+      if (!persistedCodeLabel && prev) return null;
+      return prev;
+    });
+  }, [persistedCodeLabel]);
   const originalServiceAmount =
     discountInfo?.originalAmount ??
     booking?.quote?.amount ??
@@ -1335,25 +1335,30 @@ export default function BookingPaymentPage() {
             {booking?.payment?.status !== 'authorized' && booking?.payment?.status !== 'completed' && (
               <div className="mb-4 rounded-md border border-gray-200 bg-white px-3 py-3">
                 {appliedDiscountCode ? (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        Code applied: <span className="font-mono text-green-700">{appliedDiscountCode}</span>
-                      </p>
-                      {(discountInfo?.codeDiscountAmount ?? 0) > 0 && (
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          Saving {formatMoney(discountInfo?.codeDiscountAmount ?? 0, paymentCurrency)}
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          Code applied: <span className="font-mono text-green-700">{appliedDiscountCode}</span>
                         </p>
-                      )}
+                        {(discountInfo?.codeDiscountAmount ?? 0) > 0 && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Saving {formatMoney(discountInfo?.codeDiscountAmount ?? 0, paymentCurrency)}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveDiscountCode}
+                        disabled={applyingCode || initializingPayment}
+                        className="text-sm text-red-600 hover:text-red-700 disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleRemoveDiscountCode}
-                      disabled={applyingCode || initializingPayment}
-                      className="text-sm text-red-600 hover:text-red-700 disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
+                    {codeError && (
+                      <p className="mt-2 text-sm text-red-600">{codeError}</p>
+                    )}
                   </div>
                 ) : (
                   <div>

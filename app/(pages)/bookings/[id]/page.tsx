@@ -506,6 +506,7 @@ export default function BookingDetailPage() {
   const [confirmingCompletion, setConfirmingCompletion] = useState(false)
   const [extraCostClientSecret, setExtraCostClientSecret] = useState("")
   const [loadingExtraCostPayment, setLoadingExtraCostPayment] = useState(false)
+  const extraCostInitInFlightRef = useRef(false)
   const [extraCostPaymentCompleted, setExtraCostPaymentCompleted] = useState(false)
 
   useEffect(() => {
@@ -1613,7 +1614,9 @@ export default function BookingDetailPage() {
     if (!bookingId) return false
 
     if (extraCostClientSecret) return true
+    if (extraCostInitInFlightRef.current) return false
 
+    extraCostInitInFlightRef.current = true
     setLoadingExtraCostPayment(true)
     try {
       const token = getAuthToken()
@@ -1639,6 +1642,7 @@ export default function BookingDetailPage() {
       return false
     } finally {
       setLoadingExtraCostPayment(false)
+      extraCostInitInFlightRef.current = false
     }
   }
 

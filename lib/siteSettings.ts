@@ -54,14 +54,14 @@ export async function publicGetSiteSettings(): Promise<SiteSettings> {
 export async function adminGetSiteSettings(): Promise<SiteSettings> {
   const res = await authFetch(`${API}/api/admin/site-settings`);
   const { body, text } = await safeParseJson(res);
-  if (!res.ok || !body || body?.success === false) {
+  if (!res.ok || !body || body?.success === false || body.data == null) {
     throw new Error(
       body?.msg ||
         (text && text.slice(0, 200)) ||
         `Request failed (${res.status})`
     );
   }
-  return (body.data ?? DEFAULT_SETTINGS) as SiteSettings;
+  return body.data as SiteSettings;
 }
 
 export async function adminUpdateSiteSettings(payload: { socialLinks?: SocialLinks }): Promise<SiteSettings> {

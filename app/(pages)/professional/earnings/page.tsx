@@ -119,6 +119,8 @@ export default function ProfessionalEarningsDashboard() {
   const [exporting, setExporting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const dashboardRef = useRef<HTMLDivElement>(null);
+  const latestStatsRequestId = useRef(0);
+  const latestBookingsRequestId = useRef(0);
 
   useEffect(() => {
     if (!authLoading) {
@@ -133,6 +135,8 @@ export default function ProfessionalEarningsDashboard() {
   }, [authLoading, isAuthenticated, user, router]);
 
   const loadStats = useCallback(async (selectedRange: RangeKey, isRefresh = false, signal?: AbortSignal) => {
+    const requestId = ++latestStatsRequestId.current;
+    const isCurrent = () => requestId === latestStatsRequestId.current && !signal?.aborted;
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
@@ -141,6 +145,7 @@ export default function ProfessionalEarningsDashboard() {
         { signal }
       );
       const payload = await response.json();
+      if (!isCurrent()) return;
       if (response.ok && payload?.success) {
         setData(payload.data);
       } else {
@@ -149,10 +154,11 @@ export default function ProfessionalEarningsDashboard() {
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
+      if (!isCurrent()) return;
       setData(null);
       toast.error(err instanceof Error ? err.message : 'Failed to load dashboard stats');
     } finally {
-      if (!signal?.aborted) {
+      if (isCurrent()) {
         setLoading(false);
         setRefreshing(false);
       }
@@ -160,6 +166,8 @@ export default function ProfessionalEarningsDashboard() {
   }, []);
 
   const loadBookings = useCallback(async (selectedRange: RangeKey, signal?: AbortSignal) => {
+    const requestId = ++latestBookingsRequestId.current;
+    const isCurrent = () => requestId === latestBookingsRequestId.current && !signal?.aborted;
     setBookingsLoading(true);
     try {
       const response = await authFetch(
@@ -167,6 +175,7 @@ export default function ProfessionalEarningsDashboard() {
         { signal }
       );
       const payload = await response.json();
+      if (!isCurrent()) return;
       if (response.ok && payload?.success) {
         setBookings(payload.data.bookings || []);
       } else {
@@ -174,9 +183,10 @@ export default function ProfessionalEarningsDashboard() {
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
+      if (!isCurrent()) return;
       setBookings([]);
     } finally {
-      if (!signal?.aborted) {
+      if (isCurrent()) {
         setBookingsLoading(false);
       }
     }
@@ -237,6 +247,19 @@ export default function ProfessionalEarningsDashboard() {
       if (!response.ok) {
         toast.error('Failed to export CSV');
         return;
+      }
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('text/csv')) {
+        try {
+          const cloned = response.clone();
+          const maybeJson = await cloned.json();
+          if (maybeJson && (maybeJson.success === false || maybeJson?.error)) {
+            toast.error(maybeJson?.error?.message || maybeJson?.msg || 'Failed to export CSV');
+            return;
+          }
+        } catch {
+          // Not JSON — fall through to blob download
+        }
       }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -365,6 +388,7 @@ export default function ProfessionalEarningsDashboard() {
             <Button
               variant="outline"
               size="sm"
+              aria-label="Refresh dashboard"
               onClick={() => { void loadStats(range, true); void loadBookings(range); }}
               disabled={refreshing}
               className="h-9"

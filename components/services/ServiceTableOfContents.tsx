@@ -11,19 +11,21 @@ interface Props {
 
 function measureStickyHeaderHeight(): number {
   const selectors = ['header', '[data-app-header]', 'nav[role="navigation"]'];
+  const seen = new Set<HTMLElement>();
   let total = 0;
   for (const sel of selectors) {
     const nodes = document.querySelectorAll(sel);
     nodes.forEach((node) => {
       if (!(node instanceof HTMLElement)) return;
+      if (seen.has(node)) return;
       const rect = node.getBoundingClientRect();
       if (rect.height <= 0) return;
       const cs = getComputedStyle(node);
       if (cs.position === 'fixed' || cs.position === 'sticky') {
+        seen.add(node);
         total += rect.height;
       }
     });
-    if (total > 0) break;
   }
   return total;
 }
