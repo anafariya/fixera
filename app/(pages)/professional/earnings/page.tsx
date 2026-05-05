@@ -241,7 +241,7 @@ export default function ProfessionalEarningsDashboard() {
     } finally {
       setExportingPdf(false);
     }
-  }, [range]);
+  }, [range, bookingsLoading]);
 
   const exportCsv = useCallback(async () => {
     setExporting(true);

@@ -1375,11 +1375,12 @@ export default function BookingPaymentPage() {
                   </div>
                 ) : (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="discount-code-input" className="block text-sm font-medium text-gray-700 mb-1">
                       Have a discount code?
                     </label>
                     <div className="flex gap-2">
                       <input
+                        id="discount-code-input"
                         type="text"
                         value={discountCodeInput}
                         onChange={(e) => {
