@@ -38,9 +38,15 @@ export interface MeetingRequest {
 }
 
 async function asJson<T>(res: Response): Promise<T> {
+  if (res.status === 204) {
+    return undefined as T;
+  }
   const body = await res.json().catch(() => null);
-  if (!res.ok || !body || body?.success === false) {
+  if (!res.ok || body?.success === false) {
     throw new Error(body?.msg || `Request failed (${res.status})`);
+  }
+  if (body == null) {
+    return undefined as T;
   }
   if (body.data == null) {
     throw new Error(`Empty response data (HTTP ${res.status})${body?.msg ? `: ${body.msg}` : ""}`);

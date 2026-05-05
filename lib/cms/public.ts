@@ -26,7 +26,7 @@ async function parseJsonRequired<T>(res: Response): Promise<T> {
   if (!res.ok || data?.success === false) {
     throw new Error(data?.msg || `Request failed (${res.status})`);
   }
-  return data.data as T;
+  return (data?.data ?? data) as T;
 }
 
 export async function publicListCms(

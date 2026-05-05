@@ -40,7 +40,7 @@ export async function publicGetSiteSettings(): Promise<SiteSettings> {
   try {
     const res = await fetch(`${API}/api/public/site-settings`, {
       next: { revalidate: 60 },
-      signal: AbortSignal.timeout(2000),
+      signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return DEFAULT_SETTINGS;
     const { body } = await safeParseJson(res);
@@ -71,12 +71,12 @@ export async function adminUpdateSiteSettings(payload: { socialLinks?: SocialLin
     body: JSON.stringify(payload),
   });
   const { body, text } = await safeParseJson(res);
-  if (!res.ok || !body || body?.success === false) {
+  if (!res.ok || !body || body?.success === false || body.data == null) {
     throw new Error(
       body?.msg ||
         (text && text.slice(0, 200)) ||
         `Request failed (${res.status})`
     );
   }
-  return (body.data ?? DEFAULT_SETTINGS) as SiteSettings;
+  return body.data as SiteSettings;
 }

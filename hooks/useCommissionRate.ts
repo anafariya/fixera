@@ -20,11 +20,13 @@ export function useCommissionRate() {
           setCommissionPercent(json?.data?.commissionPercent ?? 0)
           setCommissionError(null)
         } else {
+          setCommissionPercent(0)
           setCommissionError(new Error(`Commission rate request failed (${res.status})`))
         }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') return
         console.error('Failed to fetch commission rate:', error)
+        setCommissionPercent(0)
         setCommissionError(error instanceof Error ? error : new Error('Failed to fetch commission rate'))
       } finally {
         if (!controller.signal.aborted) setCommissionLoaded(true)

@@ -265,14 +265,18 @@ function MeetingsAdmin() {
                   aria-label={`Meeting status for "${m.topic}"`}
                   value={m.status}
                   onChange={(e) => {
+                    if (saving[m._id]) return;
                     const next = e.target.value as MeetingRequestStatus;
                     if (next === "scheduled" && !draft.scheduledAt && !m.scheduledAt) {
                       toast.error("Set a scheduled time before marking as scheduled");
                       return;
                     }
                     const payload: Parameters<typeof adminUpdateMeetingRequest>[1] = { status: next };
-                    if (next === "scheduled" && draft.scheduledAt) {
-                      payload.scheduledAt = new Date(draft.scheduledAt).toISOString();
+                    if (next === "scheduled") {
+                      const source = draft.scheduledAt
+                        ? new Date(draft.scheduledAt).toISOString()
+                        : m.scheduledAt;
+                      if (source) payload.scheduledAt = source;
                     }
                     update(m._id, payload);
                   }}
@@ -309,10 +313,16 @@ function MeetingsAdmin() {
               <div className="flex justify-end">
                 <button
                   onClick={() => {
-                    const payload: Parameters<typeof adminUpdateMeetingRequest>[1] = {
-                      scheduledAt: draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : undefined,
-                      adminResponse: draft.adminResponse,
-                    };
+                    const payload: Parameters<typeof adminUpdateMeetingRequest>[1] = {};
+                    const draftIso = draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : "";
+                    const persistedIso = m.scheduledAt ? new Date(m.scheduledAt).toISOString() : "";
+                    if (draftIso !== persistedIso) {
+                      payload.scheduledAt = draftIso || undefined;
+                    }
+                    if (draft.adminResponse !== (m.adminResponse || "")) {
+                      payload.adminResponse = draft.adminResponse;
+                    }
+                    if (Object.keys(payload).length === 0) return;
                     update(m._id, payload);
                   }}
                   disabled={Boolean(saving[m._id])}
