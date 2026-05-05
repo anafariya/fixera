@@ -137,6 +137,7 @@ export default function ProfessionalEarningsDashboard() {
   const loadStats = useCallback(async (selectedRange: RangeKey, isRefresh = false, signal?: AbortSignal) => {
     const requestId = ++latestStatsRequestId.current;
     const isCurrent = () => requestId === latestStatsRequestId.current && !signal?.aborted;
+    if (!isRefresh) setData(null);
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
@@ -194,6 +195,10 @@ export default function ProfessionalEarningsDashboard() {
 
   const exportPdf = useCallback(async () => {
     if (!dashboardRef.current) return;
+    if (bookingsLoading) {
+      toast.error('Please wait for the dashboard to finish loading.');
+      return;
+    }
     setExportingPdf(true);
     try {
       const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
@@ -410,7 +415,7 @@ export default function ProfessionalEarningsDashboard() {
               variant="outline"
               size="sm"
               onClick={exportPdf}
-              disabled={loading || !data || exportingPdf}
+              disabled={loading || !data || exportingPdf || bookingsLoading}
               className="h-9"
             >
               <FileDown className="w-4 h-4 mr-1" />

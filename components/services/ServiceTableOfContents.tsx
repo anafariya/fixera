@@ -41,7 +41,10 @@ function smoothScrollTo(id: string) {
   const headerOffset =
     Number.isFinite(cssOffset) && cssOffset > 0 ? cssOffset : measureStickyHeaderHeight() || 80;
   const top = el.getBoundingClientRect().top + window.scrollY - headerOffset;
-  window.scrollTo({ top, behavior: 'smooth' });
+  const prefersReducedMotion =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({ top, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
   if (typeof history.replaceState === 'function') {
     history.replaceState(null, '', `#${id}`);
   } else if (typeof history.pushState === 'function') {

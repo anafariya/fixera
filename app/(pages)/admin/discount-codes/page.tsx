@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { authFetch } from "@/lib/utils";
@@ -91,13 +91,13 @@ const toForm = (code: DiscountCode): FormState => ({
   code: code.code,
   type: code.type,
   value: String(code.value),
-  maxDiscountAmount: code.maxDiscountAmount ? String(code.maxDiscountAmount) : "",
-  minBookingAmount: code.minBookingAmount ? String(code.minBookingAmount) : "",
+  maxDiscountAmount: code.maxDiscountAmount != null ? String(code.maxDiscountAmount) : "",
+  minBookingAmount: code.minBookingAmount != null ? String(code.minBookingAmount) : "",
   activeCountries: code.activeCountries.join(", "),
   applicableServices: code.applicableServices.join(", "),
   validFrom: formatLocalIsoDate(new Date(code.validFrom)),
   validUntil: formatLocalIsoDate(new Date(code.validUntil)),
-  usageLimit: code.usageLimit ? String(code.usageLimit) : "",
+  usageLimit: code.usageLimit != null ? String(code.usageLimit) : "",
   perUserLimit: String(code.perUserLimit),
   isActive: code.isActive,
   description: code.description || "",
@@ -135,6 +135,7 @@ export default function AdminDiscountCodesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const latestLoadCodesRequestId = useRef(0);
 
   useEffect(() => {
     if (loading) return;
@@ -144,6 +145,8 @@ export default function AdminDiscountCodesPage() {
   }, [user, isAuthenticated, loading, router]);
 
   const loadCodes = useCallback(async () => {
+    const requestId = ++latestLoadCodesRequestId.current;
+    const isCurrent = () => requestId === latestLoadCodesRequestId.current;
     try {
       setListLoading(true);
       const params = new URLSearchParams();
@@ -151,12 +154,14 @@ export default function AdminDiscountCodesPage() {
       if (search.trim()) params.set("search", search.trim());
       const res = await authFetch(`${API_BASE}/api/admin/discount-codes?${params.toString()}`);
       const json = await res.json();
+      if (!isCurrent()) return;
       if (!res.ok || !json.success) throw new Error(json.msg || "Failed to load codes");
       setCodes(json.data.codes || []);
     } catch (err) {
+      if (!isCurrent()) return;
       toast.error(err instanceof Error ? err.message : "Could not load discount codes");
     } finally {
-      setListLoading(false);
+      if (isCurrent()) setListLoading(false);
     }
   }, [statusFilter, search]);
 
@@ -397,10 +402,10 @@ export default function AdminDiscountCodesPage() {
                           <td className="py-3 pr-4 font-mono font-semibold">{c.code}</td>
                           <td className="py-3 pr-4">
                             {c.type === "percentage" ? `${c.value}%` : `€${c.value}`}
-                            {c.maxDiscountAmount ? <span className="text-slate-500"> (max €{c.maxDiscountAmount})</span> : null}
+                            {c.maxDiscountAmount != null ? <span className="text-slate-500"> (max €{c.maxDiscountAmount})</span> : null}
                           </td>
                           <td className="py-3 pr-4">
-                            {c.usageCount}{c.usageLimit ? ` / ${c.usageLimit}` : ""}
+                            {c.usageCount}{c.usageLimit != null ? ` / ${c.usageLimit}` : ""}
                           </td>
                           <td className="py-3 pr-4 whitespace-nowrap">
                             {new Date(c.validFrom).toLocaleDateString()} → {new Date(c.validUntil).toLocaleDateString()}

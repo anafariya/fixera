@@ -1956,14 +1956,14 @@ export default function ProjectBookingForm({
         return false;
       }
 
-      // Check time selection for hourly projects
-      if (projectMode === 'hours' && !selectedTime) {
-        toast.error('Please select a time slot for your booking');
+      if (projectMode === 'hours' && serverSlotsError) {
+        toast.error('Could not load availability. Please try a different date.');
         return false;
       }
 
-      if (projectMode === 'hours' && serverSlotsError) {
-        toast.error('Could not load availability. Please try a different date.');
+      // Check time selection for hourly projects
+      if (projectMode === 'hours' && !selectedTime) {
+        toast.error('Please select a time slot for your booking');
         return false;
       }
     }

@@ -844,14 +844,17 @@ export default function BookingPaymentPage() {
   const discountInfo = booking?.payment?.discount;
   const hasDiscountBreakdown = (discountInfo?.totalDiscount ?? 0) > 0;
   const persistedCodeLabel = discountInfo?.codeLabel ?? null;
+  const persistedCodeAmount = discountInfo?.codeDiscountAmount ?? 0;
+  const hasPersistedCode = !!persistedCodeLabel || persistedCodeAmount > 0;
 
   useEffect(() => {
     setAppliedDiscountCode((prev) => {
       if (persistedCodeLabel && prev !== persistedCodeLabel) return persistedCodeLabel;
-      if (!persistedCodeLabel && prev) return null;
+      if (!persistedCodeLabel && hasPersistedCode && !prev) return 'APPLIED';
+      if (!hasPersistedCode && prev) return null;
       return prev;
     });
-  }, [persistedCodeLabel]);
+  }, [persistedCodeLabel, hasPersistedCode]);
   const originalServiceAmount =
     discountInfo?.originalAmount ??
     booking?.quote?.amount ??
@@ -1463,7 +1466,7 @@ export default function BookingPaymentPage() {
               {(discountInfo?.codeDiscountAmount ?? 0) > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">
-                    Discount Code ({discountInfo?.codeLabel}):
+                    Discount Code{discountInfo?.codeLabel ? ` (${discountInfo.codeLabel})` : ''}:
                   </span>
                   <span className="text-green-700">
                     -{formatMoney(discountInfo?.codeDiscountAmount ?? 0, paymentCurrency)}
