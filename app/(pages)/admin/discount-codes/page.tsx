@@ -60,9 +60,16 @@ interface FormState {
   description: string;
 }
 
+const formatLocalIsoDate = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 const emptyForm = (): FormState => {
-  const now = new Date();
-  const in30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const nowLocal = new Date();
+  const in30DaysLocal = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   return {
     code: "",
     type: "percentage",
@@ -71,8 +78,8 @@ const emptyForm = (): FormState => {
     minBookingAmount: "",
     activeCountries: "",
     applicableServices: "",
-    validFrom: now.toISOString().slice(0, 10),
-    validUntil: in30Days.toISOString().slice(0, 10),
+    validFrom: formatLocalIsoDate(nowLocal),
+    validUntil: formatLocalIsoDate(in30DaysLocal),
     usageLimit: "",
     perUserLimit: "1",
     isActive: true,
@@ -168,7 +175,7 @@ export default function AdminDiscountCodesPage() {
       toast.error("Code and value are required");
       return;
     }
-    const value = parseFloat(form.value);
+    const value = Number(form.value);
     if (!Number.isFinite(value) || value <= 0) {
       toast.error("Value must be a positive number");
       return;
@@ -189,7 +196,7 @@ export default function AdminDiscountCodesPage() {
       return;
     }
 
-    const perUserLimitParsed = form.perUserLimit.trim() === "" ? NaN : parseInt(form.perUserLimit, 10);
+    const perUserLimitParsed = form.perUserLimit.trim() === "" ? NaN : Number(form.perUserLimit);
     const perUserLimit = Number.isFinite(perUserLimitParsed) && perUserLimitParsed >= 1
       ? perUserLimitParsed
       : (form.perUserLimit.trim() === "" ? 1 : null);
@@ -211,7 +218,7 @@ export default function AdminDiscountCodesPage() {
       description: form.description.trim() || undefined,
     };
     if (form.maxDiscountAmount.trim()) {
-      const n = parseFloat(form.maxDiscountAmount);
+      const n = Number(form.maxDiscountAmount);
       if (!Number.isFinite(n) || n < 0) {
         toast.error("Max discount amount must be a non-negative number");
         return;
@@ -219,7 +226,7 @@ export default function AdminDiscountCodesPage() {
       payload.maxDiscountAmount = n;
     }
     if (form.minBookingAmount.trim()) {
-      const n = parseFloat(form.minBookingAmount);
+      const n = Number(form.minBookingAmount);
       if (!Number.isFinite(n) || n < 0) {
         toast.error("Min booking amount must be a non-negative number");
         return;
@@ -227,7 +234,7 @@ export default function AdminDiscountCodesPage() {
       payload.minBookingAmount = n;
     }
     if (form.usageLimit.trim()) {
-      const n = parseInt(form.usageLimit, 10);
+      const n = Number(form.usageLimit);
       if (!Number.isFinite(n) || n < 0) {
         toast.error("Usage limit must be a non-negative whole number");
         return;
@@ -387,10 +394,10 @@ export default function AdminDiscountCodesPage() {
                           </td>
                           <td className="py-3 pr-4 text-right">
                             <div className="flex gap-2 justify-end">
-                              <Button size="sm" variant="outline" onClick={() => openEdit(c)}>
+                              <Button size="sm" variant="outline" aria-label={`Edit discount code ${c.code}`} onClick={() => openEdit(c)}>
                                 <Pencil className="w-3.5 h-3.5" />
                               </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleDelete(c)} className="text-rose-600 hover:text-rose-700">
+                              <Button size="sm" variant="outline" aria-label={`Delete discount code ${c.code}`} onClick={() => handleDelete(c)} className="text-rose-600 hover:text-rose-700">
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
                             </div>

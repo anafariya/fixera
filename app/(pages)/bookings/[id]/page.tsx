@@ -754,7 +754,7 @@ export default function BookingDetailPage() {
     }
     // initializeExtraCostPayment is stable enough — intentionally not in deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPayExtras, user?.role, booking?.status, booking?.extraCostTotal, booking?.extraCostStatus, extraCostClientSecret, router])
+  }, [autoPayExtras, user?.role, booking?.status, booking?.extraCostTotal, booking?.extraCostStatus, extraCostClientSecret, router, bookingId])
 
   const handleAnswerChange = (index: number, answer: string) => {
     setPostBookingAnswers(prev => ({ ...prev, [index]: answer }))

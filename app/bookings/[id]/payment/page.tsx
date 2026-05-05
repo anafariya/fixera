@@ -592,6 +592,7 @@ export default function BookingPaymentPage() {
 
   const ensurePaymentIntent = useCallback(async (currentBookingId: string, currentBooking: Booking | null, discountCode?: string): Promise<{ ok: boolean; errorMessage?: string; booking?: Booking | null }> => {
     setInitializingPayment(true);
+    setClientSecret('');
     const suppressGlobalError = discountCode !== undefined;
     try {
       const sanitizedId = encodeURIComponent(currentBookingId);

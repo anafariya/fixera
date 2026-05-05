@@ -229,20 +229,16 @@ export interface PolicyLink {
   path: string;
 }
 
-function reservedPolicyFallback(): PolicyLink[] {
-  return CMS_RESERVED_POLICIES.map((r) => ({ title: r.label, slug: r.slug, path: r.path }));
-}
-
 export async function publicListPolicyLinks(): Promise<PolicyLink[]> {
   try {
     const res = await fetch(`${API}/api/public/cms/policy-links`, {
       next: { revalidate: 60 },
-      signal: AbortSignal.timeout(2000),
+      signal: AbortSignal.timeout(8000),
     });
     const data = await parseJsonRequired<{ items: PolicyLink[] }>(res);
-    return data.items?.length ? data.items : reservedPolicyFallback();
+    return data.items ?? [];
   } catch {
-    return reservedPolicyFallback();
+    return [];
   }
 }
 

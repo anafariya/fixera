@@ -9,13 +9,33 @@ interface Props {
   items: TocItem[];
 }
 
+function measureStickyHeaderHeight(): number {
+  const selectors = ['header', '[data-app-header]', 'nav[role="navigation"]'];
+  let total = 0;
+  for (const sel of selectors) {
+    const nodes = document.querySelectorAll(sel);
+    nodes.forEach((node) => {
+      if (!(node instanceof HTMLElement)) return;
+      const rect = node.getBoundingClientRect();
+      if (rect.height <= 0) return;
+      const cs = getComputedStyle(node);
+      if (cs.position === 'fixed' || cs.position === 'sticky') {
+        total += rect.height;
+      }
+    });
+    if (total > 0) break;
+  }
+  return total;
+}
+
 function smoothScrollTo(id: string) {
   const el = document.getElementById(id);
   if (!el) return;
   const cssOffset = parseFloat(
     getComputedStyle(document.documentElement).getPropertyValue('--header-height')
   );
-  const headerOffset = Number.isFinite(cssOffset) && cssOffset > 0 ? cssOffset : 80;
+  const headerOffset =
+    Number.isFinite(cssOffset) && cssOffset > 0 ? cssOffset : measureStickyHeaderHeight() || 80;
   const top = el.getBoundingClientRect().top + window.scrollY - headerOffset;
   window.scrollTo({ top, behavior: 'smooth' });
   if (typeof history.replaceState === 'function') {

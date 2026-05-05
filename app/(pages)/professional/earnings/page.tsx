@@ -144,10 +144,12 @@ export default function ProfessionalEarningsDashboard() {
       if (response.ok && payload?.success) {
         setData(payload.data);
       } else {
+        setData(null);
         toast.error(payload?.error?.message || 'Failed to load dashboard stats');
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
+      setData(null);
       toast.error(err instanceof Error ? err.message : 'Failed to load dashboard stats');
     } finally {
       if (!signal?.aborted) {
@@ -167,10 +169,12 @@ export default function ProfessionalEarningsDashboard() {
       const payload = await response.json();
       if (response.ok && payload?.success) {
         setBookings(payload.data.bookings || []);
+      } else {
+        setBookings([]);
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
-      // silent — bookings table is secondary
+      setBookings([]);
     } finally {
       if (!signal?.aborted) {
         setBookingsLoading(false);
