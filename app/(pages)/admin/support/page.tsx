@@ -154,7 +154,8 @@ function TicketsAdmin() {
                   aria-label={`Status for ticket "${t.subject}"`}
                   value={t.status}
                   onChange={(e) => update(t._id, { status: e.target.value as SupportTicketStatus })}
-                  className="rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                  disabled={Boolean(saving[t._id])}
+                  className="rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {TICKET_STATUSES.map((s) => (
                     <option key={s} value={s}>{s.replace("_", " ")}</option>
@@ -275,7 +276,8 @@ function MeetingsAdmin() {
                     }
                     update(m._id, payload);
                   }}
-                  className="rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                  disabled={Boolean(saving[m._id])}
+                  className="rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {MEETING_STATUSES.map((s) => (
                     <option key={s} value={s}>{s}</option>
@@ -311,9 +313,6 @@ function MeetingsAdmin() {
                       scheduledAt: draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : undefined,
                       adminResponse: draft.adminResponse,
                     };
-                    if (draft.scheduledAt) {
-                      payload.status = "scheduled";
-                    }
                     update(m._id, payload);
                   }}
                   disabled={Boolean(saving[m._id])}

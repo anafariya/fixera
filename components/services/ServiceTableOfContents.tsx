@@ -12,7 +12,12 @@ interface Props {
 function smoothScrollTo(id: string) {
   const el = document.getElementById(id);
   if (!el) return;
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const cssOffset = parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue('--header-height')
+  );
+  const headerOffset = Number.isFinite(cssOffset) && cssOffset > 0 ? cssOffset : 80;
+  const top = el.getBoundingClientRect().top + window.scrollY - headerOffset;
+  window.scrollTo({ top, behavior: 'smooth' });
   if (typeof history.replaceState === 'function') {
     history.replaceState(null, '', `#${id}`);
   } else if (typeof history.pushState === 'function') {

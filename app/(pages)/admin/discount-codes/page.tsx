@@ -189,21 +189,51 @@ export default function AdminDiscountCodesPage() {
       return;
     }
 
+    const perUserLimitParsed = form.perUserLimit.trim() === "" ? NaN : parseInt(form.perUserLimit, 10);
+    const perUserLimit = Number.isFinite(perUserLimitParsed) && perUserLimitParsed >= 1
+      ? perUserLimitParsed
+      : (form.perUserLimit.trim() === "" ? 1 : null);
+    if (perUserLimit === null) {
+      toast.error("Per-user limit must be a whole number ≥ 1");
+      return;
+    }
+
     const payload: Record<string, unknown> = {
       code: form.code.trim().toUpperCase(),
       type: form.type,
       value,
       validFrom: validFromDate.toISOString(),
       validUntil: validUntilDate.toISOString(),
-      perUserLimit: parseInt(form.perUserLimit, 10) || 1,
+      perUserLimit,
       isActive: form.isActive,
       activeCountries: form.activeCountries.split(",").map(s => s.trim()).filter(Boolean),
       applicableServices: form.applicableServices.split(",").map(s => s.trim()).filter(Boolean),
       description: form.description.trim() || undefined,
     };
-    if (form.maxDiscountAmount.trim()) payload.maxDiscountAmount = parseFloat(form.maxDiscountAmount);
-    if (form.minBookingAmount.trim()) payload.minBookingAmount = parseFloat(form.minBookingAmount);
-    if (form.usageLimit.trim()) payload.usageLimit = parseInt(form.usageLimit, 10);
+    if (form.maxDiscountAmount.trim()) {
+      const n = parseFloat(form.maxDiscountAmount);
+      if (!Number.isFinite(n) || n < 0) {
+        toast.error("Max discount amount must be a non-negative number");
+        return;
+      }
+      payload.maxDiscountAmount = n;
+    }
+    if (form.minBookingAmount.trim()) {
+      const n = parseFloat(form.minBookingAmount);
+      if (!Number.isFinite(n) || n < 0) {
+        toast.error("Min booking amount must be a non-negative number");
+        return;
+      }
+      payload.minBookingAmount = n;
+    }
+    if (form.usageLimit.trim()) {
+      const n = parseInt(form.usageLimit, 10);
+      if (!Number.isFinite(n) || n < 0) {
+        toast.error("Usage limit must be a non-negative whole number");
+        return;
+      }
+      payload.usageLimit = n;
+    }
 
     try {
       setSaving(true);

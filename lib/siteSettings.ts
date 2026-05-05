@@ -13,7 +13,8 @@ export interface SiteSettings {
   socialLinks?: SocialLinks;
 }
 
-const API = () => process.env.NEXT_PUBLIC_BACKEND_URL || "";
+const API = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+const DEFAULT_SETTINGS: SiteSettings = { socialLinks: {} };
 
 interface ApiEnvelope {
   success?: boolean;
@@ -37,18 +38,21 @@ async function safeParseJson(res: Response): Promise<{ body: ApiEnvelope | null;
 
 export async function publicGetSiteSettings(): Promise<SiteSettings> {
   try {
-    const res = await fetch(`${API()}/api/public/site-settings`, { cache: "no-store" });
-    if (!res.ok) return { socialLinks: {} };
+    const res = await fetch(`${API}/api/public/site-settings`, {
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!res.ok) return DEFAULT_SETTINGS;
     const { body } = await safeParseJson(res);
-    if (!body || body?.success === false) return { socialLinks: {} };
-    return (body?.data as SiteSettings) || { socialLinks: {} };
+    if (!body || body?.success === false) return DEFAULT_SETTINGS;
+    return (body?.data as SiteSettings) || DEFAULT_SETTINGS;
   } catch {
-    return { socialLinks: {} };
+    return DEFAULT_SETTINGS;
   }
 }
 
 export async function adminGetSiteSettings(): Promise<SiteSettings> {
-  const res = await authFetch(`${API()}/api/admin/site-settings`);
+  const res = await authFetch(`${API}/api/admin/site-settings`);
   const { body, text } = await safeParseJson(res);
   if (!res.ok || !body || body?.success === false) {
     throw new Error(
@@ -57,11 +61,11 @@ export async function adminGetSiteSettings(): Promise<SiteSettings> {
         `Request failed (${res.status})`
     );
   }
-  return body.data as SiteSettings;
+  return (body.data ?? DEFAULT_SETTINGS) as SiteSettings;
 }
 
 export async function adminUpdateSiteSettings(payload: { socialLinks?: SocialLinks }): Promise<SiteSettings> {
-  const res = await authFetch(`${API()}/api/admin/site-settings`, {
+  const res = await authFetch(`${API}/api/admin/site-settings`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -74,5 +78,5 @@ export async function adminUpdateSiteSettings(payload: { socialLinks?: SocialLin
         `Request failed (${res.status})`
     );
   }
-  return body.data as SiteSettings;
+  return (body.data ?? DEFAULT_SETTINGS) as SiteSettings;
 }
