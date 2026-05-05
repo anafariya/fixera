@@ -381,7 +381,7 @@ export default function ProfessionalEarningsDashboard() {
               variant="outline"
               size="sm"
               onClick={exportPdf}
-              disabled={exportingPdf}
+              disabled={loading || !data || exportingPdf}
               className="h-9"
             >
               <FileDown className="w-4 h-4 mr-1" />

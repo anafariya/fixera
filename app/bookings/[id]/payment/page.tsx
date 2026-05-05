@@ -590,7 +590,7 @@ export default function BookingPaymentPage() {
     }
   };
 
-  const ensurePaymentIntent = useCallback(async (currentBookingId: string, currentBooking: Booking | null, discountCode?: string): Promise<{ ok: boolean; errorMessage?: string }> => {
+  const ensurePaymentIntent = useCallback(async (currentBookingId: string, currentBooking: Booking | null, discountCode?: string): Promise<{ ok: boolean; errorMessage?: string; booking?: Booking | null }> => {
     setInitializingPayment(true);
     const suppressGlobalError = discountCode !== undefined;
     try {
@@ -614,16 +614,16 @@ export default function BookingPaymentPage() {
 
         if (data.data?.shouldRedirect && data.data?.redirectTo) {
           router.push(data.data.redirectTo);
-          return { ok: true };
+          return { ok: true, booking: nextBooking };
         }
 
         if (data.data?.clientSecret) {
           setClientSecret(data.data.clientSecret);
-          return { ok: true };
+          return { ok: true, booking: nextBooking };
         }
 
         console.warn('[PAYMENT PAGE] ensurePaymentIntent succeeded but no client secret returned.');
-        return { ok: false, errorMessage: 'Payment initialization did not return a client secret.' };
+        return { ok: false, errorMessage: 'Payment initialization did not return a client secret.', booking: nextBooking };
       }
 
       const message =
@@ -658,11 +658,20 @@ export default function BookingPaymentPage() {
     setApplyingCode(true);
     setCodeError(null);
     const result = await ensurePaymentIntent(bookingId, booking, code);
-    if (result.ok) {
-      setAppliedDiscountCode(code);
+    if (!result.ok) {
+      setCodeError(result.errorMessage || 'Unable to apply discount code.');
+      setApplyingCode(false);
+      return;
+    }
+    const appliedDiscount = result.booking?.payment?.discount;
+    const codeApplied =
+      !!appliedDiscount?.codeLabel ||
+      (appliedDiscount?.codeDiscountAmount ?? 0) > 0;
+    if (codeApplied) {
+      setAppliedDiscountCode(appliedDiscount?.codeLabel || code);
       setDiscountCodeInput('');
     } else {
-      setCodeError(result.errorMessage || 'Unable to apply discount code.');
+      setCodeError('This code is not applicable to your booking.');
     }
     setApplyingCode(false);
   }, [bookingId, booking, discountCodeInput, ensurePaymentIntent]);
@@ -672,10 +681,7 @@ export default function BookingPaymentPage() {
     setApplyingCode(true);
     setCodeError(null);
     const result = await ensurePaymentIntent(bookingId, booking, '');
-    if (result.ok) {
-      setAppliedDiscountCode(null);
-      setDiscountCodeInput('');
-    } else {
+    if (!result.ok) {
       setCodeError(result.errorMessage || 'Unable to remove discount code.');
     }
     setApplyingCode(false);

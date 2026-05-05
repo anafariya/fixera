@@ -583,16 +583,19 @@ export default function ProjectBookingForm({
         const res = await fetch(url, { signal: controller.signal });
         if (!isCurrent()) return;
         if (!res.ok) {
+          setServerSlotsForSelectedDate([]);
           return;
         }
         const data = await res.json();
         if (!isCurrent()) return;
         if (!Array.isArray(data?.slots)) {
+          setServerSlotsForSelectedDate([]);
           return;
         }
         setServerSlotsForSelectedDate(data.slots as string[]);
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return;
+        if (isCurrent()) setServerSlotsForSelectedDate([]);
       } finally {
         if (isCurrent()) {
           setLoadingServerSlots(false);
