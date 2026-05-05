@@ -592,8 +592,15 @@ export default function BookingPaymentPage() {
 
   const ensurePaymentIntent = useCallback(async (currentBookingId: string, currentBooking: Booking | null, discountCode?: string): Promise<{ ok: boolean; errorMessage?: string; booking?: Booking | null }> => {
     setInitializingPayment(true);
-    setClientSecret('');
+    let previousClientSecret = '';
+    setClientSecret((prev) => {
+      previousClientSecret = prev;
+      return '';
+    });
     const suppressGlobalError = discountCode !== undefined;
+    const restoreClientSecretOnError = () => {
+      if (previousClientSecret) setClientSecret(previousClientSecret);
+    };
     try {
       const sanitizedId = encodeURIComponent(currentBookingId);
       const response = await fetch(`${API_URL}/api/bookings/${sanitizedId}/payment-intent`, {
@@ -624,6 +631,7 @@ export default function BookingPaymentPage() {
         }
 
         console.warn('[PAYMENT PAGE] ensurePaymentIntent succeeded but no client secret returned.');
+        restoreClientSecretOnError();
         return { ok: false, errorMessage: 'Payment initialization did not return a client secret.', booking: nextBooking };
       }
 
@@ -636,6 +644,7 @@ export default function BookingPaymentPage() {
       if (!suppressGlobalError) {
         setError(message);
       }
+      restoreClientSecretOnError();
       return { ok: false, errorMessage: message };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to initialize payment intent.';
@@ -643,6 +652,7 @@ export default function BookingPaymentPage() {
       if (!suppressGlobalError) {
         setError(message);
       }
+      restoreClientSecretOnError();
       return { ok: false, errorMessage: message };
     } finally {
       setInitializingPayment(false);

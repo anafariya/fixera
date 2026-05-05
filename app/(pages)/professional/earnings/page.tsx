@@ -270,7 +270,8 @@ export default function ProfessionalEarningsDashboard() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch {
+    } catch (err) {
+      console.error('CSV export failed:', err);
       toast.error('Failed to export CSV');
     } finally {
       setExporting(false);

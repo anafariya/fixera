@@ -587,18 +587,23 @@ export default function ProjectBookingForm({
         if (!isCurrent()) return;
         if (!res.ok) {
           setServerSlotsError(true);
+          setSelectedTime('');
           return;
         }
         const data = await res.json();
         if (!isCurrent()) return;
         if (!Array.isArray(data?.slots)) {
           setServerSlotsError(true);
+          setSelectedTime('');
           return;
         }
         setServerSlotsForSelectedDate(data.slots as string[]);
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return;
-        if (isCurrent()) setServerSlotsError(true);
+        if (isCurrent()) {
+          setServerSlotsError(true);
+          setSelectedTime('');
+        }
       } finally {
         if (isCurrent()) {
           setLoadingServerSlots(false);
@@ -1943,6 +1948,11 @@ export default function ProjectBookingForm({
         toast.error(
           'Selected date does not meet team availability requirements.'
         );
+        return false;
+      }
+
+      if (projectMode === 'hours' && loadingServerSlots) {
+        toast.error('Please wait while we load available time slots.');
         return false;
       }
 

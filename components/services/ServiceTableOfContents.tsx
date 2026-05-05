@@ -13,6 +13,7 @@ function measureStickyHeaderHeight(): number {
   const selectors = ['header', '[data-app-header]', 'nav[role="navigation"]'];
   const seen = new Set<HTMLElement>();
   let total = 0;
+  const viewportHeight = window.innerHeight;
   for (const sel of selectors) {
     const nodes = document.querySelectorAll(sel);
     nodes.forEach((node) => {
@@ -21,10 +22,11 @@ function measureStickyHeaderHeight(): number {
       const rect = node.getBoundingClientRect();
       if (rect.height <= 0) return;
       const cs = getComputedStyle(node);
-      if (cs.position === 'fixed' || cs.position === 'sticky') {
-        seen.add(node);
-        total += rect.height;
-      }
+      if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
+      if (cs.bottom !== 'auto' && cs.top === 'auto') return;
+      if (rect.bottom >= viewportHeight - 1) return;
+      seen.add(node);
+      total += rect.height;
     });
   }
   return total;

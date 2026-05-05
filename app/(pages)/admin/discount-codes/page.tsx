@@ -110,7 +110,15 @@ const statusLabel = (code: DiscountCode): { label: string; tone: string } => {
   if (!code.isActive) return { label: "Disabled", tone: "bg-slate-200 text-slate-700" };
   if (now < from) return { label: "Scheduled", tone: "bg-amber-100 text-amber-700" };
   if (now > until) return { label: "Expired", tone: "bg-rose-100 text-rose-700" };
-  if (code.usageLimit && code.usageCount >= code.usageLimit) return { label: "Exhausted", tone: "bg-rose-100 text-rose-700" };
+  if (
+    code.usageLimit != null &&
+    Number.isInteger(code.usageLimit) &&
+    code.usageLimit > 0 &&
+    Number.isInteger(code.usageCount) &&
+    code.usageCount >= code.usageLimit
+  ) {
+    return { label: "Exhausted", tone: "bg-rose-100 text-rose-700" };
+  }
   return { label: "Active", tone: "bg-emerald-100 text-emerald-700" };
 };
 
@@ -185,8 +193,19 @@ export default function AdminDiscountCodesPage() {
       return;
     }
 
-    const validFromDate = new Date(`${form.validFrom}T00:00:00Z`);
-    const validUntilDate = new Date(`${form.validUntil}T23:59:59Z`);
+    const fromParts = form.validFrom.split("-").map((p) => parseInt(p, 10));
+    const untilParts = form.validUntil.split("-").map((p) => parseInt(p, 10));
+    if (
+      fromParts.length !== 3 ||
+      untilParts.length !== 3 ||
+      fromParts.some((n) => !Number.isFinite(n)) ||
+      untilParts.some((n) => !Number.isFinite(n))
+    ) {
+      toast.error("Invalid date format");
+      return;
+    }
+    const validFromDate = new Date(fromParts[0], fromParts[1] - 1, fromParts[2], 0, 0, 0, 0);
+    const validUntilDate = new Date(untilParts[0], untilParts[1] - 1, untilParts[2], 23, 59, 59, 999);
     if (!Number.isFinite(validFromDate.getTime()) || !Number.isFinite(validUntilDate.getTime())) {
       toast.error("Invalid date format");
       return;
@@ -197,7 +216,7 @@ export default function AdminDiscountCodesPage() {
     }
 
     const perUserLimitParsed = form.perUserLimit.trim() === "" ? NaN : Number(form.perUserLimit);
-    const perUserLimit = Number.isFinite(perUserLimitParsed) && perUserLimitParsed >= 1
+    const perUserLimit = Number.isInteger(perUserLimitParsed) && perUserLimitParsed >= 1
       ? perUserLimitParsed
       : (form.perUserLimit.trim() === "" ? 1 : null);
     if (perUserLimit === null) {
@@ -235,7 +254,7 @@ export default function AdminDiscountCodesPage() {
     }
     if (form.usageLimit.trim()) {
       const n = Number(form.usageLimit);
-      if (!Number.isFinite(n) || n < 0) {
+      if (!Number.isInteger(n) || n < 0) {
         toast.error("Usage limit must be a non-negative whole number");
         return;
       }
@@ -490,6 +509,8 @@ export default function AdminDiscountCodesPage() {
               <Label>Total usage limit (optional)</Label>
               <Input
                 type="number"
+                step={1}
+                min={0}
                 value={form.usageLimit}
                 onChange={(e) => setForm({ ...form, usageLimit: e.target.value })}
                 placeholder="Unlimited"
@@ -500,6 +521,8 @@ export default function AdminDiscountCodesPage() {
               <Label>Per-user limit</Label>
               <Input
                 type="number"
+                step={1}
+                min={1}
                 value={form.perUserLimit}
                 onChange={(e) => setForm({ ...form, perUserLimit: e.target.value })}
               />
