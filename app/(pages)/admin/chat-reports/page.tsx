@@ -85,8 +85,15 @@ export default function AdminChatReportsPage() {
       const json = await res.json()
       if (latestFetchIdRef.current !== fetchId) return
       if (json.success) {
-        setItems(json.data.items)
-        setTotal(json.data.total)
+        const newTotal = json.data.total as number
+        const maxPage = Math.max(1, Math.ceil(newTotal / limit))
+        if (page > maxPage) {
+          setPage(maxPage)
+          setTotal(newTotal)
+        } else {
+          setItems(json.data.items)
+          setTotal(newTotal)
+        }
       } else {
         toast.error('Failed to load chat reports')
       }
@@ -164,7 +171,7 @@ export default function AdminChatReportsPage() {
     }
   }
 
-  if (loading || !user) return null
+  if (loading || !user || user.role !== 'admin') return null
   const totalPages = Math.max(1, Math.ceil(total / limit))
 
   return (
