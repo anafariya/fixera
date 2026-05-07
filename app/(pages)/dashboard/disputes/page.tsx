@@ -94,22 +94,29 @@ export default function DashboardDisputesPage() {
           </Button>
         </div>
 
-        {isLoading ? (
+        {(() => {
+          const filteredItems = items.filter(i => i.dispute)
+          if (isLoading) {
+            return (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-28 w-full rounded-lg" />)}
+              </div>
+            )
+          }
+          if (filteredItems.length === 0) {
+            return (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <ShieldCheck className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                  <p className="text-gray-500">No disputes recorded</p>
+                </CardContent>
+              </Card>
+            )
+          }
+          return (
           <div className="space-y-3">
-            {[1, 2, 3].map(i => <Skeleton key={i} className="h-28 w-full rounded-lg" />)}
-          </div>
-        ) : items.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <ShieldCheck className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500">No disputes recorded</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {items.map((item) => {
-              const dispute = item.dispute
-              if (!dispute) return null
+            {filteredItems.map((item) => {
+              const dispute = item.dispute!
               const isResolved = !!dispute.resolvedAt
               const slaBreached =
                 !isResolved && !!dispute.slaDeadline && new Date(dispute.slaDeadline) < new Date()
@@ -165,7 +172,8 @@ export default function DashboardDisputesPage() {
               )
             })}
           </div>
-        )}
+          )
+        })()}
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { authFetch } from "@/lib/utils"
@@ -65,6 +65,7 @@ export default function AdminChatReportsPage() {
   const [resolveAction, setResolveAction] = useState<'warn' | 'ban' | 'dismiss'>('warn')
   const [resolveNotes, setResolveNotes] = useState('')
   const [resolving, setResolving] = useState(false)
+  const latestFetchIdRef = useRef(0)
 
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) {
@@ -73,12 +74,15 @@ export default function AdminChatReportsPage() {
   }, [user, loading, router])
 
   const fetchReports = useCallback(async () => {
+    const fetchId = latestFetchIdRef.current + 1
+    latestFetchIdRef.current = fetchId
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() })
       if (statusFilter !== 'all') params.set('status', statusFilter)
       const res = await authFetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/chat-reports?${params}`)
       const json = await res.json()
+      if (latestFetchIdRef.current !== fetchId) return
       if (json.success) {
         setItems(json.data.items)
         setTotal(json.data.total)
@@ -86,9 +90,12 @@ export default function AdminChatReportsPage() {
         toast.error('Failed to load chat reports')
       }
     } catch {
+      if (latestFetchIdRef.current !== fetchId) return
       toast.error('Failed to load chat reports')
     } finally {
-      setIsLoading(false)
+      if (latestFetchIdRef.current === fetchId) {
+        setIsLoading(false)
+      }
     }
   }, [page, statusFilter])
 

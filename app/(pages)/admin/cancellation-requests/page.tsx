@@ -141,7 +141,7 @@ export default function AdminCancellationRequestsPage() {
     }
   }
 
-  if (loading || !user) return null
+  if (loading || !user || user.role !== 'admin') return null
   const totalPages = Math.max(1, Math.ceil(total / limit))
 
   return (
