@@ -66,6 +66,7 @@ export default function AdminChatReportsPage() {
   const [resolveNotes, setResolveNotes] = useState('')
   const [resolving, setResolving] = useState(false)
   const latestFetchIdRef = useRef(0)
+  const drawerFetchIdRef = useRef(0)
 
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) {
@@ -110,33 +111,24 @@ export default function AdminChatReportsPage() {
     setDrawerMessages([])
     setResolveAction('warn')
     setResolveNotes('')
-    const requestId = report._id
+    const fetchId = drawerFetchIdRef.current + 1
+    drawerFetchIdRef.current = fetchId
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/chat-reports/${report._id}`)
       const json = await res.json()
-      setDrawerReport((current) => {
-        if (current?._id !== requestId) return current
-        if (json.success) {
-          setDrawerMessages(json.data.surroundingMessages || [])
-        } else {
-          toast.error('Failed to load conversation context')
-        }
-        return current
-      })
+      if (drawerFetchIdRef.current !== fetchId) return
+      if (json.success) {
+        setDrawerMessages(json.data.surroundingMessages || [])
+      } else {
+        toast.error('Failed to load conversation context')
+      }
     } catch {
-      setDrawerReport((current) => {
-        if (current?._id === requestId) {
-          toast.error('Failed to load conversation context')
-        }
-        return current
-      })
+      if (drawerFetchIdRef.current !== fetchId) return
+      toast.error('Failed to load conversation context')
     } finally {
-      setDrawerReport((current) => {
-        if (current?._id === requestId) {
-          setDrawerLoading(false)
-        }
-        return current
-      })
+      if (drawerFetchIdRef.current === fetchId) {
+        setDrawerLoading(false)
+      }
     }
   }
 

@@ -15,8 +15,8 @@ interface DisputeRecord {
   _id: string
   bookingNumber?: string
   status: string
-  customer?: { _id: string; name?: string; email?: string } | null
-  professional?: { _id: string; name?: string; email?: string } | null
+  customer?: { _id: string; name?: string } | null
+  professional?: { _id: string; name?: string } | null
   project?: { _id: string; title?: string } | null
   payment?: { totalWithVat?: number; currency?: string } | null
   scheduledStartDate?: string
@@ -58,6 +58,10 @@ export default function DashboardDisputesPage() {
     setIsLoading(true)
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/bookings/disputes/mine`)
+      if (!res.ok) {
+        toast.error(`Failed to load disputes (status ${res.status})`)
+        return
+      }
       const json = await res.json()
       if (json.success) {
         setItems(json.data?.items || [])

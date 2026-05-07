@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { authFetch } from "@/lib/utils"
@@ -54,6 +54,7 @@ export default function AdminCancellationRequestsPage() {
   const [denyReason, setDenyReason] = useState('')
   const [denying, setDenying] = useState(false)
   const [approvingId, setApprovingId] = useState<string | null>(null)
+  const latestFetchIdRef = useRef(0)
 
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) {
@@ -62,12 +63,15 @@ export default function AdminCancellationRequestsPage() {
   }, [user, loading, router])
 
   const fetchRequests = useCallback(async () => {
+    const fetchId = latestFetchIdRef.current + 1
+    latestFetchIdRef.current = fetchId
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() })
       if (statusFilter !== 'all') params.set('status', statusFilter)
       const res = await authFetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/cancellation-requests?${params}`)
       const json = await res.json()
+      if (latestFetchIdRef.current !== fetchId) return
       if (json.success) {
         setItems(json.data.items)
         setTotal(json.data.total)
@@ -75,9 +79,12 @@ export default function AdminCancellationRequestsPage() {
         toast.error('Failed to load cancellation requests')
       }
     } catch {
+      if (latestFetchIdRef.current !== fetchId) return
       toast.error('Failed to load cancellation requests')
     } finally {
-      setIsLoading(false)
+      if (latestFetchIdRef.current === fetchId) {
+        setIsLoading(false)
+      }
     }
   }, [page, statusFilter])
 
