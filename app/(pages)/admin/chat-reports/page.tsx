@@ -78,6 +78,7 @@ export default function AdminChatReportsPage() {
     const fetchId = latestFetchIdRef.current + 1
     latestFetchIdRef.current = fetchId
     setIsLoading(true)
+    let clamped = false
     try {
       const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() })
       if (statusFilter !== 'all') params.set('status', statusFilter)
@@ -88,6 +89,7 @@ export default function AdminChatReportsPage() {
         const newTotal = json.data.total as number
         const maxPage = Math.max(1, Math.ceil(newTotal / limit))
         if (page > maxPage) {
+          clamped = true
           setPage(maxPage)
           setTotal(newTotal)
         } else {
@@ -101,7 +103,7 @@ export default function AdminChatReportsPage() {
       if (latestFetchIdRef.current !== fetchId) return
       toast.error('Failed to load chat reports')
     } finally {
-      if (latestFetchIdRef.current === fetchId) {
+      if (!clamped && latestFetchIdRef.current === fetchId) {
         setIsLoading(false)
       }
     }
@@ -145,10 +147,11 @@ export default function AdminChatReportsPage() {
       toast.error('Please provide a ban reason')
       return
     }
+    const currentId = drawerReport._id
     setResolving(true)
     try {
       const res = await authFetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/chat-reports/${drawerReport._id}/resolve`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/chat-reports/${currentId}/resolve`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -158,8 +161,13 @@ export default function AdminChatReportsPage() {
       const json = await res.json()
       if (json.success) {
         toast.success(`Report ${resolveAction === 'dismiss' ? 'dismissed' : 'resolved'}`)
-        setDrawerOpen(false)
-        setDrawerReport(null)
+        setDrawerReport((current) => {
+          if (current?._id === currentId) {
+            setDrawerOpen(false)
+            return null
+          }
+          return current
+        })
         fetchReports()
       } else {
         toast.error(json.msg || 'Failed to resolve report')
