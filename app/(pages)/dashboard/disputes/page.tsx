@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { authFetch } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
@@ -42,15 +42,17 @@ const formatDate = (value?: string) => {
 export default function DashboardDisputesPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
 
   const [items, setItems] = useState<DisputeRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login')
+      const redirect = pathname || '/dashboard/disputes'
+      router.push(`/login?redirect=${encodeURIComponent(redirect)}`)
     }
-  }, [user, loading, router])
+  }, [user, loading, router, pathname])
 
   const fetchDisputes = useCallback(async () => {
     setIsLoading(true)

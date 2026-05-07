@@ -100,20 +100,36 @@ export default function AdminChatReportsPage() {
     setDrawerReport(report)
     setDrawerOpen(true)
     setDrawerLoading(true)
+    setDrawerMessages([])
     setResolveAction('warn')
     setResolveNotes('')
+    const requestId = report._id
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/chat-reports/${report._id}`)
       const json = await res.json()
-      if (json.success) {
-        setDrawerMessages(json.data.surroundingMessages || [])
-      } else {
-        toast.error('Failed to load conversation context')
-      }
+      setDrawerReport((current) => {
+        if (current?._id !== requestId) return current
+        if (json.success) {
+          setDrawerMessages(json.data.surroundingMessages || [])
+        } else {
+          toast.error('Failed to load conversation context')
+        }
+        return current
+      })
     } catch {
-      toast.error('Failed to load conversation context')
+      setDrawerReport((current) => {
+        if (current?._id === requestId) {
+          toast.error('Failed to load conversation context')
+        }
+        return current
+      })
     } finally {
-      setDrawerLoading(false)
+      setDrawerReport((current) => {
+        if (current?._id === requestId) {
+          setDrawerLoading(false)
+        }
+        return current
+      })
     }
   }
 

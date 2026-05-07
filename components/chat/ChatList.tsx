@@ -24,6 +24,15 @@ interface ChatListProps {
 
 const getParticipantDisplay = (conversation: ChatConversation, role: string | undefined) => {
   if (conversation.type === "support") {
+    if (role === "admin") {
+      const target = conversation.supportTargetUserId;
+      return {
+        name: target?.name || target?.username || "Support thread",
+        subtitle: target?.email || target?.role || "",
+        profileImage: target?.profileImage,
+        isSupport: true as const,
+      };
+    }
     return {
       name: "Fixera Support",
       subtitle: "Official support team",

@@ -1955,7 +1955,7 @@ export default function BookingDetailPage() {
         )}
 
         {/* Refund banner — shown to customer when payment has been refunded */}
-        {!error && booking?.payment && (booking.payment.status === 'refunded' || booking.payment.status === 'partially_refunded') && (
+        {!error && user?.role === 'customer' && booking?.payment && (booking.payment.status === 'refunded' || booking.payment.status === 'partially_refunded') && (
           <Card className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200">
             <CardContent className="py-4">
               <div className="flex items-start gap-3">

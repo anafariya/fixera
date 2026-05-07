@@ -262,7 +262,7 @@ export default function AdminCancellationRequestsPage() {
                             size="sm"
                             variant="outline"
                             className="h-7 text-xs"
-                            onClick={() => router.push(`/bookings/${item.booking?._id}`)}
+                            onClick={() => router.push(`/admin/bookings/${item.booking?._id}`)}
                           >
                             View Booking
                           </Button>
