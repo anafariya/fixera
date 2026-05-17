@@ -76,6 +76,14 @@ const toISODateInput = (d: Date) => {
   return `${yyyy}-${mm}-${dd}`
 }
 
+const isRangeValid = (fromStr: string, toStr: string): boolean => {
+  if (!fromStr || !toStr) return false
+  const f = new Date(fromStr)
+  const t = new Date(toStr)
+  if (isNaN(f.getTime()) || isNaN(t.getTime())) return false
+  return f.getTime() <= t.getTime()
+}
+
 const computePreset = (preset: Preset): { from: string; to: string } => {
   const now = new Date()
   const to = toISODateInput(now)
@@ -126,6 +134,8 @@ export default function AdminKpiDashboard() {
   const [preset, setPreset] = useState<Preset>('month')
   const [from, setFrom] = useState<string>(initial.from)
   const [to, setTo] = useState<string>(initial.to)
+  const [appliedFrom, setAppliedFrom] = useState<string>(initial.from)
+  const [appliedTo, setAppliedTo] = useState<string>(initial.to)
 
   const [summary, setSummary] = useState<Summary | null>(null)
   const [regions, setRegions] = useState<RegionRow[]>([])
@@ -134,6 +144,8 @@ export default function AdminKpiDashboard() {
   const [loading, setLoading] = useState(true)
   const [sendingReport, setSendingReport] = useState(false)
   const requestIdRef = useRef(0)
+
+  const editingRangeValid = isRangeValid(from, to)
 
   useEffect(() => {
     if (authLoading) return
@@ -152,20 +164,38 @@ export default function AdminKpiDashboard() {
       const r = computePreset(p)
       setFrom(r.from)
       setTo(r.to)
+      setAppliedFrom(r.from)
+      setAppliedTo(r.to)
     }
   }
 
-  const range = useMemo(() => `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, [from, to])
+  const applyCustom = () => {
+    if (!isRangeValid(from, to)) {
+      toast.error('"From" date must be on or before "To" date')
+      return
+    }
+    setAppliedFrom(from)
+    setAppliedTo(to)
+  }
 
-  const load = useCallback(async () => {
+  const appliedRange = useMemo(
+    () => `from=${encodeURIComponent(appliedFrom)}&to=${encodeURIComponent(appliedTo)}`,
+    [appliedFrom, appliedTo]
+  )
+
+  const load = useCallback(async (rangeQs: string, fromStr: string, toStr: string) => {
+    if (!isRangeValid(fromStr, toStr)) {
+      toast.error('"From" date must be on or before "To" date')
+      return
+    }
     const requestId = ++requestIdRef.current
     setLoading(true)
     try {
       const [sumRes, regRes, svcRes, respRes] = await Promise.all([
-        authFetch(`${BACKEND}/api/admin/kpi/summary?${range}`),
-        authFetch(`${BACKEND}/api/admin/kpi/by-region?${range}`),
-        authFetch(`${BACKEND}/api/admin/kpi/by-service?${range}`),
-        authFetch(`${BACKEND}/api/admin/kpi/professional-response?${range}`),
+        authFetch(`${BACKEND}/api/admin/kpi/summary?${rangeQs}`),
+        authFetch(`${BACKEND}/api/admin/kpi/by-region?${rangeQs}`),
+        authFetch(`${BACKEND}/api/admin/kpi/by-service?${rangeQs}`),
+        authFetch(`${BACKEND}/api/admin/kpi/professional-response?${rangeQs}`),
       ])
       if (requestId !== requestIdRef.current) return
       if (!sumRes.ok || !regRes.ok || !svcRes.ok || !respRes.ok) {
@@ -185,23 +215,31 @@ export default function AdminKpiDashboard() {
     } finally {
       if (requestId === requestIdRef.current) setLoading(false)
     }
-  }, [range])
+  }, [])
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return
-    load()
-  }, [user, load])
+    load(appliedRange, appliedFrom, appliedTo)
+  }, [user, load, appliedRange, appliedFrom, appliedTo])
 
   const downloadCsv = (section: 'region' | 'service' | 'response') => {
-    const url = `${BACKEND}/api/admin/kpi/export?section=${section}&${range}`
+    if (!isRangeValid(appliedFrom, appliedTo)) {
+      toast.error('"From" date must be on or before "To" date')
+      return
+    }
+    const url = `${BACKEND}/api/admin/kpi/export?section=${section}&${appliedRange}`
     const newWindow = window.open(url, '_blank', 'noopener,noreferrer')
     if (newWindow) newWindow.opener = null
   }
 
   const emailPdf = async () => {
+    if (!isRangeValid(appliedFrom, appliedTo)) {
+      toast.error('"From" date must be on or before "To" date')
+      return
+    }
     setSendingReport(true)
     try {
-      const res = await authFetch(`${BACKEND}/api/admin/kpi/email-report?${range}`, { method: 'POST' })
+      const res = await authFetch(`${BACKEND}/api/admin/kpi/email-report?${appliedRange}`, { method: 'POST' })
       const json = await res.json().catch(() => ({}))
       if (res.status === 202 || res.ok) {
         toast.success(json?.data?.message || 'Report is being prepared and will be emailed to you.')
@@ -230,11 +268,11 @@ export default function AdminKpiDashboard() {
             <p className="text-sm text-gray-500">Platform health by city, service, and response times.</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={load} disabled={loading}>
+            <Button variant="outline" onClick={() => load(appliedRange, appliedFrom, appliedTo)} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-            <Button onClick={emailPdf} disabled={sendingReport}>
+            <Button onClick={emailPdf} disabled={sendingReport || !isRangeValid(appliedFrom, appliedTo)}>
               <Mail className="h-4 w-4 mr-2" />
               {sendingReport ? 'Queuing…' : 'Email me the full PDF report'}
             </Button>
@@ -281,9 +319,12 @@ export default function AdminKpiDashboard() {
                     className="w-40"
                   />
                 </div>
-                <Button onClick={load} disabled={loading}>Apply</Button>
+                <Button onClick={applyCustom} disabled={loading || !editingRangeValid}>Apply</Button>
               </div>
             </div>
+            {!editingRangeValid && (
+              <p className="mt-2 text-xs text-red-600">&quot;From&quot; date must be on or before &quot;To&quot; date.</p>
+            )}
           </CardContent>
         </Card>
 
