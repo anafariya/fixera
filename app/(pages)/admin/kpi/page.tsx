@@ -92,7 +92,7 @@ const computePreset = (preset: Preset): { from: string; to: string } => {
   const to = toISODateInput(now)
   if (preset === 'last30') {
     const from = new Date(now)
-    from.setDate(from.getDate() - 30)
+    from.setDate(from.getDate() - 29)
     return { from: toISODateInput(from), to }
   }
   if (preset === 'quarter') {
@@ -193,6 +193,11 @@ export default function AdminKpiDashboard() {
       return
     }
     const requestId = ++requestIdRef.current
+    setSummary(null)
+    setRegions([])
+    setServiceViews([])
+    setServiceBookings([])
+    setResponses([])
     setLoading(true)
     try {
       const [sumRes, regRes, svcRes, respRes] = await Promise.all([
@@ -227,14 +232,30 @@ export default function AdminKpiDashboard() {
     load(appliedRange, appliedFrom, appliedTo)
   }, [user, load, appliedRange, appliedFrom, appliedTo])
 
-  const downloadCsv = (section: 'region' | 'service' | 'service-views' | 'response') => {
+  const downloadCsv = async (section: 'region' | 'service' | 'service-views' | 'response') => {
     if (!isRangeValid(appliedFrom, appliedTo)) {
       toast.error('"From" date must be on or before "To" date')
       return
     }
-    const url = `${BACKEND}/api/admin/kpi/export?section=${section}&${appliedRange}`
-    const newWindow = window.open(url, '_blank', 'noopener,noreferrer')
-    if (newWindow) newWindow.opener = null
+    try {
+      const res = await authFetch(`${BACKEND}/api/admin/kpi/export?section=${section}&${appliedRange}`)
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        toast.error(json?.error?.message || 'Failed to download CSV')
+        return
+      }
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = `fixera-kpi-${section}-${appliedFrom}_to_${appliedTo}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(objectUrl)
+    } catch {
+      toast.error('Failed to download CSV')
+    }
   }
 
   const emailPdf = async () => {
