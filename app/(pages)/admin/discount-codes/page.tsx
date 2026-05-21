@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -18,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Ticket, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Ticket, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
@@ -51,13 +52,18 @@ interface FormState {
   maxDiscountAmount: string;
   minBookingAmount: string;
   activeCountries: string;
-  applicableServices: string;
+  applicableServices: string[];
   validFrom: string;
   validUntil: string;
   usageLimit: string;
   perUserLimit: string;
   isActive: boolean;
   description: string;
+}
+
+interface ServiceCategoryItem {
+  name: string;
+  services: { name: string }[];
 }
 
 const formatLocalIsoDate = (d: Date) => {
@@ -77,7 +83,7 @@ const emptyForm = (): FormState => {
     maxDiscountAmount: "",
     minBookingAmount: "",
     activeCountries: "",
-    applicableServices: "",
+    applicableServices: [],
     validFrom: formatLocalIsoDate(nowLocal),
     validUntil: formatLocalIsoDate(in30DaysLocal),
     usageLimit: "",
@@ -94,7 +100,7 @@ const toForm = (code: DiscountCode): FormState => ({
   maxDiscountAmount: code.maxDiscountAmount != null ? String(code.maxDiscountAmount) : "",
   minBookingAmount: code.minBookingAmount != null ? String(code.minBookingAmount) : "",
   activeCountries: code.activeCountries.join(", "),
-  applicableServices: code.applicableServices.join(", "),
+  applicableServices: [...code.applicableServices],
   validFrom: formatLocalIsoDate(new Date(code.validFrom)),
   validUntil: formatLocalIsoDate(new Date(code.validUntil)),
   usageLimit: code.usageLimit != null ? String(code.usageLimit) : "",
@@ -135,6 +141,9 @@ export default function AdminDiscountCodesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategoryItem[]>([]);
+  const [servicesOpen, setServicesOpen] = useState(false);
+  const servicesPopoverRef = useRef<HTMLDivElement | null>(null);
   const latestLoadCodesRequestId = useRef(0);
 
   useEffect(() => {
@@ -170,6 +179,37 @@ export default function AdminDiscountCodesPage() {
     const t = setTimeout(loadCodes, 250);
     return () => clearTimeout(t);
   }, [isAuthenticated, user, loadCodes]);
+
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== "admin") return;
+    const ac = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/service-categories/active?country=BE`, {
+          signal: ac.signal,
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data)) setServiceCategories(data as ServiceCategoryItem[]);
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        console.error("Failed to load service categories:", err);
+      }
+    })();
+    return () => ac.abort();
+  }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    if (!servicesOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (servicesPopoverRef.current && !servicesPopoverRef.current.contains(e.target as Node)) {
+        setServicesOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [servicesOpen]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -238,7 +278,7 @@ export default function AdminDiscountCodesPage() {
       perUserLimit,
       isActive: form.isActive,
       activeCountries: form.activeCountries.split(",").map(s => s.trim()).filter(Boolean),
-      applicableServices: form.applicableServices.split(",").map(s => s.trim()).filter(Boolean),
+      applicableServices: form.applicableServices,
       description: form.description.trim() || undefined,
     };
     if (form.maxDiscountAmount.trim()) {
@@ -546,12 +586,80 @@ export default function AdminDiscountCodesPage() {
             </div>
 
             <div className="col-span-2">
-              <Label>Applicable services (comma-separated; empty = all)</Label>
-              <Input
-                value={form.applicableServices}
-                onChange={(e) => setForm({ ...form, applicableServices: e.target.value })}
-                placeholder="Plumbing, Electrical"
-              />
+              <Label>Applicable services</Label>
+              <div className="relative" ref={servicesPopoverRef}>
+                <button
+                  type="button"
+                  onClick={() => setServicesOpen((o) => !o)}
+                  className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                  aria-haspopup="listbox"
+                  aria-expanded={servicesOpen}
+                >
+                  <span className="truncate text-left">
+                    {form.applicableServices.length === 0
+                      ? "All services"
+                      : form.applicableServices.length <= 2
+                        ? form.applicableServices.join(", ")
+                        : `${form.applicableServices.length} services selected`}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-slate-500 shrink-0 ml-2" />
+                </button>
+                {servicesOpen && (
+                  <div className="absolute z-50 mt-1 w-full max-h-72 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
+                    <label className="flex items-center gap-2 px-3 py-2 border-b border-slate-200 cursor-pointer hover:bg-slate-50">
+                      <Checkbox
+                        checked={form.applicableServices.length === 0}
+                        onCheckedChange={(v) => {
+                          if (v) setForm({ ...form, applicableServices: [] });
+                        }}
+                      />
+                      <span className="text-sm font-medium">All services</span>
+                    </label>
+                    {serviceCategories.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-slate-500">Loading services...</div>
+                    ) : (
+                      serviceCategories.map((cat) => (
+                        <div key={cat.name}>
+                          <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 bg-slate-50">
+                            {cat.name}
+                          </div>
+                          {cat.services.map((svc) => {
+                            const checked = form.applicableServices.includes(svc.name);
+                            return (
+                              <label
+                                key={`${cat.name}-${svc.name}`}
+                                className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-slate-50"
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={(v) => {
+                                    if (v) {
+                                      if (!form.applicableServices.includes(svc.name)) {
+                                        setForm({ ...form, applicableServices: [...form.applicableServices, svc.name] });
+                                      }
+                                    } else {
+                                      setForm({
+                                        ...form,
+                                        applicableServices: form.applicableServices.filter((s) => s !== svc.name),
+                                      });
+                                    }
+                                  }}
+                                />
+                                <span className="text-sm">{svc.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {form.applicableServices.length === 0
+                  ? "Code applies to all services."
+                  : `Applies to ${form.applicableServices.length} service${form.applicableServices.length === 1 ? "" : "s"}.`}
+              </p>
             </div>
 
             <div className="col-span-2">
